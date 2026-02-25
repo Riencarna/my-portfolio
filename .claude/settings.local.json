@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd C:\\\\Users\\\\경남교육청\\\\Desktop\\\\my-portfolio:*)",
+      "Bash(start:*)"
+    ]
+  }
+}

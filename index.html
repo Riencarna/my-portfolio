@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!-- My Portfolio v1.7.0 | 2026-02-24 | 자산 관리 대시보드 -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; connect-src *; img-src 'self' data:;">
+<meta name="description" content="국내주식, 해외주식, 코인, 현금, 예적금을 한 곳에서 관리하는 무료 자산 관리 도구. 실시간 가격 업데이트, 손익 분석, 자산 구성 차트 제공.">
+<meta property="og:title" content="My Portfolio - 자산 관리 대시보드">
+<meta property="og:description" content="주식·코인·현금·예적금을 한눈에. 실시간 가격 최신화, 손익 분석, 자산 구성 차트까지.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0B0D11">
+<title>My Portfolio v1.7.0 - 자산 관리 대시보드</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" crossorigin="anonymous">
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" defer></script>
+<script src="js/constants.js" defer></script>
+<script src="js/utils.js" defer></script>
+<script src="js/state.js" defer></script>
+<script src="js/api.js" defer></script>
+<script src="js/charts.js" defer></script>
+<script src="js/ui-modals.js" defer></script>
+<script src="js/ui-dashboard.js" defer></script>
+<script src="js/ui-list.js" defer></script>
+<script src="js/ui-history.js" defer></script>
+<script src="js/ui-income.js" defer></script>
+<script src="js/ui-ai.js" defer></script>
+<script src="js/wallet.js" defer></script>
+<script src="js/app.js" defer></script>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="hdr-bg">
+  <div class="hdr">
+    <div class="wrap">
+      <div class="hdr-row">
+        <div>
+          <div class="logo-s">My Portfolio</div>
+          <div class="logo">자산 관리 대시보드 <span style="font-size:10px;color:var(--t5);font-weight:400">v1.7.0</span></div>
+        </div>
+        <div style="display:flex;gap:7px">
+          <button id="btnSnap" onclick="saveSnapshot()" title="오늘 기록 저장"
+            style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15);color:var(--green);width:38px;height:38px;border-radius:11px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">📸</button>
+          <button onclick="openWalletModal()" title="지갑 연동"
+            style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);color:var(--amber);height:38px;border-radius:11px;cursor:pointer;padding:0 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px;font-family:inherit">🔗 지갑</button>
+          <button onclick="openAddAsset()"
+            style="background:linear-gradient(135deg,var(--blue),#2563EB);border:none;color:#fff;height:38px;border-radius:11px;cursor:pointer;padding:0 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px;font-family:inherit"><span style="font-size:17px">+</span> 자산 추가</button>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--t5);margin-top:5px" id="elSaved"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 네비게이션 -->
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab on" data-t="dash" onclick="goTab('dash')">📊<span class="tl"> 대시보드</span></button>
+    <button class="tab" data-t="list" onclick="goTab('list')">💼<span class="tl"> 자산 목록</span></button>
+    <button class="tab" data-t="inc" onclick="goTab('inc')">💵<span class="tl"> 수입</span></button>
+    <button class="tab" data-t="hist" onclick="goTab('hist')">📈<span class="tl"> 변동 추이</span></button>
+    <button class="tab" data-t="ai" onclick="goTab('ai')">🤖<span class="tl"> AI</span></button>
+  </div>
+</div>
+
+<!-- 페이지 컨테이너 -->
+<div class="wrap" style="padding-bottom:80px">
+  <div id="pgDash"></div>
+  <div id="pgList" class="hidden"></div>
+  <div id="pgInc" class="hidden"></div>
+  <div id="pgHist" class="hidden"></div>
+  <div id="pgAi" class="hidden"></div>
+</div>
+
+<!-- 모달 -->
+<div class="mbg hidden" id="mBg" onclick="closeModal()">
+  <div class="mdl" onclick="event.stopPropagation()">
+    <div class="mh">
+      <div class="mt" id="mTi"></div>
+      <button class="mc" onclick="closeModal()">✕</button>
+    </div>
+    <div id="mBd"></div>
+  </div>
+</div>
+
+</body>
+</html>
