@@ -83,7 +83,9 @@ function renderAssetList() {
     if (appState.assets.length >= 5) {
       h += "<div style=\"margin-bottom:10px\">" +
         "<input type=\"text\" id=\"assetSearch\" placeholder=\"자산명 검색...\" value=\"" + escapeHtml(assetSearchQuery) + "\" " +
-          "oninput=\"assetSearchQuery=this.value;renderAssetList()\" " +
+          "oncompositionstart=\"this.dataset.composing=1\" " +
+          "oncompositionend=\"this.dataset.composing=0;assetSearchQuery=this.value;renderAssetList()\" " +
+          "oninput=\"if(!this.dataset.composing||this.dataset.composing==='0'){assetSearchQuery=this.value;renderAssetList()}\" " +
           "style=\"width:100%;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);" +
           "background:var(--card);color:var(--t1);font-size:13px;outline:none;font-family:inherit\">" +
         "</div>";
