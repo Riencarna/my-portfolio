@@ -198,8 +198,14 @@ function renderDashboard() {
   if (hasF) {
     var rr = getCurrentExchangeRate();
     var rOk = cachedExchangeRate && cachedExchangeRate.r;
-    var rTime = cachedExchangeRate && cachedExchangeRate.t
-      ? new Date(cachedExchangeRate.t).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+    var _rCacheT = null;
+    if (cachedExchangeRate && cachedExchangeRate.t) {
+      _rCacheT = cachedExchangeRate.t;
+    } else {
+      try { var _s = JSON.parse(localStorage.getItem("mp_ex_rate")); if (_s && _s.t) _rCacheT = _s.t; } catch(e) {}
+    }
+    var rTime = _rCacheT
+      ? new Date(_rCacheT).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
       : "";
     h += "<div style=\"display:flex;align-items:center;gap:8px;padding:10px 14px;" +
       "background:rgba(255,255,255,.02);border:1px solid var(--bd);border-radius:12px;margin-bottom:14px\">" +
@@ -210,7 +216,7 @@ function renderDashboard() {
           Math.round(rr).toLocaleString() + "원</span> " +
         (rOk
           ? "<span style=\"font-size:10px;color:var(--green)\">✓ 실시간</span>"
-          : "<span style=\"font-size:10px;color:var(--amber)\">⚠ 기본값</span>") +
+          : "<span style=\"font-size:10px;color:var(--amber)\">⚠ " + (_rCacheT ? "캐시" : "기본값") + "</span>") +
         (rTime
           ? " <span style=\"font-size:10px;color:var(--t5)\">" + rTime + "</span>"
           : "") +

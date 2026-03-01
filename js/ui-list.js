@@ -114,6 +114,26 @@ function renderAssetList() {
       "onclick=\"toggleEditMode()\">" +
       (isEditMode ? "✓ 완료" : "↕ 순서 편집") + "</button></div>";
 
+    /* Sort options */
+    if (appState.assets.length >= 3) {
+      var sorts = [
+        { id: "default", label: "기본순" },
+        { id: "value_desc", label: "금액 높은순" },
+        { id: "value_asc", label: "금액 낮은순" },
+        { id: "name", label: "이름순" }
+      ];
+      h += "<div style=\"display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap\">";
+      sorts.forEach(function(s) {
+        var sel = assetSortMode === s.id;
+        h += "<button style=\"padding:5px 10px;border-radius:8px;font-size:11px;font-family:inherit;" +
+          "border:1px solid " + (sel ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
+          "background:" + (sel ? "rgba(59,130,246,.1)" : "rgba(255,255,255,.03)") + ";" +
+          "color:" + (sel ? "#60A5FA" : "var(--t4)") + ";cursor:pointer;font-weight:" + (sel ? "600" : "400") +
+          "\" onclick=\"assetSortMode=" + QUOTE + s.id + QUOTE + ";renderAssetList()\">" + s.label + "</button>";
+      });
+      h += "</div>";
+    }
+
     /* Ordered categories */
     var ordCats = getOrderedCategories();
     var usedCats = ordCats.filter(function (cat) {
@@ -167,6 +187,16 @@ function renderAssetList() {
         ca = ca.filter(function (a) { return a.name.toLowerCase().indexOf(sq) >= 0; });
       }
       if (!ca.length) return;
+
+      if (assetSortMode !== "default") {
+        ca = ca.slice().sort(function (a, b) {
+          if (assetSortMode === "name") return a.name.localeCompare(b.name);
+          var va = calcAsset(a).evalAmt, vb = calcAsset(b).evalAmt;
+          if (assetSortMode === "value_desc") return vb - va;
+          if (assetSortMode === "value_asc") return va - vb;
+          return 0;
+        });
+      }
       var ct = 0;
       ca.forEach(function (a) { ct += getAssetValue(a); });
 

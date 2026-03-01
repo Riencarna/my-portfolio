@@ -226,6 +226,27 @@ function retryFailed() {
   });
 }
 
+// --- 모바일 스와이프 탭 전환 ---
+
+(function() {
+  var startX = 0, startY = 0;
+  document.addEventListener("touchstart", function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener("touchend", function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    var dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    // 모달이 열려있으면 무시
+    if (!document.getElementById("mBg").classList.contains("hidden")) return;
+    var idx = VALID_TABS.indexOf(currentTab);
+    if (dx < 0 && idx < VALID_TABS.length - 1) goTab(VALID_TABS[idx + 1]);
+    else if (dx > 0 && idx > 0) goTab(VALID_TABS[idx - 1]);
+  }, { passive: true });
+})();
+
 // --- 초기화 ---
 
 loadData();

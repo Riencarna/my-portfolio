@@ -31,14 +31,24 @@ function fetchCoinPrices(ids) {
 
 // --- CORS 프록시 통한 fetch ---
 
+function _shuffleArray(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
 function tryFetch(url, timeoutMs) {
   var tm = timeoutMs || 8000;
   var round = 0;
+  var shuffled = _shuffleArray(CORS_PROXIES);
 
   function batch() {
     var start = round * 2;
-    if (start >= CORS_PROXIES.length) return Promise.resolve(null);
-    var candidates = CORS_PROXIES.slice(start, start + 2);
+    if (start >= shuffled.length) return Promise.resolve(null);
+    var candidates = shuffled.slice(start, start + 2);
     round++;
 
     var promises = candidates.map(function(proxyFn) {

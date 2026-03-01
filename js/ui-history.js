@@ -12,7 +12,8 @@
 function renderHistory() {
   var el = document.getElementById("pgHist");
 
-  var cht = appState.history.slice(-30).map(function(h) {
+  var sliced = historyChartDays === 0 ? appState.history : appState.history.slice(-historyChartDays);
+  var cht = sliced.map(function(h) {
     return { d: h.date.slice(5), v: h.total };
   });
 
@@ -44,7 +45,18 @@ function renderHistory() {
   } else {
     // 자산 변동 추이 차트
     h += "<div class=\"card\">";
-    h += "<div style=\"font-size:14px;font-weight:700;color:var(--t1);margin-bottom:16px\">자산 변동 추이 (최근 30일)</div>";
+    h += "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:16px\">";
+    h += "<div style=\"font-size:14px;font-weight:700;color:var(--t1)\">자산 변동 추이</div>";
+    h += "<div style=\"display:flex;gap:4px\">";
+    [{ d: 7, l: "7일" }, { d: 30, l: "30일" }, { d: 90, l: "90일" }, { d: 0, l: "전체" }].forEach(function(o) {
+      var sel = historyChartDays === o.d;
+      h += "<button style=\"padding:4px 9px;border-radius:7px;font-size:10.5px;font-family:inherit;" +
+        "border:1px solid " + (sel ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
+        "background:" + (sel ? "rgba(59,130,246,.12)" : "rgba(255,255,255,.03)") + ";" +
+        "color:" + (sel ? "#60A5FA" : "var(--t4)") + ";cursor:pointer;font-weight:" + (sel ? "600" : "400") +
+        "\" onclick=\"historyChartDays=" + o.d + ";renderHistory()\">" + o.l + "</button>";
+    });
+    h += "</div></div>";
     h += "<div style=\"position:relative;height:230px\"><canvas id=\"cL2\"></canvas></div>";
     h += "</div>";
 
