@@ -249,6 +249,10 @@ function doTransaction(assetId, type) {
         date: dateVal,
         memo: memoVal || (uq + " USDT (1USDT=" + Math.round(rt) + "원" + (src ? " " + src : "") + ")")
       });
+      // USDT 수량 재계산
+      var c = calcAsset(a);
+      a.usdtQty = rt > 0 ? Math.round((c.evalAmt / rt) * 100) / 100 : (a.usdtQty || 0);
+      a.lpu = getNowString();
       appState.history = makeSnapshot(appState.assets, appState.history);
       saveData();
       closeModal();
@@ -634,6 +638,8 @@ function doUsdtBalanceUpdate(assetId, currentBalance) {
       memo: memoVal || (uq + " USDT (1USDT=" + Math.round(rt) + "원" + (src ? " " + src : "") + ") 잔액→" + formatCurrency(newKrw))
     });
 
+    a.usdtQty = uq;
+    a.lpu = getNowString();
     appState.history = makeSnapshot(appState.assets, appState.history);
     saveData();
     closeModal();

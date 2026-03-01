@@ -160,7 +160,8 @@ function getAssetValue(asset) {
 // 자동 업데이트 가능 여부
 function canAutoUpdate(asset) {
   return (asset.category === "코인" && asset.coinId) ||
-    ((asset.category === "국내주식" || asset.category === "해외주식") && asset.stockCode);
+    ((asset.category === "국내주식" || asset.category === "해외주식") && asset.stockCode) ||
+    (asset.isUsdt && asset.usdtQty > 0);
 }
 
 // --- 거래 라벨 ---
@@ -245,6 +246,7 @@ function sanitizeAsset(a) {
     coinId: sanitizeStr(a.coinId, 80),
     krxEtf: !!a.krxEtf,
     isUsdt: !!a.isUsdt,
+    usdtQty: a.usdtQty ? sanitizeNum(a.usdtQty) : undefined,
     walletCoinId: a.walletCoinId ? sanitizeStr(a.walletCoinId, 80) : undefined,
     txns: Array.isArray(a.txns) ? a.txns.map(function(t) {
       return {

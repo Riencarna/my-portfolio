@@ -67,8 +67,40 @@ function autoAll() {
   var stocks = targets.filter(function(a) {
     return (a.category === "국내주식" || a.category === "해외주식") && a.stockCode;
   });
+  var usdtAssets = targets.filter(function(a) { return a.isUsdt && a.usdtQty > 0; });
 
-  fetchCoinPrices(coins.map(function(a) { return a.coinId; })).then(function(prices) {
+  // USDT 자산 시세 업데이트
+  var usdtPromise = usdtAssets.length > 0
+    ? getUsdtExchangeRate().then(function(rt) {
+        usdtAssets.forEach(function(a) {
+          var oldEval = calcAsset(a).evalAmt;
+          var newKrw = Math.round(a.usdtQty * rt);
+          var diff = newKrw - oldEval;
+          if (diff !== 0) {
+            if (!a.txns) a.txns = [];
+            a.txns.push({
+              id: generateId(),
+              type: diff > 0 ? "buy" : "sell",
+              price: Math.abs(diff),
+              qty: 1,
+              account: null,
+              date: getTodayString(),
+              memo: a.usdtQty + " USDT × " + Math.round(rt) + "원 (자동 최신화)"
+            });
+          }
+          a.lpu = getNowString();
+          updateLogs.push({ name: a.name, old: oldEval, nu: newKrw, ok: true, aid: a.id });
+        });
+      }).catch(function() {
+        usdtAssets.forEach(function(a) {
+          updateLogs.push({ name: a.name, ok: false, msg: "USDT 시세 조회 실패", aid: a.id });
+        });
+      })
+    : Promise.resolve();
+
+  usdtPromise.then(function() {
+    return fetchCoinPrices(coins.map(function(a) { return a.coinId; }));
+  }).then(function(prices) {
     coins.forEach(function(a) {
       var d = prices[a.coinId];
       if (d && d.krw) {
