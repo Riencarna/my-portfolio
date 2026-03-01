@@ -6,10 +6,16 @@ function openModal(title, bodyHtml) {
   document.getElementById("mTi").textContent = title;
   document.getElementById("mBd").innerHTML = bodyHtml;
   document.getElementById("mBg").classList.remove("hidden");
+  document.addEventListener("keydown", _modalEscHandler);
 }
 
 function closeModal() {
   document.getElementById("mBg").classList.add("hidden");
+  document.removeEventListener("keydown", _modalEscHandler);
+}
+
+function _modalEscHandler(e) {
+  if (e.key === "Escape") closeModal();
 }
 
 // --- 거래 기록 모달 ---
@@ -235,7 +241,7 @@ function doTransaction(assetId, type) {
       if (!a.txns) a.txns = [];
       var src = cachedUsdtRate && cachedUsdtRate.src ? cachedUsdtRate.src : "";
       a.txns.push({
-        id: Date.now(),
+        id: generateId(),
         type: type,
         price: krw,
         qty: 1,
@@ -262,7 +268,7 @@ function doTransaction(assetId, type) {
   function saveTxn(finalP, rate) {
     if (!a.txns) a.txns = [];
     a.txns.push({
-      id: Date.now(),
+      id: generateId(),
       type: type,
       price: finalP,
       qty: q,
@@ -343,10 +349,13 @@ function openTransactionList(assetId) {
 // --- 거래 삭제 ---
 
 function deleteTransaction(assetId, transactionId) {
+  if (!confirm("이 거래 내역을 삭제하시겠습니까?")) return;
+
   var a = null;
   appState.assets.forEach(function(x) { if (x.id === assetId) a = x; });
   if (!a) return;
 
+  captureUndo();
   a.txns = a.txns.filter(function(t) { return t.id !== transactionId; });
   appState.history = makeSnapshot(appState.assets, appState.history);
   saveData();
@@ -561,7 +570,7 @@ function doBalanceUpdate(assetId, currentBalance) {
   var amt = Math.abs(diff);
 
   a.txns.push({
-    id: Date.now(),
+    id: generateId(),
     type: type,
     price: amt,
     qty: 1,
@@ -616,7 +625,7 @@ function doUsdtBalanceUpdate(assetId, currentBalance) {
     var src = cachedUsdtRate && cachedUsdtRate.src ? cachedUsdtRate.src : "";
 
     a.txns.push({
-      id: Date.now(),
+      id: generateId(),
       type: type,
       price: amt,
       qty: 1,
@@ -678,7 +687,7 @@ function onCategoryChange() {
       + "<div class=\"cgrid\">"
       + KR_STOCK_PRESETS.map(function(s) {
           return "<div class=\"cchip\" onclick=\"selectKoreanStock("
-            + QUOTE + s.code + QUOTE + "," + QUOTE + s.name + QUOTE + ")\">"
+            + QUOTE + s.code + QUOTE + "," + QUOTE + s.name + QUOTE + ",this)\">"
             + s.name + "</div>";
         }).join("")
       + "</div></div>"
@@ -694,7 +703,7 @@ function onCategoryChange() {
       + "<div class=\"cgrid\" id=\"kr-etf-grid\">"
       + KR_FOREIGN_ETF_PRESETS.slice(0, 8).map(function(s) {
           return "<div class=\"cchip\" onclick=\"selectKoreanEtf("
-            + QUOTE + s.code + QUOTE + "," + QUOTE + s.name + QUOTE + ")\">"
+            + QUOTE + s.code + QUOTE + "," + QUOTE + s.name + QUOTE + ",this)\">"
             + s.name + "</div>";
         }).join("")
       + "</div>"
@@ -710,7 +719,7 @@ function onCategoryChange() {
          ["NVDA", "엔비디아"], ["TSLA", "테슬라"], ["META", "메타"], ["NFLX", "넷플릭스"]
         ].map(function(s) {
           return "<div class=\"cchip\" onclick=\"selectUsStock("
-            + QUOTE + s[0] + QUOTE + "," + QUOTE + s[1] + QUOTE + ")\">"
+            + QUOTE + s[0] + QUOTE + "," + QUOTE + s[1] + QUOTE + ",this)\">"
             + s[1] + "</div>";
         }).join("")
       + "</div></div>"
@@ -735,9 +744,9 @@ function onCategoryChange() {
       + [["농협 은행 통장", "💚"], ["CMA 계좌", "📊"], ["카카오뱅크 통장", "🟡"], ["토스뱅크 통장", "🔵"]
         ].map(function(s) {
           return "<div class=\"cchip\" onclick=\"selectAssetName("
-            + QUOTE + s[0] + QUOTE + ")\">" + s[1] + " " + s[0] + "</div>";
+            + QUOTE + s[0] + QUOTE + ",this)\">" + s[1] + " " + s[0] + "</div>";
         }).join("")
-      + "<div class=\"cchip\" onclick=\"selectUsdt()\" style=\"border:1px solid rgba(16,185,129,.2)\">💲 USDT 보유분</div>"
+      + "<div class=\"cchip\" onclick=\"selectUsdt(this)\" style=\"border:1px solid rgba(16,185,129,.2)\">💲 USDT 보유분</div>"
       + "</div>"
       + "<div class=\"ht\">선택하거나 위에 직접 입력하세요</div>"
       + "</div>"
@@ -749,7 +758,7 @@ function onCategoryChange() {
       + [["공제회", "🏛️"], ["청년도약계좌", "🌱"], ["정기적금", "🏦"], ["ISA 계좌", "📈"]
         ].map(function(s) {
           return "<div class=\"cchip\" onclick=\"selectAssetName("
-            + QUOTE + s[0] + QUOTE + ")\">" + s[1] + " " + s[0] + "</div>";
+            + QUOTE + s[0] + QUOTE + ",this)\">" + s[1] + " " + s[0] + "</div>";
         }).join("")
       + "</div>"
       + "<div class=\"ht\">선택하거나 위에 직접 입력하세요</div>"
@@ -772,42 +781,42 @@ function selectMarket(m) {
 
 // --- 국내 종목 선택 ---
 
-function selectKoreanStock(c, n) {
+function selectKoreanStock(c, n, el) {
   document.getElementById("f-code").value = c;
   var ni = document.getElementById("f-name");
   if (ni && !ni.value) ni.value = n;
-  document.querySelectorAll("#f-extra .cchip").forEach(function(el) {
-    el.classList.remove("sel");
+  document.querySelectorAll("#f-extra .cchip").forEach(function(e) {
+    e.classList.remove("sel");
   });
-  if (event && event.currentTarget) event.currentTarget.classList.add("sel");
+  if (el) el.classList.add("sel");
 }
 
 // --- 해외 종목 선택 ---
 
-function selectUsStock(t, n) {
+function selectUsStock(t, n, el) {
   document.getElementById("f-code").value = t;
   var ni = document.getElementById("f-name");
   if (ni && !ni.value) ni.value = n;
   var ke = document.getElementById("f-krxEtf");
   if (ke) ke.value = "";
-  document.querySelectorAll("#f-extra .cchip").forEach(function(el) {
-    el.classList.remove("sel");
+  document.querySelectorAll("#f-extra .cchip").forEach(function(e) {
+    e.classList.remove("sel");
   });
-  if (event && event.currentTarget) event.currentTarget.classList.add("sel");
+  if (el) el.classList.add("sel");
 }
 
 // --- 국내 상장 해외 ETF 선택 ---
 
-function selectKoreanEtf(c, n) {
+function selectKoreanEtf(c, n, el) {
   document.getElementById("f-code").value = c;
   var ni = document.getElementById("f-name");
   if (ni) ni.value = n;
   var ke = document.getElementById("f-krxEtf");
   if (ke) ke.value = "1";
-  document.querySelectorAll("#f-extra .cchip").forEach(function(el) {
-    el.classList.remove("sel");
+  document.querySelectorAll("#f-extra .cchip").forEach(function(e) {
+    e.classList.remove("sel");
   });
-  if (event && event.currentTarget) event.currentTarget.classList.add("sel");
+  if (el) el.classList.add("sel");
 }
 
 // --- 전체 해외 ETF 목록 표시 ---
@@ -819,7 +828,7 @@ function showAllKoreanEtfs() {
 
   g.innerHTML = KR_FOREIGN_ETF_PRESETS.map(function(s) {
     return "<div class=\"cchip\" onclick=\"selectKoreanEtf("
-      + QUOTE + s.code + QUOTE + "," + QUOTE + s.name + QUOTE + ")\">"
+      + QUOTE + s.code + QUOTE + "," + QUOTE + s.name + QUOTE + ",this)\">"
       + s.name + "</div>";
   }).join("");
 
@@ -840,28 +849,28 @@ function selectCoin(id) {
 
 // --- 자산명 빠른 선택 ---
 
-function selectAssetName(n) {
+function selectAssetName(n, el) {
   var ni = document.getElementById("f-name");
   if (ni) ni.value = n;
   var uf = document.getElementById("f-isUsdt");
   if (uf) uf.value = "";
-  document.querySelectorAll("#f-extra .cchip").forEach(function(el) {
-    el.classList.remove("sel");
+  document.querySelectorAll("#f-extra .cchip").forEach(function(e) {
+    e.classList.remove("sel");
   });
-  if (event && event.currentTarget) event.currentTarget.classList.add("sel");
+  if (el) el.classList.add("sel");
 }
 
 // --- USDT 선택 ---
 
-function selectUsdt() {
+function selectUsdt(el) {
   var ni = document.getElementById("f-name");
   if (ni) ni.value = "USDT 보유분";
   var uf = document.getElementById("f-isUsdt");
   if (uf) uf.value = "1";
-  document.querySelectorAll("#f-extra .cchip").forEach(function(el) {
-    el.classList.remove("sel");
+  document.querySelectorAll("#f-extra .cchip").forEach(function(e) {
+    e.classList.remove("sel");
   });
-  if (event && event.currentTarget) event.currentTarget.classList.add("sel");
+  if (el) el.classList.add("sel");
 }
 
 // --- 자산 추가 실행 ---
@@ -875,7 +884,7 @@ function doAddAsset() {
     name: name,
     category: cat,
     amount: 0,
-    id: Date.now(),
+    id: generateId(),
     lpu: null,
     coinId: null,
     stockCode: null,

@@ -62,6 +62,16 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+// --- 고유 ID 생성 (충돌 방지) ---
+
+var _lastId = 0;
+function generateId() {
+  var id = Date.now();
+  if (id <= _lastId) id = _lastId + 1;
+  _lastId = id;
+  return id;
+}
+
 // --- 디바운스 (성능 최적화) ---
 
 function debounce(fn, delay) {

@@ -395,7 +395,7 @@ function doIncomeAdd() {
   captureUndo();
 
   appState.income.push({
-    id: Date.now(),
+    id: generateId(),
     date: date,
     amount: Math.round(amt),
     cat: cat,
@@ -415,6 +415,8 @@ function doIncomeAdd() {
  * @param {number} id - 수입 항목 ID
  */
 function deleteIncome(id) {
+  if (!confirm("이 수입 기록을 삭제하시겠습니까?")) return;
+
   captureUndo();
   appState.income = appState.income.filter(function(x) { return x.id !== id; });
   saveData();
@@ -440,7 +442,7 @@ function copyRecurring(fromYm, toYm) {
     if (appState.income.length >= 5000) return;
     var newDate = toYm + x.date.slice(7);
     appState.income.push({
-      id: Date.now() + cnt,
+      id: generateId(),
       date: newDate,
       amount: x.amount,
       cat: x.cat,

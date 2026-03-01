@@ -84,7 +84,7 @@ function saveInlineEdit(cat, curVal) {
   captureUndo();
   var type = diff > 0 ? "buy" : "sell";
   a.txns.push({
-    id: Date.now(),
+    id: generateId(),
     type: type,
     price: Math.abs(diff),
     qty: 1,
@@ -97,7 +97,7 @@ function saveInlineEdit(cat, curVal) {
   appState.history = makeSnapshot(appState.assets, appState.history);
   saveData();
   showToast(
-    "✅ " + CATEGORY_CONFIG[cat].iconon + " " + cat + " → " +
+    "✅ " + CATEGORY_CONFIG[cat].icon + " " + cat + " → " +
     formatCurrency(Math.round(newVal)),
     true
   );

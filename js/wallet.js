@@ -290,7 +290,7 @@ function importWalletAssets() {
       if (Math.abs(diff) > 0.0001) {
         if (!existing.txns) existing.txns = [];
         existing.txns.push({
-          id: Date.now() + Math.floor(Math.random() * 1000),
+          id: generateId(),
           type: diff > 0 ? "buy" : "sell",
           price: Math.round(m.priceKrw),
           qty: Math.abs(diff),
@@ -306,11 +306,11 @@ function importWalletAssets() {
       var item = {
         name: coinName, category: "코인",
         amount: Math.round(m.priceKrw),
-        id: Date.now() + Math.floor(Math.random() * 1000),
+        id: generateId(),
         lpu: null, coinId: m.coingeckoId, stockCode: null,
         market: null, krxEtf: false, isUsdt: false, walletCoinId: k,
         txns: [{
-          id: Date.now() + 1, type: "buy",
+          id: generateId(), type: "buy",
           price: Math.round(m.priceKrw), qty: m.totalBalance,
           account: "지갑 연동", date: getTodayString(),
           memo: "지갑 스캔 (" + m.chains.join("+") + ")"

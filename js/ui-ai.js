@@ -550,9 +550,12 @@ function askGemini(mode) {
   geminiResult = null;
   renderAI();
 
-  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=" + gk, {
+  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": gk
+    },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: sys + "\n\n" + um }] }],
       generationConfig: { maxOutputTokens: 2048 }
