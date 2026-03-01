@@ -7,9 +7,26 @@
 function fetchCoinPrices(ids) {
   if (!ids.length) return Promise.resolve({});
   var unique = ids.filter(function(v, i, a) { return a.indexOf(v) === i; });
-  return fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + unique.join(",") + "&vs_currencies=krw")
-    .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .catch(function() { return {}; });
+  var attempt = 0;
+  var maxRetries = 2;
+
+  function doFetch() {
+    return fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + unique.join(",") + "&vs_currencies=krw")
+      .then(function(r) {
+        if (r.status === 429 && attempt < maxRetries) {
+          attempt++;
+          var delay = attempt * 3000;
+          return new Promise(function(resolve) {
+            setTimeout(function() { resolve(doFetch()); }, delay);
+          });
+        }
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
+      .catch(function() { return {}; });
+  }
+
+  return doFetch();
 }
 
 // --- CORS 프록시 통한 fetch ---
@@ -85,23 +102,40 @@ function getExchangeRate() {
   return fetchExchangeRate();
 }
 
+function _saveExchangeRateCache(rate) {
+  cachedExchangeRate = { r: rate, t: Date.now() };
+  try { localStorage.setItem("mp_ex_rate", JSON.stringify(cachedExchangeRate)); } catch (e) {}
+  return rate;
+}
+
+function _getLastKnownExchangeRate() {
+  try {
+    var s = localStorage.getItem("mp_ex_rate");
+    if (s) {
+      var d = JSON.parse(s);
+      if (d && d.r > 1000) return d.r;
+    }
+  } catch (e) {}
+  return 1350;
+}
+
 function fetchExchangeRate() {
   return fetchYahooFinance("KRW=X").then(function(r) {
-    if (r && r.price > 1000) { cachedExchangeRate = { r: r.price, t: Date.now() }; return r.price; }
+    if (r && r.price > 1000) return _saveExchangeRateCache(r.price);
     return null;
   }).then(function(v) {
     if (v) return v;
     return fetch("https://open.er-api.com/v6/latest/USD").then(function(r) { return r.json(); }).then(function(d) {
-      if (d && d.rates && d.rates.KRW) { cachedExchangeRate = { r: d.rates.KRW, t: Date.now() }; return d.rates.KRW; }
+      if (d && d.rates && d.rates.KRW) return _saveExchangeRateCache(d.rates.KRW);
       return null;
     }).catch(function() { return null; });
   }).then(function(v) {
     if (v) return v;
     return tryFetch("https://www.floatrates.com/daily/usd.json", 8000).then(function(d) {
-      if (d && d.krw && d.krw.rate) { cachedExchangeRate = { r: Math.round(d.krw.rate), t: Date.now() }; return d.krw.rate; }
+      if (d && d.krw && d.krw.rate) return _saveExchangeRateCache(Math.round(d.krw.rate));
       return null;
     }).catch(function() { return null; });
-  }).then(function(v) { return v || 1350; });
+  }).then(function(v) { return v || _getLastKnownExchangeRate(); });
 }
 
 // --- 주식 가격 조회 ---
@@ -160,12 +194,12 @@ function fetchUsdtExchangeRate() {
 // --- 환율 변환 ---
 
 function usdToKrw(usd) {
-  var r = (cachedExchangeRate && cachedExchangeRate.r) ? cachedExchangeRate.r : 1350;
+  var r = (cachedExchangeRate && cachedExchangeRate.r) ? cachedExchangeRate.r : _getLastKnownExchangeRate();
   return Math.round(usd * r);
 }
 
 function getCurrentExchangeRate() {
-  return (cachedExchangeRate && cachedExchangeRate.r) ? cachedExchangeRate.r : 1350;
+  return (cachedExchangeRate && cachedExchangeRate.r) ? cachedExchangeRate.r : _getLastKnownExchangeRate();
 }
 
 // --- 환율 수동 새로고침 ---

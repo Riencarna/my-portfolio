@@ -4,9 +4,12 @@
 
 // --- 탭 전환 ---
 
+var VALID_TABS = ["dash", "list", "inc", "hist", "ai"];
+
 function goTab(tabId) {
   destroyAllCharts();
   currentTab = tabId;
+  try { localStorage.setItem("mp_last_tab", tabId); } catch (e) {}
   document.querySelectorAll(".tab").forEach(function(el) {
     el.classList.toggle("on", el.dataset.t === tabId);
   });
@@ -18,10 +21,22 @@ function goTab(tabId) {
   render();
 }
 
+function restoreLastTab() {
+  try {
+    var saved = localStorage.getItem("mp_last_tab");
+    if (saved && VALID_TABS.indexOf(saved) >= 0) {
+      goTab(saved);
+      return;
+    }
+  } catch (e) {}
+}
+
 // --- 메인 렌더 디스패처 ---
 
-function render() {
+function render(opts) {
   document.getElementById("elSaved").textContent = appState.saved ? "마지막 저장: " + appState.saved : "";
+  // 자동 최신화 중간 렌더: 대시보드/리스트 탭에서만 업데이트
+  if (opts && opts.priceUpdateOnly && currentTab !== "dash" && currentTab !== "list") return;
   if (currentTab === "dash") renderDashboard();
   else if (currentTab === "list") renderAssetList();
   else if (currentTab === "inc") renderIncome();
@@ -65,7 +80,7 @@ function autoAll() {
         updateLogs.push({ name: a.name, ok: false, msg: "응답 없음", aid: a.id });
       }
     });
-    render();
+    render({ priceUpdateOnly: true });
 
     var i = 0;
     function processNextStock() {
@@ -88,7 +103,7 @@ function autoAll() {
 
       var a = stocks[i++];
       loadingAssets[a.id] = true;
-      render();
+      render({ priceUpdateOnly: true });
 
       fetchStockPrice(a).then(function(p) {
         loadingAssets[a.id] = false;
@@ -100,7 +115,7 @@ function autoAll() {
         } else {
           updateLogs.push({ name: a.name, ok: false, msg: "응답 없음", aid: a.id });
         }
-        render();
+        render({ priceUpdateOnly: true });
         setTimeout(processNextStock, 600);
       });
     }
@@ -158,7 +173,7 @@ function retryFailed() {
 
       var a = stocks[i++];
       loadingAssets[a.id] = true;
-      render();
+      render({ priceUpdateOnly: true });
 
       fetchStockPrice(a).then(function(p) {
         loadingAssets[a.id] = false;
@@ -170,7 +185,7 @@ function retryFailed() {
         } else {
           updateLogs.push({ name: a.name, ok: false, msg: "재시도 실패", aid: a.id });
         }
-        render();
+        render({ priceUpdateOnly: true });
         setTimeout(processNextStock, 600);
       });
     }
@@ -182,6 +197,7 @@ function retryFailed() {
 // --- 초기화 ---
 
 loadData();
+restoreLastTab();
 render();
 checkSandbox().then(function() {
   render();

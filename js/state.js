@@ -30,6 +30,7 @@ var geminiResult = null;
 var isGeminiLoading = false;
 var selectedIncomeMonth = null;
 var isLogOpen = false;
+var assetSearchQuery = "";
 var undoSnapshot = null;
 var undoTimerHandle = null;
 var isSandbox = false;

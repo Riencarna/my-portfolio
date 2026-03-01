@@ -79,6 +79,16 @@ function renderAssetList() {
       "<button class=\"btn btn-p\" onclick=\"openAddAsset()\" style=\"margin-top:14px\">" +
         "+ 자산 추가</button></div>";
   } else {
+    /* Search bar */
+    if (appState.assets.length >= 5) {
+      h += "<div style=\"margin-bottom:10px\">" +
+        "<input type=\"text\" id=\"assetSearch\" placeholder=\"자산명 검색...\" value=\"" + escapeHtml(assetSearchQuery) + "\" " +
+          "oninput=\"assetSearchQuery=this.value;renderAssetList()\" " +
+          "style=\"width:100%;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);" +
+          "background:var(--card);color:var(--t1);font-size:13px;outline:none;font-family:inherit\">" +
+        "</div>";
+    }
+
     /* Toolbar: auto-update + edit toggle */
     h += "<div style=\"display:flex;gap:8px;margin-bottom:12px\">";
 
@@ -148,8 +158,12 @@ function renderAssetList() {
     }
 
     /* Per-category asset groups */
+    var sq = assetSearchQuery.trim().toLowerCase();
     usedCats.forEach(function (cat, catIdx) {
       var ca = appState.assets.filter(function (a) { return a.category === cat; });
+      if (sq) {
+        ca = ca.filter(function (a) { return a.name.toLowerCase().indexOf(sq) >= 0; });
+      }
       if (!ca.length) return;
       var ct = 0;
       ca.forEach(function (a) { ct += getAssetValue(a); });
@@ -475,6 +489,12 @@ function renderAssetList() {
 
   h += "</div>";
   el.innerHTML = h;
+
+  /* Restore search input focus after re-render */
+  if (sq) {
+    var si = document.getElementById("assetSearch");
+    if (si) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+  }
 
   /* Draw / update list pie chart */
   if (cdL && cdL.length > 0 && totalL > 0) {

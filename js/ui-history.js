@@ -116,6 +116,12 @@ function renderHistory() {
  * 오늘 기록 스냅샷 저장
  */
 function saveSnapshot() {
+  var today = getTodayString();
+  var existing = appState.history.some(function(h) { return h.date === today; });
+  if (existing) {
+    if (!confirm("오늘(" + today + ") 기록이 이미 있습니다. 덮어쓰시겠습니까?")) return;
+  }
+
   appState.history = makeSnapshot(appState.assets, appState.history);
   saveData();
   render();
@@ -126,7 +132,7 @@ function saveSnapshot() {
     setTimeout(function() { b.style.animation = ""; }, 700);
   }
 
-  showToast("✅ " + getTodayString() + " 기록이 저장되었습니다");
+  showToast("✅ " + today + " 기록이 저장되었습니다");
 }
 
 /**
@@ -211,6 +217,7 @@ function exportData() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
+    try { localStorage.setItem("mp_last_backup", Date.now().toString()); } catch (ex) {}
     showToast("✅ 백업 파일이 저장되었습니다: " + fn);
   } catch (e) {
     showToast("❌ 백업 실패: " + e.message);

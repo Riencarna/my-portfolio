@@ -394,9 +394,21 @@ function renderAI() {
 function setGoal() {
   var amt = Number((document.getElementById("ai-goal-amt") || {}).value);
   var dt = (document.getElementById("ai-goal-date") || {}).value || null;
-  if (!amt || amt <= 0) return;
+  if (!amt || amt <= 0) {
+    showToast("❌ 목표 금액을 입력하세요");
+    return;
+  }
+  if (dt) {
+    var goalDate = new Date(dt);
+    var today = new Date(getTodayString());
+    if (goalDate <= today) {
+      showToast("❌ 목표 날짜는 오늘 이후여야 합니다");
+      return;
+    }
+  }
   appState.goal = { amount: amt, date: dt, setDate: getTodayString() };
   saveData();
+  showToast("✅ 목표가 설정되었습니다");
   renderAI();
 }
 

@@ -169,6 +169,28 @@ function renderDashboard() {
         "💡 다운로드 → 파일 더블클릭 → 자동 최신화 정상 작동</div></div>";
   }
 
+  /* Backup reminder */
+  if (appState.assets.length > 0) {
+    var _lastBk = null;
+    try { _lastBk = Number(localStorage.getItem("mp_last_backup")); } catch (e) {}
+    var _daysSinceBk = _lastBk ? Math.floor((Date.now() - _lastBk) / 86400000) : null;
+    if (_daysSinceBk === null || _daysSinceBk >= 7) {
+      h += "<div style=\"display:flex;align-items:center;gap:10px;padding:11px 14px;" +
+        "background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.12);" +
+        "border-radius:12px;margin-bottom:14px\">" +
+        "<span style=\"font-size:14px\">💾</span>" +
+        "<div style=\"flex:1;font-size:12px;color:var(--t3)\">" +
+          (_daysSinceBk === null
+            ? "아직 백업한 적이 없습니다. 데이터 보호를 위해 백업하세요."
+            : _daysSinceBk + "일 전 마지막 백업. 정기 백업을 권장합니다.") +
+        "</div>" +
+        "<button style=\"border:none;background:rgba(245,158,11,.1);color:var(--amber);" +
+          "padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;" +
+          "cursor:pointer;font-family:inherit;white-space:nowrap\" " +
+          "onclick=\"goTab(" + QUOTE + "hist" + QUOTE + ")\">백업하기</button></div>";
+    }
+  }
+
   /* Exchange rate bar */
   var hasF = appState.assets.some(function (a) {
     return a.category === "해외주식" || a.category === "코인";
