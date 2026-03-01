@@ -63,35 +63,42 @@ function moveAsset(id, dir) {
 
 /* === Main List Render === */
 
-function renderAssetList() {
-  var el = document.getElementById("pgList");
+function _setupSearchInput() {
+  var wrap = document.getElementById("assetSearchWrap");
+  if (!wrap) return;
+  if (appState.assets.length >= 5) {
+    if (!document.getElementById("assetSearch")) {
+      wrap.innerHTML = "<input type=\"text\" id=\"assetSearch\" placeholder=\"자산명 검색...\" " +
+        "style=\"width:100%;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);" +
+        "background:var(--card);color:var(--t1);font-size:13px;outline:none;font-family:inherit\">";
+      var inp = document.getElementById("assetSearch");
+      var composing = false;
+      inp.addEventListener("compositionstart", function() { composing = true; });
+      inp.addEventListener("compositionend", function() {
+        composing = false;
+        assetSearchQuery = inp.value;
+        _renderAssetListContent();
+      });
+      inp.addEventListener("input", function() {
+        if (!composing) {
+          assetSearchQuery = inp.value;
+          _renderAssetListContent();
+        }
+      });
+    }
+  } else {
+    wrap.innerHTML = "";
+  }
+}
+
+function _renderAssetListContent() {
+  var el = document.getElementById("assetListContent");
+  if (!el) return;
   var ac = appState.assets.filter(canAutoUpdate).length;
   var totalL = 0, cdL = [];
+  var h = "";
 
-  var h = "<div style=\"animation:fadeUp .4s ease\">";
-
-  /* Empty state */
-  if (!appState.assets.length) {
-    h += "<div class=\"card\" style=\"text-align:center;padding:50px 20px\">" +
-      "<div style=\"font-size:44px;margin-bottom:12px\">💼</div>" +
-      "<div style=\"font-size:15px;font-weight:600;color:var(--t2);margin-bottom:5px\">" +
-        "등록된 자산이 없습니다</div>" +
-      "<button class=\"btn btn-p\" onclick=\"openAddAsset()\" style=\"margin-top:14px\">" +
-        "+ 자산 추가</button></div>";
-  } else {
-    /* Search bar */
-    if (appState.assets.length >= 5) {
-      h += "<div style=\"margin-bottom:10px\">" +
-        "<input type=\"text\" id=\"assetSearch\" placeholder=\"자산명 검색...\" value=\"" + escapeHtml(assetSearchQuery) + "\" " +
-          "oncompositionstart=\"this.dataset.composing=1\" " +
-          "oncompositionend=\"this.dataset.composing=0;assetSearchQuery=this.value;renderAssetList()\" " +
-          "oninput=\"if(!this.dataset.composing||this.dataset.composing==='0'){assetSearchQuery=this.value;renderAssetList()}\" " +
-          "style=\"width:100%;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);" +
-          "background:var(--card);color:var(--t1);font-size:13px;outline:none;font-family:inherit\">" +
-        "</div>";
-    }
-
-    /* Toolbar: auto-update + edit toggle */
+  /* Toolbar: auto-update + edit toggle */
     h += "<div style=\"display:flex;gap:8px;margin-bottom:12px\">";
 
     if (ac > 0) {
@@ -517,16 +524,8 @@ function renderAssetList() {
     /* Add asset button */
     h += "<div style=\"margin-top:14px\">" +
       "<button class=\"btn btn-p btn-w\" onclick=\"openAddAsset()\">+ 새 자산 추가</button></div>";
-  }
 
-  h += "</div>";
   el.innerHTML = h;
-
-  /* Restore search input focus after re-render */
-  if (sq) {
-    var si = document.getElementById("assetSearch");
-    if (si) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
-  }
 
   /* Draw / update list pie chart */
   if (cdL && cdL.length > 0 && totalL > 0) {
@@ -595,4 +594,30 @@ function renderAssetList() {
       });
     }, 30);
   }
+}
+
+function renderAssetList() {
+  var el = document.getElementById("pgList");
+
+  /* Empty state */
+  if (!appState.assets.length) {
+    el.innerHTML = "<div style=\"animation:fadeUp .4s ease\">" +
+      "<div class=\"card\" style=\"text-align:center;padding:50px 20px\">" +
+      "<div style=\"font-size:44px;margin-bottom:12px\">💼</div>" +
+      "<div style=\"font-size:15px;font-weight:600;color:var(--t2);margin-bottom:5px\">" +
+        "등록된 자산이 없습니다</div>" +
+      "<button class=\"btn btn-p\" onclick=\"openAddAsset()\" style=\"margin-top:14px\">" +
+        "+ 자산 추가</button></div></div>";
+    return;
+  }
+
+  /* Ensure structure: search wrapper + content container */
+  if (!document.getElementById("assetListContent")) {
+    el.innerHTML = "<div style=\"animation:fadeUp .4s ease\">" +
+      "<div id=\"assetSearchWrap\" style=\"margin-bottom:10px\"></div>" +
+      "<div id=\"assetListContent\"></div></div>";
+  }
+
+  _setupSearchInput();
+  _renderAssetListContent();
 }
