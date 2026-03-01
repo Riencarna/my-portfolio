@@ -63,6 +63,8 @@ function moveAsset(id, dir) {
 
 /* === Main List Render === */
 
+var _searchDebounceTimer = null;
+
 function _setupSearchInput() {
   var wrap = document.getElementById("assetSearchWrap");
   if (!wrap) return;
@@ -72,18 +74,13 @@ function _setupSearchInput() {
         "style=\"width:100%;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);" +
         "background:var(--card);color:var(--t1);font-size:13px;outline:none;font-family:inherit\">";
       var inp = document.getElementById("assetSearch");
-      var composing = false;
-      inp.addEventListener("compositionstart", function() { composing = true; });
-      inp.addEventListener("compositionend", function() {
-        composing = false;
-        assetSearchQuery = inp.value;
-        _renderAssetListContent();
-      });
       inp.addEventListener("input", function() {
-        if (!composing) {
-          assetSearchQuery = inp.value;
+        var self = this;
+        if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+        _searchDebounceTimer = setTimeout(function() {
+          assetSearchQuery = self.value;
           _renderAssetListContent();
-        }
+        }, 300);
       });
     }
   } else {
