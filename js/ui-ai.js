@@ -51,7 +51,7 @@ function renderAI() {
     h += "</div>";
 
     if (dLeft !== null)
-      h += "<div style=\"font-size:10.5px;color:var(--t5);margin-top:4px\">📅 목표일 " + g.date
+      h += "<div style=\"font-size:11.5px;color:var(--t5);margin-top:4px\">📅 목표일 " + g.date
         + " (D" + (dLeft > 0 ? "-" + dLeft : dLeft === 0 ? "-Day" : "+" + (0 - dLeft)) + ")</div>";
 
     if (remain > 0 && dLeft && dLeft > 0) {
@@ -117,12 +117,12 @@ function renderAI() {
 
   h += "<div style=\"display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap\">"
     + "<div style=\"flex:1;min-width:120px;padding:12px;background:rgba(59,130,246,.04);border:1px solid rgba(59,130,246,.08);border-radius:10px;text-align:center\">"
-    + "<div style=\"font-size:10px;color:var(--t4)\">분산투자 점수</div>"
+    + "<div style=\"font-size:11px;color:var(--t4)\">분산투자 점수</div>"
     + "<div style=\"font-size:24px;font-weight:800;color:" + divColor + "\">" + divScore + "<span style=\"font-size:12px\">/100</span></div>"
     + "<div style=\"font-size:11px;color:" + divColor + ";font-weight:600\">" + divLabel + "</div></div>";
 
   h += "<div style=\"flex:1;min-width:120px;padding:12px;background:rgba(139,92,246,.04);border:1px solid rgba(139,92,246,.08);border-radius:10px;text-align:center\">"
-    + "<div style=\"font-size:10px;color:var(--t4)\">활용 카테고리</div>"
+    + "<div style=\"font-size:11px;color:var(--t4)\">활용 카테고리</div>"
     + "<div style=\"font-size:24px;font-weight:800;color:var(--t1)\">" + activeCats + "<span style=\"font-size:12px\">/" + CATEGORY_LIST.length + "</span></div>"
     + "<div style=\"font-size:11px;color:var(--t4)\">" + appState.assets.length + "개 종목 보유</div></div></div>";
 
@@ -137,7 +137,7 @@ function renderAI() {
         + "<div style=\"flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden\">"
         + "<div style=\"height:100%;width:" + wp + "%;background:" + CATEGORY_CONFIG[cat].color + ";border-radius:3px\"></div></div>"
         + "<span style=\"font-size:11px;color:var(--t2);font-weight:600;min-width:40px;text-align:right\">" + wp.toFixed(1) + "%</span>"
-        + (warn ? "<span style=\"font-size:10px;color:var(--red)\">" + warn + "</span>" : "")
+        + (warn ? "<span style=\"font-size:11px;color:var(--red)\">" + warn + "</span>" : "")
         + "</div>";
     }
   });
@@ -151,12 +151,12 @@ function renderAI() {
         + "<span style=\"font-size:11px;color:var(--t4);min-width:18px\">" + (i + 1) + ".</span>"
         + "<span style=\"flex:1;font-size:11.5px;color:var(--t2)\">" + escapeHtml(it.name) + "</span>"
         + "<span style=\"font-size:11px;font-weight:600;color:var(--t1)\">" + wp.toFixed(1) + "%</span>"
-        + (wp > 40 ? "<span style=\"font-size:10px;color:var(--red)\">⚠️</span>" : "")
+        + (wp > 40 ? "<span style=\"font-size:11px;color:var(--red)\">⚠️</span>" : "")
         + "</div>";
     });
     var topPct = total > 0 ? (top3.reduce(function (s, x) { return s + x.eval; }, 0) / total) * 100 : 0;
     if (topPct > 70)
-      h += "<div style=\"font-size:10.5px;color:var(--red);margin-top:4px\">⚠️ 상위 3개 종목이 전체의 " + topPct.toFixed(0) + "%를 차지합니다</div>";
+      h += "<div style=\"font-size:11.5px;color:var(--red);margin-top:4px\">⚠️ 상위 3개 종목이 전체의 " + topPct.toFixed(0) + "%를 차지합니다</div>";
   }
 
   h += "</div>";
@@ -279,7 +279,7 @@ function renderAI() {
 
     [500000, 1000000, 2000000, 3000000].forEach(function (mp) {
       h += "<div style=\"flex:1;min-width:110px;padding:10px;background:rgba(255,255,255,.02);border:1px solid var(--bd);border-radius:9px;text-align:center\">"
-        + "<div style=\"font-size:10px;color:var(--t4)\">월 " + formatShortCurrency(mp) + "</div>";
+        + "<div style=\"font-size:11px;color:var(--t4)\">월 " + formatShortCurrency(mp) + "</div>";
 
       rates.forEach(function (r) {
         var mr = r / 100 / 12;
@@ -380,12 +380,12 @@ function renderAI() {
         + "<div style=\"font-size:13px;color:var(--t2);white-space:pre-wrap\">" + formatGeminiResponse(geminiResult) + "</div></div>";
 
     h += "<div style=\"margin-top:8px;text-align:right\">"
-      + "<button style=\"background:none;border:none;color:var(--t5);font-size:10.5px;cursor:pointer;font-family:inherit\" onclick=\"clearGeminiApiKey()\">🔑 API 키 변경</button></div>";
+      + "<button style=\"background:none;border:none;color:var(--t5);font-size:11.5px;cursor:pointer;font-family:inherit\" onclick=\"clearGeminiApiKey()\">🔑 API 키 변경</button></div>";
   }
 
   h += "</div>";
 
-  h += "<div style=\"padding:10px 14px;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.1);border-radius:10px;font-size:10.5px;color:var(--t4)\">"
+  h += "<div style=\"padding:10px 14px;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.1);border-radius:10px;font-size:11.5px;color:var(--t4)\">"
     + "⚠️ 분석 결과는 참고용이며, 투자 판단은 본인의 책임입니다. 전문적인 투자 상담은 공인 재무설계사에게 문의하세요.</div>";
 
   el.innerHTML = h;

@@ -105,7 +105,10 @@ function _renderAssetListContent() {
         "border-radius:13px\" onclick=\"autoAll()\"" +
         (isAllLoading ? " disabled" : "") + ">" +
         (isAllLoading
-          ? "<span class=\"spinner\"></span> 업데이트 중..."
+          ? "<span class=\"spinner\"></span> " +
+            (autoUpdateProgress.total > 0
+              ? autoUpdateProgress.done + "/" + autoUpdateProgress.total + " 업데이트 중..."
+              : "업데이트 중...")
           : "⚡ 전체 가격 최신화 (" + ac + ")") +
         "</button>";
     }
@@ -176,7 +179,7 @@ function _renderAssetListContent() {
           "<div style=\"text-align:right\">" +
             "<div style=\"font-size:12.5px;font-weight:700;color:var(--t1)\">" +
               formatShortCurrency(d.v) + "</div>" +
-            "<div style=\"font-size:10px;color:var(--t4)\">" +
+            "<div style=\"font-size:11px;color:var(--t4)\">" +
               ((d.v / totalL) * 100).toFixed(1) + "%</div></div></div>";
       });
 
@@ -234,7 +237,7 @@ function _renderAssetListContent() {
         h += "</div>";
         h += "<span style=\"font-size:16px\">" + CATEGORY_CONFIG[cat].icon + "</span>" +
           "<span style=\"font-size:13px;font-weight:700;color:var(--t1)\">" + cat + "</span>" +
-          "<span style=\"font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;color:" +
+          "<span style=\"font-size:11px;padding:2px 6px;border-radius:5px;font-weight:600;color:" +
             CATEGORY_CONFIG[cat].color + ";background:" + CATEGORY_CONFIG[cat].color + "12\">" +
             ca.length + "개</span>";
         h += "</div>" +
@@ -248,11 +251,11 @@ function _renderAssetListContent() {
           CATEGORY_CONFIG[cat].color + "06,transparent);cursor:pointer\" " +
           "onclick=\"toggleListCategory(" + QUOTE + cat + QUOTE + ")\">" +
           "<div style=\"display:flex;align-items:center;gap:6px\">" +
-            "<span style=\"font-size:10px;color:var(--t4);transition:transform .2s;" +
+            "<span style=\"font-size:11px;color:var(--t4);transition:transform .2s;" +
               "display:inline-block;transform:rotate(" + (isCatOpen ? "90" : "0") + "deg)\">▶</span>" +
             "<span style=\"font-size:16px\">" + CATEGORY_CONFIG[cat].icon + "</span>" +
             "<span style=\"font-size:13px;font-weight:700;color:var(--t1)\">" + cat + "</span>" +
-            "<span style=\"font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600;color:" +
+            "<span style=\"font-size:11px;padding:2px 6px;border-radius:5px;font-weight:600;color:" +
               CATEGORY_CONFIG[cat].color + ";background:" + CATEGORY_CONFIG[cat].color + "12\">" +
               ca.length + "개</span>" +
           "</div>" +
@@ -266,7 +269,7 @@ function _renderAssetListContent() {
           h += "<div style=\"padding:6px 16px 2px;display:flex;justify-content:flex-end\">" +
             "<button style=\"border:none;background:rgba(255,255,255,.04);color:" +
               (appState.coinShowProfitLoss ? "var(--t3)" : "var(--t4)") +
-              ";padding:4px 10px;border-radius:6px;font-size:10.5px;cursor:pointer;" +
+              ";padding:4px 10px;border-radius:6px;font-size:11.5px;cursor:pointer;" +
               "font-family:inherit;display:flex;align-items:center;gap:4px\" " +
               "onclick=\"event.stopPropagation();appState.coinShowProfitLoss=!appState.coinShowProfitLoss;" +
                 "saveData();render()\">" +
@@ -348,7 +351,7 @@ function _renderAssetListContent() {
                   ? "💰 잔액을 입력해주세요"
                   : "📋 첫 " + getTransactionLabel(a.category, "buy") + " 기록을 추가해주세요") +
               "</div>" +
-              "<div style=\"font-size:10.5px;color:var(--t5);margin-top:2px\">" +
+              "<div style=\"font-size:11.5px;color:var(--t5);margin-top:2px\">" +
                 (isCashLike(a.category)
                   ? "현재 잔액을 입력하면 총 자산에 반영됩니다"
                   : "거래 기록이 있어야 평가금액과 수익률을 계산합니다") +
@@ -356,9 +359,11 @@ function _renderAssetListContent() {
           }
 
           if (ld) {
-            h += "<div style=\"font-size:10.5px;color:var(--amber);margin-top:2px;" +
+            h += "<div style=\"margin-top:4px\">" +
+              "<div class=\"skeleton sk-bar\" style=\"width:70%\"></div>" +
+              "<div style=\"font-size:11px;color:var(--amber);margin-top:4px;" +
               "display:flex;align-items:center;gap:4px\">" +
-              "<span class=\"spinner sm\"></span> 검색 중...</div>";
+              "<span class=\"spinner sm\"></span> 가격 검색 중...</div></div>";
           }
 
           h += "</div>";
@@ -376,11 +381,11 @@ function _renderAssetListContent() {
             h += "</div>";
           } else {
             h += "<div style=\"display:flex;gap:4px;align-items:center;flex-shrink:0;margin-left:8px\">" +
-              "<button class=\"btn-buy\" onclick=\"" +
+              "<button class=\"" + (isCL ? "btn-dep" : "btn-buy") + "\" onclick=\"" +
                 (isCL
                   ? "openBalanceUpdate(" + a.id + ")"
                   : "openTransaction(" + a.id + "," + QUOTE + "buy" + QUOTE + ")") +
-              "\">" + (isCL ? "잔액 입력" : getTransactionLabel(a.category, "buy")) + "</button>" +
+              "\">" + (isCL ? "💰 잔액 입력" : getTransactionLabel(a.category, "buy")) + "</button>" +
               "<button class=\"ibtn\" style=\"background:rgba(255,255,255,.04);color:var(--t3)\" " +
                 "onclick=\"openEditAsset(" + a.id + ")\">✏️</button>" +
               "<button class=\"ibtn\" style=\"background:rgba(239,68,68,.05);color:var(--red)\" " +
@@ -400,7 +405,7 @@ function _renderAssetListContent() {
               /* Action buttons */
               h += "<div style=\"display:flex;gap:6px;margin-bottom:12px\">";
               if (isCL) {
-                h += "<button class=\"btn-buy\" style=\"flex:1;text-align:center;padding:9px\" " +
+                h += "<button class=\"btn-dep\" style=\"flex:1;text-align:center;padding:9px\" " +
                   "onclick=\"openBalanceUpdate(" + a.id + ")\">💰 잔액 업데이트</button>";
               } else {
                 h += "<button class=\"btn-buy\" style=\"flex:1;text-align:center;padding:9px\" " +
@@ -480,7 +485,7 @@ function _renderAssetListContent() {
 
               /* Last price update */
               if (a.lpu) {
-                h += "<div style=\"font-size:10px;color:var(--t5);margin-top:8px\">" +
+                h += "<div style=\"font-size:11px;color:var(--t5);margin-top:8px\">" +
                   "⚡ " + a.lpu + "</div>";
               }
 
@@ -495,15 +500,16 @@ function _renderAssetListContent() {
                     "onclick=\"openTransactionList(" + a.id + ")\">전체 보기 →</button></div>";
 
               (a.txns || []).slice().reverse().slice(0, 3).forEach(function (t) {
+                var _txCls = t.type === "buy" ? (isCL ? "txd" : "txb") : "txs";
                 h += "<div class=\"txr\">" +
-                  "<span class=\"txt " + (t.type === "buy" ? "txb" : "txs") + "\">" +
+                  "<span class=\"txt " + _txCls + "\">" +
                     getTransactionLabel(a.category, t.type) + "</span>" +
                   "<span style=\"color:var(--t2)\">" + formatNumber(t.price) + "</span>" +
                   (isCL ? "" : "<span style=\"color:var(--t4)\">×" + t.qty + "</span>") +
                   (t.account
                     ? "<span class=\"txa\">" + escapeHtml(t.account) + "</span>"
                     : "") +
-                  "<span style=\"color:var(--t5);margin-left:auto;font-size:10px\">" +
+                  "<span style=\"color:var(--t5);margin-left:auto;font-size:11px\">" +
                     (t.date || "") + "</span></div>";
               });
 
@@ -596,14 +602,25 @@ function _renderAssetListContent() {
 function renderAssetList() {
   var el = document.getElementById("pgList");
 
-  /* Empty state */
+  /* Empty state with onboarding */
   if (!appState.assets.length) {
     el.innerHTML = "<div style=\"animation:fadeUp .4s ease\">" +
-      "<div class=\"card\" style=\"text-align:center;padding:50px 20px\">" +
+      "<div class=\"card\" style=\"text-align:center;padding:40px 20px\">" +
       "<div style=\"font-size:44px;margin-bottom:12px\">💼</div>" +
       "<div style=\"font-size:15px;font-weight:600;color:var(--t2);margin-bottom:5px\">" +
         "등록된 자산이 없습니다</div>" +
-      "<button class=\"btn btn-p\" onclick=\"openAddAsset()\" style=\"margin-top:14px\">" +
+      "<div style=\"font-size:12px;color:var(--t4);margin-bottom:16px\">자산을 추가하면 목록이 여기에 표시됩니다</div>" +
+      "<div class=\"onboard-wrap\" style=\"text-align:left;margin-top:0\">" +
+        "<div class=\"onboard-step\">" +
+          "<div class=\"onboard-num\">1</div>" +
+          "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">아래 버튼으로 자산 추가</div>" +
+          "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">주식, 코인, 현금 등 분류별로 등록하세요</div></div></div>" +
+        "<div class=\"onboard-step\">" +
+          "<div class=\"onboard-num\">2</div>" +
+          "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">거래 기록 입력</div>" +
+          "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">매수 가격과 수량을 기록하면 수익률이 자동 계산됩니다</div></div></div>" +
+      "</div>" +
+      "<button class=\"btn btn-p\" onclick=\"openAddAsset()\" style=\"margin-top:14px;width:100%\">" +
         "+ 자산 추가</button></div></div>";
     return;
   }

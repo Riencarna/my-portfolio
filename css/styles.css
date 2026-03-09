@@ -1,5 +1,5 @@
 /* ===================================================
-   My Portfolio v2.0.0 - Styles
+   My Portfolio v2.1.0 - Styles
    자산 관리 대시보드 스타일시트
    =================================================== */
 
@@ -411,7 +411,7 @@ button {
 }
 
 .tag {
-  font-size: 8.5px;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: 4px;
   font-weight: 600;
@@ -503,7 +503,7 @@ button {
 }
 
 .fld .ht {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--amber);
   margin-top: 3px;
 }
@@ -580,7 +580,7 @@ button {
 }
 
 .lgi {
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 0;
   display: flex;
   gap: 5px;
@@ -676,7 +676,7 @@ button {
 }
 
 .ditem .dl {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t4);
 }
 
@@ -694,7 +694,7 @@ button {
   gap: 8px;
   padding: 7px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .txr:last-child {
@@ -704,7 +704,7 @@ button {
 .txt {
   padding: 2px 7px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -723,7 +723,7 @@ button {
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--t4);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* --- Accordion Row --- */
@@ -820,6 +820,97 @@ button {
   background: linear-gradient(90deg, var(--green), var(--cyan));
   border-radius: 2px;
   transition: width 0.3s;
+}
+
+/* --- Deposit Badge (green for cash deposits) --- */
+.txd {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--green);
+}
+
+/* --- Deposit Button (green for cash) --- */
+.btn-dep {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--green);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* --- Auto-update Progress Bar --- */
+.au-prog {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(16, 185, 129, 0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(16, 185, 129, 0.08);
+}
+
+.au-prog-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.au-prog-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* --- Onboarding Guide --- */
+.onboard-wrap {
+  padding: 20px;
+  background: rgba(59, 130, 246, 0.03);
+  border: 1px dashed rgba(59, 130, 246, 0.15);
+  border-radius: 16px;
+  margin-top: 12px;
+}
+
+.onboard-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.onboard-step + .onboard-step {
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.onboard-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.1);
+  color: #60A5FA;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+:root[data-theme="light"] .onboard-wrap {
+  background: rgba(37, 99, 235, 0.03);
+  border-color: rgba(37, 99, 235, 0.15);
+}
+
+:root[data-theme="light"] .onboard-num {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563EB;
+}
+
+:root[data-theme="light"] .au-prog {
+  background: rgba(5, 150, 105, 0.04);
+  border-color: rgba(5, 150, 105, 0.1);
 }
 
 /* --- Responsive --- */

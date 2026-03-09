@@ -61,6 +61,7 @@ function autoAll() {
 
   isAllLoading = true;
   updateLogs = [];
+  autoUpdateProgress = { total: targets.length, done: 0 };
   render();
 
   var coins = targets.filter(function(a) { return a.category === "코인" && a.coinId; });
@@ -90,10 +91,12 @@ function autoAll() {
           }
           a.lpu = getNowString();
           updateLogs.push({ name: a.name, old: oldEval, nu: newKrw, ok: true, aid: a.id });
+          autoUpdateProgress.done++;
         });
       }).catch(function() {
         usdtAssets.forEach(function(a) {
           updateLogs.push({ name: a.name, ok: false, msg: "USDT 시세 조회 실패", aid: a.id });
+          autoUpdateProgress.done++;
         });
       })
     : Promise.resolve();
@@ -111,6 +114,7 @@ function autoAll() {
       } else {
         updateLogs.push({ name: a.name, ok: false, msg: "응답 없음", aid: a.id });
       }
+      autoUpdateProgress.done++;
     });
     render({ priceUpdateOnly: true });
 
@@ -147,6 +151,7 @@ function autoAll() {
         } else {
           updateLogs.push({ name: a.name, ok: false, msg: "응답 없음", aid: a.id });
         }
+        autoUpdateProgress.done++;
         render({ priceUpdateOnly: true });
         setTimeout(processNextStock, 600);
       });

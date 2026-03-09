@@ -50,7 +50,7 @@ function renderHistory() {
     h += "<div style=\"display:flex;gap:4px\">";
     [{ d: 7, l: "7일" }, { d: 30, l: "30일" }, { d: 90, l: "90일" }, { d: 0, l: "전체" }].forEach(function(o) {
       var sel = historyChartDays === o.d;
-      h += "<button style=\"padding:4px 9px;border-radius:7px;font-size:10.5px;font-family:inherit;" +
+      h += "<button style=\"padding:4px 9px;border-radius:7px;font-size:11.5px;font-family:inherit;" +
         "border:1px solid " + (sel ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
         "background:" + (sel ? "rgba(59,130,246,.12)" : "rgba(255,255,255,.03)") + ";" +
         "color:" + (sel ? "#60A5FA" : "var(--t4)") + ";cursor:pointer;font-weight:" + (sel ? "600" : "400") +
@@ -91,7 +91,7 @@ function renderHistory() {
   h += "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px\">";
   h += "<div>";
   h += "<div style=\"font-size:12.5px;font-weight:600;color:var(--t3)\">데이터 관리</div>";
-  h += "<div style=\"font-size:10.5px;color:var(--t5);margin-top:1px\">";
+  h += "<div style=\"font-size:11.5px;color:var(--t5);margin-top:1px\">";
   h += "기록 " + appState.history.length + "일 / 자산 " + appState.assets.length + "건";
   if (appState.income.length > 0) {
     h += " / 수입 " + appState.income.length + "건";
@@ -109,7 +109,7 @@ function renderHistory() {
   h += "</div>";
 
   // 안내 문구
-  h += "<div style=\"font-size:10px;color:var(--t5);margin-top:8px;line-height:1.5\">";
+  h += "<div style=\"font-size:11px;color:var(--t5);margin-top:8px;line-height:1.5\">";
   h += "💡 백업 파일에는 자산, 거래 내역, 히스토리, 목표, 수입 기록이 모두 포함됩니다.<br>";
   h += "다른 기기나 브라우저로 옮기거나, 만약을 위해 정기적으로 백업하세요.";
   h += "</div>";

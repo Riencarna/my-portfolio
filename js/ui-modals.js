@@ -44,7 +44,7 @@ function openTransaction(assetId, type) {
       + "<button class=\"mkt-opt\" id=\"cur-usd\" onclick=\"selectCurrency(" + QUOTE + "USD" + QUOTE + ")\">🇺🇸 달러(USD)</button>"
       + "</div>"
       + "<input type=\"hidden\" id=\"tx-cur\" value=\"KRW\">"
-      + "<div id=\"tx-rate\" style=\"font-size:10.5px;color:var(--t5);margin-top:4px\">"
+      + "<div id=\"tx-rate\" style=\"font-size:11.5px;color:var(--t5);margin-top:4px\">"
       + "💱 현재 환율: "
       + (cachedExchangeRate && cachedExchangeRate.r
         ? Math.round(cachedExchangeRate.r).toLocaleString() + "원/$ ✓"
@@ -56,7 +56,7 @@ function openTransaction(assetId, type) {
   if (isU) {
     h += "<div class=\"fld\"><label>💲 " + lbl + " USDT 수량</label>"
       + "<input type=\"number\" id=\"tx-uq\" step=\"any\" placeholder=\"예: 500\" oninput=\"updateUsdtConversion()\">"
-      + "<div id=\"tx-usdt-rate\" style=\"font-size:10.5px;color:var(--t5);margin-top:4px\">"
+      + "<div id=\"tx-usdt-rate\" style=\"font-size:11.5px;color:var(--t5);margin-top:4px\">"
       + "💱 USDT 시세 조회 중... (업비트/빗썸 김프 반영)</div>"
       + "<div id=\"tx-usdt-cv\" style=\"font-size:12px;color:var(--t2);margin-top:4px;font-weight:600\"></div>"
       + "</div>"
@@ -73,7 +73,7 @@ function openTransaction(assetId, type) {
       + "<div id=\"tx-kp\" style=\"font-size:12px;color:var(--green);font-weight:600;margin-top:3px;min-height:16px\">"
       + (a.amount && !isCL ? "→ " + formatCurrency(a.amount) : "")
       + "</div>"
-      + (isF ? "<div id=\"tx-cv\" style=\"font-size:10.5px;color:var(--t4);margin-top:1px\"></div>" : "")
+      + (isF ? "<div id=\"tx-cv\" style=\"font-size:11.5px;color:var(--t4);margin-top:1px\"></div>" : "")
       + "</div>";
   }
 
@@ -324,15 +324,16 @@ function openTransactionList(assetId) {
     h += "<div style=\"text-align:center;color:var(--t4);padding:20px;font-size:13px\">거래 내역이 없습니다</div>";
   } else {
     txns.forEach(function(t) {
+      var _txCls = t.type === "buy" ? (isCL ? "txd" : "txb") : "txs";
       h += "<div class=\"txr\" style=\"padding:9px 0\">"
-        + "<span class=\"txt " + (t.type === "buy" ? "txb" : "txs") + "\">"
+        + "<span class=\"txt " + _txCls + "\">"
         + getTransactionLabel(a.category, t.type) + "</span>"
         + "<div style=\"flex:1\"><div>"
         + "<span style=\"color:var(--t1);font-weight:600\">" + formatNumber(t.price) + "</span>"
         + (isCL ? "" : " × " + t.qty + " = <span style=\"color:var(--t1);font-weight:600\">"
           + formatNumber(t.price * t.qty) + "</span>")
         + "</div>"
-        + "<div style=\"font-size:10px;color:var(--t5);margin-top:2px\">"
+        + "<div style=\"font-size:11px;color:var(--t5);margin-top:2px\">"
         + (t.date || "")
         + (t.account ? " · " + escapeHtml(t.account) : "")
         + (t.memo ? " · " + escapeHtml(t.memo) : "")
@@ -395,7 +396,7 @@ function openBalanceUpdate(assetId) {
 
     h += "<div class=\"fld\"><label>💲 현재 보유 USDT 수량</label>"
       + "<input type=\"number\" id=\"bal-uq\" step=\"any\" placeholder=\"예: 500\" data-cur=\"" + curBal + "\" oninput=\"previewUsdtDiff()\">"
-      + "<div id=\"bal-usdt-rate\" style=\"font-size:10.5px;color:var(--t5);margin-top:4px\">💱 USDT 시세 조회 중...</div>"
+      + "<div id=\"bal-usdt-rate\" style=\"font-size:11.5px;color:var(--t5);margin-top:4px\">💱 USDT 시세 조회 중...</div>"
       + "<div id=\"bal-usdt-cv\" style=\"font-size:12px;color:var(--green);font-weight:600;margin-top:4px;min-height:18px\"></div>"
       + "<div id=\"bal-diff\" style=\"font-size:12.5px;font-weight:600;margin-top:6px;min-height:20px\"></div>"
       + "</div>";
@@ -492,10 +493,10 @@ function previewBalanceDiff(v, cur) {
   if (diff === 0) {
     df.innerHTML = "<span style=\"color:var(--t4)\">변동 없음</span>";
   } else if (diff > 0) {
-    df.innerHTML = "<span style=\"color:var(--red)\">📈 +" + formatCurrency(diff) + " "
+    df.innerHTML = "<span style=\"color:var(--green)\">▲ +" + formatCurrency(diff) + " "
       + getTransactionLabel("현금", "buy") + "</span>";
   } else {
-    df.innerHTML = "<span style=\"color:var(--blue)\">📉 " + formatCurrency(diff) + " "
+    df.innerHTML = "<span style=\"color:var(--blue)\">▼ " + formatCurrency(diff) + " "
       + getTransactionLabel("현금", "sell") + "</span>";
   }
 }
@@ -531,9 +532,9 @@ function previewUsdtDiff() {
       if (diff === 0) {
         df.innerHTML = "<span style=\"color:var(--t4)\">변동 없음</span>";
       } else if (diff > 0) {
-        df.innerHTML = "<span style=\"color:var(--red)\">📈 +" + formatCurrency(diff) + " 입금</span>";
+        df.innerHTML = "<span style=\"color:var(--green)\">▲ +" + formatCurrency(diff) + " 입금</span>";
       } else {
-        df.innerHTML = "<span style=\"color:var(--blue)\">📉 " + formatCurrency(diff) + " 출금</span>";
+        df.innerHTML = "<span style=\"color:var(--blue)\">▼ " + formatCurrency(diff) + " 출금</span>";
       }
     }
   });

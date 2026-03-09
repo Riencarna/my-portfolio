@@ -126,7 +126,7 @@ function renderIncome() {
       h += "<div style=\"flex:1;font-size:12px;color:var(--t3)\">" + d.nm + "</div>";
       h += "<div style=\"text-align:right\">";
       h += "<div style=\"font-size:12.5px;font-weight:700;color:var(--t1)\">" + formatShortCurrency(d.v) + "</div>";
-      h += "<div style=\"font-size:10px;color:var(--t4)\">" + ((d.v / total) * 100).toFixed(1) + "%</div>";
+      h += "<div style=\"font-size:11px;color:var(--t4)\">" + ((d.v / total) * 100).toFixed(1) + "%</div>";
       h += "</div></div>";
     });
 
@@ -212,7 +212,7 @@ function renderIncome() {
         h += "<span style=\"font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(139,92,246,.1);color:#A78BFA;font-weight:600\">반복</span>";
       }
       h += "</div>";
-      h += "<div style=\"font-size:10.5px;color:var(--t5);margin-top:2px\">";
+      h += "<div style=\"font-size:11.5px;color:var(--t5);margin-top:2px\">";
       h += (x.date || "");
       if (x.memo) h += " · " + escapeHtml(x.memo);
       h += "</div></div>";
@@ -220,7 +220,7 @@ function renderIncome() {
       // 금액
       h += "<div style=\"text-align:right;flex-shrink:0\">";
       h += "<div style=\"font-size:14px;font-weight:700;color:var(--green)\">+" + formatCurrency(x.amount) + "</div>";
-      h += "<div style=\"font-size:10px;color:var(--t4)\">" + catObj.label + "</div>";
+      h += "<div style=\"font-size:11px;color:var(--t4)\">" + catObj.label + "</div>";
       h += "</div>";
 
       // 삭제 버튼

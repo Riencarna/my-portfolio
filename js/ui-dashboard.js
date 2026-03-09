@@ -35,7 +35,7 @@ function startInlineEdit(cat, curVal) {
         "display:flex;align-items:center;justify-content:center\" " +
         "onclick=\"saveInlineEdit(" + QUOTE + cat + QUOTE + "," + curVal + ")\">✓</button>" +
     "</div>" +
-    "<div id=\"dip_" + cat + "\" style=\"font-size:10.5px;margin-top:3px;min-height:16px\"></div>";
+    "<div id=\"dip_" + cat + "\" style=\"font-size:11.5px;margin-top:3px;min-height:16px\"></div>";
   el.onclick = null;
   setTimeout(function () {
     var inp = document.getElementById("dii_" + cat);
@@ -215,10 +215,10 @@ function renderDashboard() {
         "<span style=\"font-size:14px;font-weight:700;color:var(--t1)\">" +
           Math.round(rr).toLocaleString() + "원</span> " +
         (rOk
-          ? "<span style=\"font-size:10px;color:var(--green)\">✓ 실시간</span>"
-          : "<span style=\"font-size:10px;color:var(--amber)\">⚠ " + (_rCacheT ? "캐시" : "기본값") + "</span>") +
+          ? "<span style=\"font-size:11px;color:var(--green)\">✓ 실시간</span>"
+          : "<span style=\"font-size:11px;color:var(--amber)\">⚠ " + (_rCacheT ? "캐시" : "기본값") + "</span>") +
         (rTime
-          ? " <span style=\"font-size:10px;color:var(--t5)\">" + rTime + "</span>"
+          ? " <span style=\"font-size:11px;color:var(--t5)\">" + rTime + "</span>"
           : "") +
       "</div>" +
       "<button style=\"border:none;background:rgba(59,130,246,.08);color:#60A5FA;padding:5px 10px;" +
@@ -237,7 +237,7 @@ function renderDashboard() {
         (chg >= 0 ? "▲" : "▼") + " " + formatShortCurrency(Math.abs(chg)) + "</span>" +
       "<span style=\"font-size:12px;color:" + (chg >= 0 ? "var(--red)" : "#60A5FA") + "\">" +
         "(" + (chg >= 0 ? "+" : "") + chgP + "%)</span>" +
-      "<span style=\"font-size:10px;color:var(--t5)\">전일 대비</span></div>";
+      "<span style=\"font-size:11px;color:var(--t5)\">전일 대비</span></div>";
   }
 
   if (inv > 0) {
@@ -255,10 +255,23 @@ function renderDashboard() {
   }
 
   if (!appState.assets.length) {
-    h += "<div style=\"margin-top:12px;padding:11px 14px;background:rgba(255,255,255,.03);" +
-      "border-radius:11px;color:var(--t4);font-size:12.5px\">" +
-      "자산이 없습니다. <span style=\"color:#60A5FA;cursor:pointer\" " +
-      "onclick=\"openAddAsset()\">+ 추가하기</span></div>";
+    h += "<div class=\"onboard-wrap\">" +
+      "<div style=\"font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px\">시작하기</div>" +
+      "<div style=\"font-size:12px;color:var(--t4);margin-bottom:12px\">3단계로 자산 관리를 시작하세요</div>" +
+      "<div class=\"onboard-step\">" +
+        "<div class=\"onboard-num\">1</div>" +
+        "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">자산 추가</div>" +
+        "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">주식, 코인, 현금, 예적금 등을 등록하세요</div></div></div>" +
+      "<div class=\"onboard-step\">" +
+        "<div class=\"onboard-num\">2</div>" +
+        "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">거래 기록</div>" +
+        "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">매수/매도, 입금/출금 내역을 기록하세요</div></div></div>" +
+      "<div class=\"onboard-step\">" +
+        "<div class=\"onboard-num\">3</div>" +
+        "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">자동 최신화</div>" +
+        "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">가격을 자동으로 업데이트하고 수익률을 확인하세요</div></div></div>" +
+      "<button class=\"btn btn-p\" style=\"width:100%;margin-top:14px\" onclick=\"openAddAsset()\">+ 첫 자산 추가하기</button>" +
+    "</div>";
   }
 
   /* Period returns */
@@ -307,6 +320,17 @@ function renderDashboard() {
         : "⚡ 전체 최신화") +
       "</button></div>";
 
+    if (isAllLoading && autoUpdateProgress.total > 0) {
+      var _pDone = autoUpdateProgress.done;
+      var _pTotal = autoUpdateProgress.total;
+      var _pPct = Math.round((_pDone / _pTotal) * 100);
+      h += "<div class=\"au-prog\">" +
+        "<div style=\"display:flex;justify-content:space-between;align-items:center\">" +
+          "<span style=\"font-size:11.5px;color:var(--t2);font-weight:600\">" + _pDone + "/" + _pTotal + " 완료</span>" +
+          "<span style=\"font-size:11px;color:var(--t4)\">" + _pPct + "%</span></div>" +
+        "<div class=\"au-prog-bar\"><div style=\"width:" + _pPct + "%\"></div></div></div>";
+    }
+
     if (updateLogs.length > 0) {
       var okCnt = 0, failCnt = 0;
       updateLogs.forEach(function (l) { if (l.ok) okCnt++; else failCnt++; });
@@ -323,7 +347,7 @@ function renderDashboard() {
               ? "<span style=\"font-size:11px;color:var(--red);font-weight:600\">❌ " + failCnt + "개 실패</span>"
               : "") +
           "</div>" +
-          "<span style=\"font-size:10px;color:var(--t5)\">" +
+          "<span style=\"font-size:11px;color:var(--t5)\">" +
             (isLogOpen ? "▲ 접기" : "▼ 상세") + "</span></div>";
 
       if (failCnt > 0 && !isAllLoading) {
@@ -418,10 +442,10 @@ function renderDashboard() {
               "<div style=\"font-size:13px;font-weight:700;color:var(--t1);" +
                 "display:flex;align-items:center;justify-content:flex-end;gap:4px\">" +
                 formatShortCurrency(d.v) +
-                " <span style=\"font-size:10px;color:var(--t5)\">✏️</span></div></div>"
+                " <span style=\"font-size:11px;color:var(--t5)\">✏️</span></div></div>"
             : "<div style=\"font-size:13px;font-weight:700;color:var(--t1)\">" +
               formatShortCurrency(d.v) + "</div>") +
-          "<div style=\"font-size:10px;color:var(--t4)\">" +
+          "<div style=\"font-size:11px;color:var(--t4)\">" +
             ((d.v / total) * 100).toFixed(1) + "%" +
             (catChg !== null && catChg !== 0
               ? " <span style=\"color:" + (catChg > 0 ? "var(--red)" : "#60A5FA") +

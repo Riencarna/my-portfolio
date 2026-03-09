@@ -58,7 +58,7 @@ function openWalletModal() {
   h += "EVM 지갑 주소를 입력하면 <strong style=\"color:var(--t1)\">6개 체인</strong>의 네이티브 코인과 주요 토큰 잔고를 자동으로 스캔합니다.</div>";
   h += "<div style=\"display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px\">";
   EVM_CHAINS.forEach(function (c) {
-    h += "<span style=\"font-size:10.5px;padding:3px 8px;background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:6px;color:var(--t3)\">";
+    h += "<span style=\"font-size:11.5px;padding:3px 8px;background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:6px;color:var(--t3)\">";
     h += c.icon + " " + c.name + "</span>";
   });
   h += "</div>";
@@ -201,9 +201,9 @@ function renderWalletResults(addr) {
 
   var h = "<div style=\"margin:10px 0 8px;padding:10px 12px;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.12);border-radius:10px;display:flex;justify-content:space-between;align-items:center\">";
   h += "<div><div style=\"font-size:11px;color:var(--green);font-weight:600\">✅ " + walletScanResults.length + "개 자산 발견</div>";
-  h += "<div style=\"font-size:10px;color:var(--t4);margin-top:2px\">" + addr.slice(0, 8) + "..." + addr.slice(-6) + "</div></div>";
+  h += "<div style=\"font-size:11px;color:var(--t4);margin-top:2px\">" + addr.slice(0, 8) + "..." + addr.slice(-6) + "</div></div>";
   h += "<div style=\"text-align:right\"><div style=\"font-size:14px;font-weight:700;color:var(--t1)\" id=\"wl-total\">" + formatShortCurrency(Math.round(totalKrw)) + "</div>";
-  h += "<div style=\"font-size:10px;color:var(--t4)\">선택 자산 합계</div></div></div>";
+  h += "<div style=\"font-size:11px;color:var(--t4)\">선택 자산 합계</div></div></div>";
 
   h += "<div style=\"display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px\">";
   h += "<button style=\"border:none;background:none;color:#60A5FA;font-size:11px;cursor:pointer;font-family:inherit\" onclick=\"toggleAllWalletAssets(true)\">전체 선택</button>";
@@ -214,7 +214,7 @@ function renderWalletResults(addr) {
     h += "<div class=\"wl-chain" + (r.balance > 0 ? " found" : "") + "\">";
     h += "<input type=\"checkbox\" class=\"wl-cb\" " + (r.checked ? "checked" : "") + " onchange=\"toggleWalletAsset(" + i + ",this.checked)\">";
     h += "<div class=\"wl-ic\">" + r.chainIc + "</div>";
-    h += "<div class=\"wl-info\"><div class=\"wl-nm\">" + r.symbol + "<span style=\"font-size:10px;color:var(--t5);margin-left:5px\">" + r.chainName + "</span></div>";
+    h += "<div class=\"wl-info\"><div class=\"wl-nm\">" + r.symbol + "<span style=\"font-size:11px;color:var(--t5);margin-left:5px\">" + r.chainName + "</span></div>";
     h += "<div class=\"wl-bal\">" + balStr + " " + r.symbol + "</div></div>";
     h += "<div style=\"text-align:right\"><div class=\"wl-val\">" + formatShortCurrency(Math.round(r.valueKrw)) + "</div>";
     h += "<div class=\"wl-st\">$" + (r.balance * r.priceUsd >= 1 ? (r.balance * r.priceUsd).toFixed(2) : (r.balance * r.priceUsd).toFixed(4)) + "</div></div>";

@@ -36,6 +36,7 @@ var historyChartDays = 30;
 var undoSnapshot = null;
 var undoTimerHandle = null;
 var isSandbox = false;
+var autoUpdateProgress = { total: 0, done: 0 };
 
 // --- 데이터 로드 ---
 
