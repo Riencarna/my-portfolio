@@ -1,5 +1,5 @@
 /* ===================================================
-   My Portfolio v1.9.2 - Styles
+   My Portfolio v2.0.0 - Styles
    자산 관리 대시보드 스타일시트
    =================================================== */
 
@@ -22,6 +22,27 @@
   --red: #EF4444;
   --pink: #EC4899;
   --cyan: #06B6D4;
+}
+
+/* --- Light Theme --- */
+:root[data-theme="light"] {
+  --bg: #F8FAFC;
+  --bg2: #F1F5F9;
+  --card: #FFFFFF;
+  --card2: #F8FAFC;
+  --bd: rgba(0, 0, 0, 0.08);
+  --t1: #0F172A;
+  --t2: #1E293B;
+  --t3: #475569;
+  --t4: #94A3B8;
+  --t5: #CBD5E1;
+  --blue: #2563EB;
+  --purple: #7C3AED;
+  --amber: #D97706;
+  --green: #059669;
+  --red: #DC2626;
+  --pink: #DB2777;
+  --cyan: #0891B2;
 }
 
 /* --- Reset & Base --- */
@@ -831,4 +852,269 @@ button {
   .tab.on {
     font-size: 11.5px;
   }
+}
+
+/* --- Splash Screen --- */
+.splash {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity .4s ease;
+}
+
+.splash-icon {
+  font-size: 48px;
+  margin-bottom: 14px;
+  animation: splashPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes splashPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: .8; }
+}
+
+.splash-title {
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #60A5FA, #A78BFA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.splash-sub {
+  font-size: 11px;
+  color: var(--t4);
+  margin-top: 6px;
+}
+
+/* --- Skeleton Loading --- */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,.02) 25%, rgba(255,255,255,.07) 50%, rgba(255,255,255,.02) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 10px;
+}
+
+:root[data-theme="light"] .skeleton {
+  background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%);
+  background-size: 200% 100%;
+}
+
+.sk-text {
+  height: 14px;
+  margin-bottom: 8px;
+  width: 80%;
+}
+
+.sk-lg {
+  height: 32px;
+  width: 55%;
+  margin-bottom: 12px;
+}
+
+.sk-card {
+  height: 140px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+}
+
+.sk-bar {
+  height: 8px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+}
+
+/* --- Period Returns --- */
+.period-returns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.period-badge {
+  flex: 1;
+  min-width: 72px;
+  padding: 10px 6px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--bd);
+  text-align: center;
+  transition: all .15s;
+}
+
+.period-badge .pb-label {
+  font-size: 10px;
+  color: var(--t4);
+  margin-bottom: 4px;
+}
+
+.period-badge .pb-value {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.period-badge .pb-pct {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+/* --- Theme Toggle --- */
+.theme-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--t3);
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* --- Light Theme Overrides --- */
+:root[data-theme="light"] body {
+  background: linear-gradient(180deg, var(--bg), var(--bg2));
+}
+
+:root[data-theme="light"] .hdr-bg {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.04), transparent);
+}
+
+:root[data-theme="light"] .tot {
+  background: linear-gradient(135deg, #EFF6FF, var(--card));
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+:root[data-theme="light"] .tot .glow {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08), transparent 70%);
+}
+
+:root[data-theme="light"] .tabs {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="light"] .tab.on {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+:root[data-theme="light"] .ai {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(59, 130, 246, 0.06));
+  border-color: rgba(16, 185, 129, 0.12);
+}
+
+:root[data-theme="light"] .cg {
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .cg-h {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .ar {
+  border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .card {
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .mdl {
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme="light"] .mbg {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="light"] .fld input,
+:root[data-theme="light"] .fld select {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: var(--card2);
+}
+
+:root[data-theme="light"] .cchip {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .dtgl {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .dsec {
+  background: rgba(0, 0, 0, 0.015);
+  border-color: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .hrow {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .ditem {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="light"] .period-badge {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .theme-toggle {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .mc {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .wl-chain {
+  background: rgba(0, 0, 0, 0.01);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .wl-chain.found {
+  border-color: rgba(5, 150, 105, 0.2);
+  background: rgba(5, 150, 105, 0.03);
+}
+
+:root[data-theme="light"] .logo {
+  background: linear-gradient(135deg, #2563EB, #7C3AED);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+:root[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme="light"] .spinner {
+  border-color: rgba(217, 119, 6, 0.2);
+  border-top-color: var(--amber);
+}
+
+:root[data-theme="light"] .splash {
+  background: var(--bg);
 }

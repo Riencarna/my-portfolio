@@ -72,6 +72,62 @@ function generateId() {
   return id;
 }
 
+// --- 숫자 카운트업 애니메이션 ---
+
+var _lastCountUpTotal = 0;
+
+function animateCountUp(el, target, duration) {
+  if (!el) return;
+  var start = Number(el.dataset.countCurrent || 0);
+  var dur = duration || 800;
+  var startTime = null;
+
+  if (Math.abs(target - start) < 500) {
+    el.textContent = Math.round(target).toLocaleString() + "원";
+    el.dataset.countCurrent = target;
+    return;
+  }
+
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    var progress = Math.min((ts - startTime) / dur, 1);
+    var eased = 1 - Math.pow(1 - progress, 3);
+    var current = Math.round(start + (target - start) * eased);
+    el.textContent = Math.round(current).toLocaleString() + "원";
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    } else {
+      el.textContent = Math.round(target).toLocaleString() + "원";
+      el.dataset.countCurrent = target;
+    }
+  }
+
+  requestAnimationFrame(step);
+}
+
+// --- 기간별 수익률 계산 ---
+
+function calcPeriodReturn(days) {
+  if (appState.history.length < 2) return null;
+  var latest = appState.history[appState.history.length - 1];
+  var target = new Date();
+  target.setDate(target.getDate() - days);
+  var targetStr = target.getFullYear() + "-" + String(target.getMonth() + 1).padStart(2, "0") + "-" + String(target.getDate()).padStart(2, "0");
+
+  var closest = null;
+  for (var i = appState.history.length - 1; i >= 0; i--) {
+    if (appState.history[i].date <= targetStr) {
+      closest = appState.history[i];
+      break;
+    }
+  }
+
+  if (!closest || closest.date === latest.date) return null;
+  var diff = latest.total - closest.total;
+  var pct = closest.total > 0 ? ((diff / closest.total) * 100).toFixed(2) : "0.00";
+  return { diff: diff, pct: pct };
+}
+
 // --- 디바운스 (성능 최적화) ---
 
 function debounce(fn, delay) {

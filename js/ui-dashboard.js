@@ -229,7 +229,7 @@ function renderDashboard() {
   /* Total asset card */
   h += "<div class=\"tot\"><div class=\"glow\"></div>" +
     "<div style=\"font-size:12px;color:var(--t3);margin-bottom:5px;font-weight:500\">총 자산</div>" +
-    "<div class=\"tot-n\">" + formatNumber(total) + "</div>";
+    "<div class=\"tot-n\" id=\"totNum\">" + formatNumber(total) + "</div>";
 
   if (chg !== null) {
     h += "<div style=\"display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap\">" +
@@ -260,6 +260,38 @@ function renderDashboard() {
       "자산이 없습니다. <span style=\"color:#60A5FA;cursor:pointer\" " +
       "onclick=\"openAddAsset()\">+ 추가하기</span></div>";
   }
+
+  /* Period returns */
+  if (appState.history.length >= 2) {
+    var periods = [
+      { days: 7, label: "1주" },
+      { days: 30, label: "1개월" },
+      { days: 90, label: "3개월" },
+      { days: 180, label: "6개월" },
+      { days: 365, label: "1년" }
+    ];
+    var hasAny = false;
+    var prHtml = "";
+    periods.forEach(function(p) {
+      var r = calcPeriodReturn(p.days);
+      if (r) {
+        hasAny = true;
+        var isUp = r.diff >= 0;
+        prHtml += "<div class=\"period-badge\">" +
+          "<div class=\"pb-label\">" + p.label + "</div>" +
+          "<div class=\"pb-value\" style=\"color:" + (isUp ? "var(--red)" : "var(--blue)") + "\">" +
+            (isUp ? "+" : "") + formatShortCurrency(r.diff) + "</div>" +
+          "<div class=\"pb-pct\" style=\"color:" + (isUp ? "var(--red)" : "var(--blue)") + "\">" +
+            (isUp ? "+" : "") + r.pct + "%</div></div>";
+      }
+    });
+    if (hasAny) {
+      h += "<div style=\"margin-top:12px\">" +
+        "<div style=\"font-size:11px;color:var(--t4);margin-bottom:6px;font-weight:500\">📊 기간별 수익률</div>" +
+        "<div class=\"period-returns\">" + prHtml + "</div></div>";
+    }
+  }
+
   h += "</div>";
 
   /* Auto-update section */
@@ -479,6 +511,15 @@ function renderDashboard() {
 
   /* Inject HTML and draw charts */
   el.innerHTML = h;
+
+  /* Count-up animation */
+  var totEl = document.getElementById("totNum");
+  if (totEl && Math.abs(total - _lastCountUpTotal) > 100) {
+    totEl.dataset.countCurrent = _lastCountUpTotal;
+    animateCountUp(totEl, total, 800);
+  }
+  _lastCountUpTotal = total;
+
   if (cd.length > 0) drawPie(cd, total);
   if (cht.length >= 2) drawLine("cL1", cht, 145);
 

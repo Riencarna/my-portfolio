@@ -1,0 +1,20 @@
+{
+  "name": "My Portfolio - 자산 관리 대시보드",
+  "short_name": "My Portfolio",
+  "description": "국내주식, 해외주식, 코인, 현금, 예적금을 한 곳에서 관리하는 자산 관리 도구",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0D11",
+  "theme_color": "#0B0D11",
+  "categories": ["finance"],
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

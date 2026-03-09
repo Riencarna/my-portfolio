@@ -247,11 +247,59 @@ function retryFailed() {
   }, { passive: true });
 })();
 
+// --- 테마 토글 ---
+
+function toggleTheme() {
+  var root = document.documentElement;
+  var current = root.getAttribute("data-theme");
+  var next = current === "light" ? "dark" : "light";
+  root.setAttribute("data-theme", next);
+  try { localStorage.setItem("mp_theme", next); } catch (e) {}
+  var btn = document.getElementById("btnTheme");
+  if (btn) btn.textContent = next === "light" ? "🌙" : "☀️";
+  var meta = document.querySelector("meta[name=\"theme-color\"]");
+  if (meta) meta.content = next === "light" ? "#F8FAFC" : "#0B0D11";
+}
+
+function loadTheme() {
+  try {
+    var saved = localStorage.getItem("mp_theme");
+    if (saved === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+      var btn = document.getElementById("btnTheme");
+      if (btn) btn.textContent = "🌙";
+      var meta = document.querySelector("meta[name=\"theme-color\"]");
+      if (meta) meta.content = "#F8FAFC";
+    }
+  } catch (e) {}
+}
+
+// --- 스플래시 제거 ---
+
+function removeSplash() {
+  var splash = document.getElementById("splash");
+  if (splash) {
+    splash.style.opacity = "0";
+    setTimeout(function() { splash.remove(); }, 400);
+  }
+}
+
+// --- Service Worker 등록 ---
+
+function registerSW() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(function() {});
+  }
+}
+
 // --- 초기화 ---
 
+loadTheme();
 loadData();
 restoreLastTab();
 render();
+removeSplash();
+registerSW();
 checkSandbox().then(function() {
   render();
   fetchExchangeRate().then(function() { render(); });

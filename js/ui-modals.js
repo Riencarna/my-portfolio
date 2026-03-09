@@ -938,7 +938,31 @@ function doAddAsset() {
   saveData();
   closeModal();
   render();
-  showToast("✅ " + name + " 자산이 추가되었습니다", true);
+
+  // 자산 추가 후 첫 거래 기록 안내
+  var newId = item.id;
+  var isCL = isCashLike(item.category);
+  setTimeout(function() {
+    openModal("🎉 자산 추가 완료",
+      "<div style=\"text-align:center;padding:8px 0\">" +
+        "<div style=\"font-size:40px;margin-bottom:10px\">" + CATEGORY_CONFIG[item.category].icon + "</div>" +
+        "<div style=\"font-size:15px;font-weight:700;color:var(--t1);margin-bottom:4px\">" + escapeHtml(name) + "</div>" +
+        "<div style=\"font-size:12px;color:var(--t4);margin-bottom:20px\">" +
+          (isCL
+            ? "현재 잔액을 입력하면 총 자산에 바로 반영됩니다"
+            : "첫 " + getTransactionLabel(item.category, "buy") + " 기록을 추가하면 평가금액과 수익률을 확인할 수 있습니다") +
+        "</div>" +
+        "<div class=\"mbtn\">" +
+          "<button class=\"btn btn-g\" onclick=\"closeModal()\">나중에 할게요</button>" +
+          "<button class=\"btn btn-p\" style=\"flex:2\" onclick=\"closeModal();setTimeout(function(){" +
+            (isCL
+              ? "openBalanceUpdate(" + newId + ")"
+              : "openTransaction(" + newId + "," + QUOTE + "buy" + QUOTE + ")") +
+          "},150)\">" + (isCL ? "💰 잔액 입력하기" : "📋 " + getTransactionLabel(item.category, "buy") + " 기록하기") + "</button>" +
+        "</div>" +
+      "</div>"
+    );
+  }, 200);
 }
 
 // --- 자산 수정 모달 ---

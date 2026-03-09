@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- My Portfolio v1.9.2 | 2026-03-01 | 자산 관리 대시보드 -->
+<!-- My Portfolio v2.0.0 | 2026-03-10 | 자산 관리 대시보드 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -12,8 +12,13 @@
 <meta property="og:description" content="주식·코인·현금·예적금을 한눈에. 실시간 가격 최신화, 손익 분석, 자산 구성 차트까지.">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#0B0D11">
-<title>My Portfolio v1.9.2 - 자산 관리 대시보드</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Portfolio">
+<title>My Portfolio v2.0.0 - 자산 관리 대시보드</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="manifest" href="manifest.json">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" crossorigin="anonymous">
 <link rel="stylesheet" href="css/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous" defer></script>
@@ -33,6 +38,14 @@
 </head>
 <body>
 
+<!-- 로딩 스플래시 -->
+<div id="splash" class="splash">
+  <div class="splash-icon">💰</div>
+  <div class="splash-title">My Portfolio</div>
+  <div class="splash-sub">자산을 불러오는 중...</div>
+  <div style="margin-top:18px"><div class="spinner"></div></div>
+</div>
+
 <!-- 헤더 -->
 <div class="hdr-bg">
   <div class="hdr">
@@ -40,9 +53,10 @@
       <div class="hdr-row">
         <div>
           <div class="logo-s">My Portfolio</div>
-          <div class="logo">자산 관리 대시보드 <span style="font-size:10px;color:var(--t5);font-weight:400">v1.9.2</span></div>
+          <div class="logo">자산 관리 대시보드 <span style="font-size:10px;color:var(--t5);font-weight:400">v2.0.0</span></div>
         </div>
         <div style="display:flex;gap:7px">
+          <button id="btnTheme" class="theme-toggle" onclick="toggleTheme()" title="테마 전환">☀️</button>
           <button id="btnSnap" onclick="saveSnapshot()" title="오늘 기록 저장"
             style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15);color:var(--green);width:38px;height:38px;border-radius:11px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">📸</button>
           <button onclick="openWalletModal()" title="지갑 연동"
