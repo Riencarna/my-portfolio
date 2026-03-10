@@ -48,6 +48,7 @@ function restoreLastTab() {
 
 function render(opts) {
   document.getElementById("elSaved").textContent = appState.saved ? "마지막 저장: " + appState.saved : "";
+  updatePortfolioSelector();
   // 자동 최신화 중간 렌더: 대시보드/리스트 탭에서만 업데이트
   if (opts && opts.priceUpdateOnly && currentTab !== "dash" && currentTab !== "list") return;
   if (currentTab === "dash") renderDashboard();
@@ -310,9 +311,23 @@ function registerSW() {
   }
 }
 
+// --- 포트폴리오 초기화 ---
+
+function initPortfolio() {
+  var meta = _getPortfolioMeta();
+  currentPortfolioId = meta.active || "default";
+  _currentStorageKey = _getStorageKeyForPortfolio(currentPortfolioId);
+}
+
+function updatePortfolioSelector() {
+  var el = document.getElementById("pfName");
+  if (el) el.textContent = getActivePortfolioName();
+}
+
 // --- 초기화 ---
 
 loadTheme();
+initPortfolio();
 loadData();
 restoreLastTab();
 render();

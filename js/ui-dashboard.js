@@ -523,15 +523,49 @@ function renderDashboard() {
     h += "</div>";
   }
 
-  /* Asset trend chart */
-  if (cht.length >= 2) {
+  /* Asset growth chart (enhanced) */
+  if (appState.history.length >= 2) {
+    var growthData = growthChartDays === 0 ? appState.history : appState.history.slice(-growthChartDays);
+    h += "<div class=\"card\">" +
+      "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px\">" +
+        "<div style=\"font-size:14px;font-weight:700;color:var(--t1)\">📈 자산 성장 그래프</div>" +
+        "<div style=\"display:flex;gap:4px;align-items:center\">" +
+          "<button style=\"padding:3px 8px;border-radius:6px;font-size:10px;font-family:inherit;" +
+            "border:1px solid " + (growthShowCategories ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
+            "background:" + (growthShowCategories ? "rgba(59,130,246,.1)" : "rgba(255,255,255,.03)") + ";" +
+            "color:" + (growthShowCategories ? "#60A5FA" : "var(--t4)") + ";cursor:pointer\" " +
+            "onclick=\"growthShowCategories=!growthShowCategories;renderDashboard()\">카테고리별</button>";
+    [{ d: 30, l: "30일" }, { d: 90, l: "90일" }, { d: 0, l: "전체" }].forEach(function(o) {
+      var sel = growthChartDays === o.d;
+      h += "<button style=\"padding:3px 8px;border-radius:6px;font-size:10px;font-family:inherit;" +
+        "border:1px solid " + (sel ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
+        "background:" + (sel ? "rgba(59,130,246,.1)" : "rgba(255,255,255,.03)") + ";" +
+        "color:" + (sel ? "#60A5FA" : "var(--t4)") + ";cursor:pointer\" " +
+        "onclick=\"growthChartDays=" + o.d + ";renderDashboard()\">" + o.l + "</button>";
+    });
+    h += "</div></div>" +
+      "<div style=\"position:relative;height:200px\"><canvas id=\"cGrowth\"></canvas></div></div>";
+  }
+
+  /* Benchmark comparison */
+  if (appState.history.length >= 2) {
     h += "<div class=\"card\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px\">" +
-        "<div style=\"font-size:14px;font-weight:700;color:var(--t1)\">자산 추이</div>" +
-        "<button style=\"background:none;border:none;color:#60A5FA;font-size:11.5px;" +
-          "cursor:pointer;font-weight:500;font-family:inherit\" " +
-          "onclick=\"goTab('hist')\">자세히 →</button></div>" +
-      "<div style=\"position:relative;height:145px\"><canvas id=\"cL1\"></canvas></div></div>";
+        "<div style=\"font-size:14px;font-weight:700;color:var(--t1)\">📊 벤치마크 비교</div>" +
+        "<button id=\"btnBench\" style=\"padding:5px 10px;border-radius:7px;font-size:11px;font-family:inherit;" +
+          "border:1px solid rgba(59,130,246,.15);background:rgba(59,130,246,.05);color:#60A5FA;" +
+          "cursor:pointer;font-weight:600\" " +
+          "onclick=\"loadBenchmark()\">🔄 불러오기</button></div>" +
+      "<div id=\"benchContent\">";
+
+    if (cachedBenchmark && (cachedBenchmark.kospi || cachedBenchmark.sp500)) {
+      h += _buildBenchmarkTable();
+    } else {
+      h += "<div style=\"text-align:center;padding:16px;color:var(--t4);font-size:12px\">" +
+        "불러오기 버튼을 눌러 KOSPI · S&P500 수익률과 비교해보세요</div>";
+    }
+
+    h += "</div></div>";
   }
 
   h += "</div></div>";
@@ -548,7 +582,12 @@ function renderDashboard() {
   _lastCountUpTotal = total;
 
   if (cd.length > 0) drawPie(cd, total);
-  if (cht.length >= 2) drawLine("cL1", cht, 145);
+
+  /* Draw growth chart */
+  if (appState.history.length >= 2) {
+    var gd = growthChartDays === 0 ? appState.history : appState.history.slice(-growthChartDays);
+    setTimeout(function() { drawGrowthChart("cGrowth", gd, 200, growthShowCategories); }, 40);
+  }
 
   cd.forEach(function (d, i) {
     if (dashboardCategoryOpen[d.n] && catBreakMap[d.n]) {
@@ -562,4 +601,142 @@ function renderDashboard() {
       }, 40);
     }
   });
+}
+
+/* --- Benchmark helpers --- */
+
+function _buildBenchmarkTable() {
+  var periods = [7, 30, 90, 180, 365];
+  var h = "<div style=\"overflow-x:auto\">" +
+    "<table style=\"width:100%;border-collapse:collapse;font-size:12px\">" +
+    "<tr style=\"border-bottom:1px solid rgba(255,255,255,.06)\">" +
+    "<th style=\"text-align:left;padding:6px 8px;color:var(--t4);font-weight:500\">기간</th>" +
+    "<th style=\"text-align:right;padding:6px 8px;color:var(--t4);font-weight:500\">내 포트폴리오</th>" +
+    "<th style=\"text-align:right;padding:6px 8px;color:var(--t4);font-weight:500\">KOSPI</th>" +
+    "<th style=\"text-align:right;padding:6px 8px;color:var(--t4);font-weight:500\">S&P500</th>" +
+    "</tr>";
+
+  var labels = { 7: "1주", 30: "1개월", 90: "3개월", 180: "6개월", 365: "1년" };
+  periods.forEach(function(days) {
+    var myReturn = calcPeriodReturn(days);
+    var kReturn = cachedBenchmark.kospi && cachedBenchmark.kospi[days] ? cachedBenchmark.kospi[days] : null;
+    var sReturn = cachedBenchmark.sp500 && cachedBenchmark.sp500[days] ? cachedBenchmark.sp500[days] : null;
+
+    if (!myReturn && !kReturn && !sReturn) return;
+
+    h += "<tr style=\"border-bottom:1px solid rgba(255,255,255,.03)\">";
+    h += "<td style=\"padding:7px 8px;color:var(--t2);font-weight:500\">" + labels[days] + "</td>";
+
+    // My portfolio
+    if (myReturn) {
+      var myPct = Number(myReturn.pct);
+      h += "<td style=\"text-align:right;padding:7px 8px;font-weight:700;color:" +
+        (myPct >= 0 ? "var(--red)" : "var(--blue)") + "\">" +
+        (myPct >= 0 ? "+" : "") + myPct.toFixed(2) + "%</td>";
+    } else {
+      h += "<td style=\"text-align:right;padding:7px 8px;color:var(--t5)\">-</td>";
+    }
+
+    // KOSPI
+    if (kReturn) {
+      var kPct = Number(kReturn.pct);
+      h += "<td style=\"text-align:right;padding:7px 8px;color:" +
+        (kPct >= 0 ? "var(--red)" : "var(--blue)") + "\">" +
+        (kPct >= 0 ? "+" : "") + kPct + "%</td>";
+    } else {
+      h += "<td style=\"text-align:right;padding:7px 8px;color:var(--t5)\">-</td>";
+    }
+
+    // S&P500
+    if (sReturn) {
+      var sPct = Number(sReturn.pct);
+      h += "<td style=\"text-align:right;padding:7px 8px;color:" +
+        (sPct >= 0 ? "var(--red)" : "var(--blue)") + "\">" +
+        (sPct >= 0 ? "+" : "") + sPct + "%</td>";
+    } else {
+      h += "<td style=\"text-align:right;padding:7px 8px;color:var(--t5)\">-</td>";
+    }
+
+    h += "</tr>";
+  });
+
+  h += "</table></div>";
+
+  if (cachedBenchmark.t) {
+    var t = new Date(cachedBenchmark.t);
+    h += "<div style=\"font-size:10px;color:var(--t5);margin-top:6px;text-align:right\">" +
+      "기준: " + t.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) + "</div>";
+  }
+
+  return h;
+}
+
+function loadBenchmark() {
+  var btn = document.getElementById("btnBench");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ 불러오는 중..."; }
+
+  fetchBenchmarkData().then(function(data) {
+    var el = document.getElementById("benchContent");
+    if (el && data) {
+      el.innerHTML = _buildBenchmarkTable();
+    } else if (el) {
+      el.innerHTML = "<div style=\"text-align:center;padding:12px;color:var(--red);font-size:12px\">" +
+        "데이터를 불러올 수 없습니다. 나중에 다시 시도해주세요.</div>";
+    }
+    if (btn) { btn.disabled = false; btn.textContent = "🔄 불러오기"; }
+  });
+}
+
+/* --- Portfolio Management Modal --- */
+
+function openPortfolioManager() {
+  var list = getPortfolioList();
+  var h = "";
+
+  list.forEach(function(p) {
+    var isActive = p.id === currentPortfolioId;
+    h += "<div style=\"display:flex;align-items:center;gap:8px;padding:10px 12px;" +
+      "border-radius:10px;margin-bottom:6px;background:" +
+      (isActive ? "rgba(59,130,246,.08)" : "rgba(255,255,255,.02)") + ";" +
+      "border:1px solid " + (isActive ? "rgba(59,130,246,.2)" : "rgba(255,255,255,.04)") + "\">" +
+      "<div style=\"flex:1\">" +
+        "<div style=\"font-size:13px;font-weight:600;color:" + (isActive ? "#60A5FA" : "var(--t2)") + "\">" +
+          escapeHtml(p.name) + (isActive ? " ✓" : "") + "</div>" +
+      "</div>";
+
+    if (!isActive) {
+      h += "<button class=\"ibtn\" style=\"background:rgba(59,130,246,.08);color:#60A5FA;width:28px;height:28px\" " +
+        "onclick=\"closeModal();switchPortfolio(" + QUOTE + p.id + QUOTE + ")\">→</button>";
+    }
+
+    h += "<button class=\"ibtn\" style=\"background:rgba(255,255,255,.04);color:var(--t3);width:28px;height:28px\" " +
+      "onclick=\"_renamePortfolioPrompt(" + QUOTE + p.id + QUOTE + "," + QUOTE + escapeHtml(p.name) + QUOTE + ")\">✏️</button>";
+
+    if (p.id !== "default") {
+      h += "<button class=\"ibtn\" style=\"background:rgba(239,68,68,.05);color:var(--red);width:28px;height:28px\" " +
+        "onclick=\"if(confirm('정말 삭제하시겠습니까?')){closeModal();deletePortfolio(" + QUOTE + p.id + QUOTE + ")}\">🗑</button>";
+    }
+
+    h += "</div>";
+  });
+
+  h += "<div style=\"margin-top:12px\">" +
+    "<button class=\"btn btn-p btn-w\" onclick=\"_createPortfolioPrompt()\">+ 새 포트폴리오 만들기</button></div>";
+
+  openModal("📂 포트폴리오 관리", h);
+}
+
+function _createPortfolioPrompt() {
+  var name = prompt("새 포트폴리오 이름을 입력하세요:");
+  if (!name || !name.trim()) return;
+  closeModal();
+  createPortfolio(name.trim());
+}
+
+function _renamePortfolioPrompt(id, currentName) {
+  var name = prompt("새 이름을 입력하세요:", currentName);
+  if (!name || !name.trim()) return;
+  renamePortfolio(id, name.trim());
+  closeModal();
+  openPortfolioManager();
 }

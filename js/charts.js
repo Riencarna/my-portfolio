@@ -1,4 +1,4 @@
-/* charts.js - Chart.js 차트 렌더링 */
+/* charts.js - Chart.js 차트 렌더링 (v2.6.0) */
 
 function destroyAllCharts() {
   for (var key in charts) {
@@ -227,6 +227,98 @@ function drawLine(id, data, h) {
           callbacks: {
             label: function(c) { return formatNumber(c.raw); }
           }
+        }
+      }
+    }
+  });
+}
+
+/* --- Growth Chart (multi-line with categories) --- */
+
+function drawGrowthChart(id, historyData, h, showCategories) {
+  var ctx = document.getElementById(id);
+  if (!ctx) return;
+
+  if (charts.growth) { try { charts.growth.destroy(); } catch(e) {} }
+  charts.growth = null;
+
+  var labels = historyData.map(function(d) { return d.date.slice(5); });
+  var totalData = historyData.map(function(d) { return d.total; });
+
+  var g = ctx.getContext("2d").createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "rgba(59,130,246,.15)");
+  g.addColorStop(1, "rgba(59,130,246,0)");
+
+  var datasets = [{
+    label: "총 자산",
+    data: totalData,
+    borderColor: "#3B82F6",
+    borderWidth: 2.5,
+    backgroundColor: g,
+    fill: true,
+    pointRadius: historyData.length > 30 ? 0 : 2,
+    pointBackgroundColor: "#3B82F6",
+    tension: .35,
+    order: 0
+  }];
+
+  if (showCategories) {
+    var cats = {};
+    historyData.forEach(function(d) {
+      if (!d.byCategory) return;
+      for (var c in d.byCategory) {
+        if (!cats[c]) cats[c] = [];
+      }
+    });
+
+    var catNames = Object.keys(cats);
+    catNames.forEach(function(cat) {
+      var cfg = CATEGORY_CONFIG[cat];
+      if (!cfg) return;
+      var catValues = historyData.map(function(d) {
+        return d.byCategory && d.byCategory[cat] ? d.byCategory[cat] : 0;
+      });
+      if (catValues.every(function(v) { return v === 0; })) return;
+
+      datasets.push({
+        label: (cfg.icon || "") + " " + cat,
+        data: catValues,
+        borderColor: cfg.color,
+        borderWidth: 1.5,
+        borderDash: [4, 3],
+        fill: false,
+        pointRadius: 0,
+        tension: .35,
+        order: 1
+      });
+    });
+  }
+
+  charts.growth = new Chart(ctx, {
+    type: "line",
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          grid: { color: "rgba(255,255,255,.03)" },
+          ticks: { color: "#475569", font: { size: 10, family: "Pretendard Variable" }, maxTicksLimit: 10 },
+          border: { display: false }
+        },
+        y: {
+          grid: { color: "rgba(255,255,255,.03)" },
+          ticks: { color: "#475569", font: { size: 10, family: "Pretendard Variable" }, callback: function(v) { return formatShortCurrency(v); } },
+          border: { display: false }
+        }
+      },
+      plugins: {
+        legend: { display: showCategories, position: "bottom", labels: { color: "#94A3B8", font: { size: 10, family: "Pretendard Variable" }, boxWidth: 12, padding: 8 } },
+        tooltip: {
+          backgroundColor: "#1A1D23", borderColor: "rgba(255,255,255,.1)", borderWidth: 1,
+          titleFont: { family: "Pretendard Variable" }, bodyFont: { family: "Pretendard Variable" },
+          callbacks: { label: function(c) { return c.dataset.label + ": " + formatNumber(c.raw); } }
         }
       }
     }

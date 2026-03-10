@@ -18,7 +18,7 @@ var updateLogs = [];
 var loadingAssets = {};
 var isAllLoading = false;
 var currentTab = "dash";
-var charts = { pie: null, l1: null, l2: null, catPies: {}, incPie: null, listPie: null };
+var charts = { pie: null, l1: null, l2: null, catPies: {}, incPie: null, listPie: null, growth: null };
 var cachedExchangeRate = null;
 var cachedUsdtRate = null;
 var selectedMarket = "KOSPI";
@@ -37,12 +37,16 @@ var undoSnapshot = null;
 var undoTimerHandle = null;
 var isSandbox = false;
 var autoUpdateProgress = { total: 0, done: 0 };
+var cachedBenchmark = null;
+var growthChartDays = 0;
+var growthShowCategories = false;
+var currentPortfolioId = "default";
 
 // --- 데이터 로드 ---
 
 function loadData() {
   try {
-    var raw = localStorage.getItem(STORAGE_KEY);
+    var raw = localStorage.getItem(_currentStorageKey);
     if (!raw || raw.length > 10 * 1024 * 1024) return;
     var d = JSON.parse(raw);
     if (!d || typeof d !== "object") return;
@@ -109,7 +113,7 @@ function saveData() {
       showToast("⚠️ 데이터가 너무 큽니다. 오래된 기록을 정리해주세요.");
       return;
     }
-    localStorage.setItem(STORAGE_KEY, data);
+    localStorage.setItem(_currentStorageKey, data);
   } catch (e) {
     if (e.name === "QuotaExceededError") showToast("⚠️ 저장 공간이 부족합니다");
   }
@@ -159,6 +163,106 @@ function performUndo() {
     showToast("❌ 실행 취소 실패");
   }
 }
+
+// --- 다중 포트폴리오 ---
+
+function _getPortfolioMeta() {
+  try {
+    var raw = localStorage.getItem("mp_portfolio_meta");
+    if (raw) {
+      var d = JSON.parse(raw);
+      if (d && Array.isArray(d.list)) return d;
+    }
+  } catch(e) {}
+  return { active: "default", list: [{ id: "default", name: "기본 포트폴리오" }] };
+}
+
+function _savePortfolioMeta(meta) {
+  try { localStorage.setItem("mp_portfolio_meta", JSON.stringify(meta)); } catch(e) {}
+}
+
+function _getStorageKeyForPortfolio(id) {
+  return id === "default" ? STORAGE_KEY : STORAGE_KEY + "_" + id;
+}
+
+function getPortfolioList() {
+  return _getPortfolioMeta().list;
+}
+
+function getActivePortfolioName() {
+  var meta = _getPortfolioMeta();
+  var found = null;
+  meta.list.forEach(function(p) { if (p.id === currentPortfolioId) found = p; });
+  return found ? found.name : "기본 포트폴리오";
+}
+
+function switchPortfolio(id) {
+  if (id === currentPortfolioId) return;
+  // Save current
+  saveData();
+  // Switch
+  currentPortfolioId = id;
+  var meta = _getPortfolioMeta();
+  meta.active = id;
+  _savePortfolioMeta(meta);
+  // Update STORAGE_KEY reference for load
+  _currentStorageKey = _getStorageKeyForPortfolio(id);
+  // Reset UI state
+  updateLogs = [];
+  loadingAssets = {};
+  isAllLoading = false;
+  expandedAssets = {};
+  isEditMode = false;
+  dashboardCategoryOpen = {};
+  listCategoryOpen = {};
+  cachedBenchmark = null;
+  // Load new portfolio
+  loadData();
+  render();
+  showToast("📂 포트폴리오 전환: " + getActivePortfolioName());
+}
+
+function createPortfolio(name) {
+  var meta = _getPortfolioMeta();
+  if (meta.list.length >= 10) {
+    showToast("❌ 최대 10개까지 생성 가능합니다");
+    return;
+  }
+  var id = "pf_" + Date.now();
+  meta.list.push({ id: id, name: name });
+  _savePortfolioMeta(meta);
+  // Initialize empty data
+  try {
+    localStorage.setItem(_getStorageKeyForPortfolio(id), JSON.stringify({
+      a: [], h: [], s: null, co: null, cpl: true, goal: null, inc: []
+    }));
+  } catch(e) {}
+  switchPortfolio(id);
+}
+
+function renamePortfolio(id, newName) {
+  var meta = _getPortfolioMeta();
+  meta.list.forEach(function(p) { if (p.id === id) p.name = newName; });
+  _savePortfolioMeta(meta);
+  render();
+}
+
+function deletePortfolio(id) {
+  if (id === "default") { showToast("❌ 기본 포트폴리오는 삭제할 수 없습니다"); return; }
+  var meta = _getPortfolioMeta();
+  meta.list = meta.list.filter(function(p) { return p.id !== id; });
+  try { localStorage.removeItem(_getStorageKeyForPortfolio(id)); } catch(e) {}
+  if (currentPortfolioId === id) {
+    meta.active = "default";
+    _savePortfolioMeta(meta);
+    switchPortfolio("default");
+  } else {
+    _savePortfolioMeta(meta);
+  }
+  showToast("🗑 포트폴리오가 삭제되었습니다");
+}
+
+var _currentStorageKey = STORAGE_KEY;
 
 // --- 카테고리 순서 ---
 

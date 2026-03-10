@@ -223,6 +223,58 @@ function refreshExchangeRate() {
   });
 }
 
+// --- 벤치마크 데이터 (KOSPI, S&P500) ---
+
+function fetchBenchmarkData() {
+  if (cachedBenchmark && Date.now() - cachedBenchmark.t < 3600000) {
+    return Promise.resolve(cachedBenchmark);
+  }
+
+  function getReturns(symbol) {
+    var url = "https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(symbol) + "?range=1y&interval=1d";
+    return tryFetch(url, 12000).then(function(d) {
+      if (!d || !d.chart || !d.chart.result || !d.chart.result[0]) return null;
+      var result = d.chart.result[0];
+      var closes = result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close;
+      if (!closes || closes.length < 2) return null;
+
+      var valid = closes.filter(function(c) { return c !== null && isFinite(c); });
+      if (valid.length < 2) return null;
+
+      var latest = valid[valid.length - 1];
+      var returns = {};
+      var periods = [
+        { days: 7, label: "1주" },
+        { days: 30, label: "1개월" },
+        { days: 90, label: "3개월" },
+        { days: 180, label: "6개월" },
+        { days: 365, label: "1년" }
+      ];
+
+      periods.forEach(function(p) {
+        var idx = valid.length - 1 - p.days;
+        if (idx >= 0 && valid[idx]) {
+          returns[p.days] = { pct: (((latest - valid[idx]) / valid[idx]) * 100).toFixed(2), label: p.label };
+        }
+      });
+
+      return returns;
+    }).catch(function() { return null; });
+  }
+
+  return Promise.all([
+    getReturns("^KS11"),
+    getReturns("^GSPC")
+  ]).then(function(results) {
+    cachedBenchmark = {
+      t: Date.now(),
+      kospi: results[0],
+      sp500: results[1]
+    };
+    return cachedBenchmark;
+  });
+}
+
 // --- 샌드박스 체크 ---
 
 function checkSandbox() {

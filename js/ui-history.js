@@ -193,7 +193,7 @@ function doReset() {
   selectedIncomeMonth = null;
 
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(_currentStorageKey);
   } catch (e) {}
 
   closeModal();

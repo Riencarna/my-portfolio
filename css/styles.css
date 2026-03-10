@@ -1,5 +1,5 @@
 /* ===================================================
-   My Portfolio v2.5.0 - Styles
+   My Portfolio v2.6.0 - Styles
    자산 관리 대시보드 스타일시트
    =================================================== */
 
@@ -1048,6 +1048,163 @@ button {
 :root[data-theme="light"] .au-prog {
   background: rgba(5, 150, 105, 0.04);
   border-color: rgba(5, 150, 105, 0.1);
+}
+
+/* --- Portfolio Selector --- */
+.pf-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--t3);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.pf-selector:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+}
+
+.pf-selector:active {
+  transform: scale(0.96);
+}
+
+.pf-arrow {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.pf-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--bd);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pf-item:hover {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.12);
+}
+
+.pf-item.active {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.pf-item .pf-nm {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.pf-item .pf-act {
+  display: flex;
+  gap: 4px;
+}
+
+.pf-item .pf-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t4);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+
+.pf-item .pf-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--t2);
+  transform: scale(1.1);
+}
+
+:root[data-theme="light"] .pf-selector {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .pf-selector:hover {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.15);
+  color: #2563EB;
+}
+
+:root[data-theme="light"] .pf-item {
+  background: rgba(0, 0, 0, 0.01);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .pf-item:hover {
+  background: rgba(37, 99, 235, 0.04);
+  border-color: rgba(37, 99, 235, 0.1);
+}
+
+:root[data-theme="light"] .pf-item.active {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* --- Benchmark Table --- */
+.bench-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.bench-table th {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--t4);
+  font-weight: 600;
+  border-bottom: 1px solid var(--bd);
+}
+
+.bench-table td {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.bench-table tr:last-child td {
+  border-bottom: none;
+}
+
+.bench-table .bench-label {
+  text-align: left;
+  color: var(--t2);
+  font-weight: 700;
+}
+
+:root[data-theme="light"] .bench-table th {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .bench-table td {
+  border-bottom-color: rgba(0, 0, 0, 0.04);
 }
 
 /* --- Responsive --- */
