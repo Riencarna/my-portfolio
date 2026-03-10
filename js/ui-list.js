@@ -61,6 +61,179 @@ function moveAsset(id, dir) {
   render();
 }
 
+/* === Drag & Drop === */
+
+var _dragAssetId = null;
+var _dragCatName = null;
+var _touchDragEl = null;
+var _touchClone = null;
+var _touchStartY = 0;
+
+function _setupDragAndDrop() {
+  var container = document.getElementById("assetListContent");
+  if (!container || !isEditMode) return;
+
+  // Asset drag & drop
+  var rows = container.querySelectorAll(".ar[draggable]");
+  rows.forEach(function(row) {
+    row.addEventListener("dragstart", function(e) {
+      _dragAssetId = Number(row.dataset.aid);
+      _dragCatName = null;
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", "asset:" + _dragAssetId);
+    });
+    row.addEventListener("dragend", function() {
+      row.classList.remove("dragging");
+      _clearDragOver();
+      _dragAssetId = null;
+    });
+    row.addEventListener("dragover", function(e) {
+      if (_dragAssetId === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      _clearDragOver();
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", function() {
+      row.classList.remove("drag-over");
+    });
+    row.addEventListener("drop", function(e) {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      var targetId = Number(row.dataset.aid);
+      if (_dragAssetId && targetId && _dragAssetId !== targetId) {
+        _reorderAsset(_dragAssetId, targetId);
+      }
+    });
+
+    // Touch drag support
+    var handle = row.querySelector(".drag-handle");
+    if (handle) {
+      handle.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        _dragAssetId = Number(row.dataset.aid);
+        _dragCatName = null;
+        _touchDragEl = row;
+        _touchStartY = e.touches[0].clientY;
+        row.classList.add("dragging");
+
+        _touchClone = row.cloneNode(true);
+        _touchClone.style.cssText = "position:fixed;left:0;right:0;z-index:999;pointer-events:none;" +
+          "opacity:0.85;box-shadow:0 8px 24px rgba(0,0,0,0.3);background:var(--card);transform:scale(1.02);" +
+          "top:" + row.getBoundingClientRect().top + "px;width:" + row.offsetWidth + "px;";
+        document.body.appendChild(_touchClone);
+      }, { passive: false });
+    }
+  });
+
+  // Category drag & drop
+  var cats = container.querySelectorAll(".cg[draggable]");
+  cats.forEach(function(cg) {
+    cg.addEventListener("dragstart", function(e) {
+      _dragCatName = cg.dataset.cat;
+      _dragAssetId = null;
+      cg.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", "cat:" + _dragCatName);
+    });
+    cg.addEventListener("dragend", function() {
+      cg.classList.remove("dragging");
+      _clearDragOver();
+      _dragCatName = null;
+    });
+    cg.addEventListener("dragover", function(e) {
+      if (_dragCatName === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      _clearDragOver();
+      cg.classList.add("drag-over-cat");
+    });
+    cg.addEventListener("dragleave", function() {
+      cg.classList.remove("drag-over-cat");
+    });
+    cg.addEventListener("drop", function(e) {
+      e.preventDefault();
+      cg.classList.remove("drag-over-cat");
+      var targetCat = cg.dataset.cat;
+      if (_dragCatName && targetCat && _dragCatName !== targetCat) {
+        _reorderCategory(_dragCatName, targetCat);
+      }
+    });
+  });
+}
+
+// Touch move/end (global)
+document.addEventListener("touchmove", function(e) {
+  if (!_touchDragEl || !_touchClone) return;
+  var y = e.touches[0].clientY;
+  _touchClone.style.top = y - 20 + "px";
+
+  _clearDragOver();
+  var elBelow = document.elementFromPoint(e.touches[0].clientX, y);
+  if (elBelow) {
+    var row = elBelow.closest(".ar[draggable]");
+    if (row && row !== _touchDragEl) row.classList.add("drag-over");
+  }
+}, { passive: true });
+
+document.addEventListener("touchend", function() {
+  if (!_touchDragEl || !_touchClone) return;
+
+  var overEl = document.querySelector(".ar.drag-over");
+  if (overEl) {
+    var targetId = Number(overEl.dataset.aid);
+    if (_dragAssetId && targetId && _dragAssetId !== targetId) {
+      _reorderAsset(_dragAssetId, targetId);
+    }
+  }
+
+  _touchDragEl.classList.remove("dragging");
+  if (_touchClone && _touchClone.parentNode) _touchClone.parentNode.removeChild(_touchClone);
+  _touchDragEl = null;
+  _touchClone = null;
+  _dragAssetId = null;
+  _clearDragOver();
+}, { passive: true });
+
+function _clearDragOver() {
+  document.querySelectorAll(".drag-over,.drag-over-cat").forEach(function(el) {
+    el.classList.remove("drag-over", "drag-over-cat");
+  });
+}
+
+function _reorderAsset(fromId, toId) {
+  var fromIdx = -1, toIdx = -1;
+  appState.assets.forEach(function(a, i) {
+    if (a.id === fromId) fromIdx = i;
+    if (a.id === toId) toIdx = i;
+  });
+  if (fromIdx < 0 || toIdx < 0) return;
+  // Check same category
+  if (appState.assets[fromIdx].category !== appState.assets[toIdx].category) return;
+  var item = appState.assets.splice(fromIdx, 1)[0];
+  // Recalculate toIdx after splice
+  toIdx = -1;
+  appState.assets.forEach(function(a, i) { if (a.id === toId) toIdx = i; });
+  if (toIdx < 0) { appState.assets.push(item); } else {
+    appState.assets.splice(toIdx, 0, item);
+  }
+  saveData();
+  render();
+}
+
+function _reorderCategory(fromCat, toCat) {
+  var ord = getOrderedCategories();
+  var fi = ord.indexOf(fromCat), ti = ord.indexOf(toCat);
+  if (fi < 0 || ti < 0) return;
+  ord.splice(fi, 1);
+  ti = ord.indexOf(toCat);
+  ord.splice(ti, 0, fromCat);
+  appState.categoryOrder = ord;
+  saveData();
+  render();
+}
+
 /* === Main List Render === */
 
 var _searchDebounceTimer = null;
@@ -208,33 +381,11 @@ function _renderAssetListContent() {
       ca.forEach(function (a) { ct += getAssetValue(a); });
 
       if (isEditMode) {
-        /* --- Edit-mode category header --- */
-        h += "<div class=\"cg\"><div class=\"cg-h\" style=\"background:linear-gradient(90deg," +
+        /* --- Edit-mode category header (draggable) --- */
+        h += "<div class=\"cg\" draggable=\"true\" data-cat=\"" + cat + "\"><div class=\"cg-h\" style=\"background:linear-gradient(90deg," +
           CATEGORY_CONFIG[cat].color + "06,transparent)\">";
         h += "<div style=\"display:flex;align-items:center;gap:8px\">";
-        h += "<div style=\"display:flex;gap:3px\">";
-
-        /* Up button */
-        h += "<button style=\"border:none;background:" +
-          (catIdx > 0 ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.03)") + ";color:" +
-          (catIdx > 0 ? "var(--t1)" : "var(--t5)") +
-          ";width:26px;height:26px;border-radius:6px;cursor:" +
-          (catIdx > 0 ? "pointer" : "default") +
-          ";font-size:11px;font-family:inherit;display:flex;align-items:center;justify-content:center\" " +
-          "onclick=\"moveCategory(" + QUOTE + cat + QUOTE + ",-1)\"" +
-          (catIdx <= 0 ? " disabled" : "") + ">▲</button>";
-
-        /* Down button */
-        h += "<button style=\"border:none;background:" +
-          (catIdx < usedCats.length - 1 ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.03)") + ";color:" +
-          (catIdx < usedCats.length - 1 ? "var(--t1)" : "var(--t5)") +
-          ";width:26px;height:26px;border-radius:6px;cursor:" +
-          (catIdx < usedCats.length - 1 ? "pointer" : "default") +
-          ";font-size:11px;font-family:inherit;display:flex;align-items:center;justify-content:center\" " +
-          "onclick=\"moveCategory(" + QUOTE + cat + QUOTE + ",1)\"" +
-          (catIdx >= usedCats.length - 1 ? " disabled" : "") + ">▼</button>";
-
-        h += "</div>";
+        h += "<span class=\"drag-handle\">☰</span>";
         h += "<span style=\"font-size:16px\">" + CATEGORY_CONFIG[cat].icon + "</span>" +
           "<span style=\"font-size:13px;font-weight:700;color:var(--t1)\">" + cat + "</span>" +
           "<span style=\"font-size:11px;padding:2px 6px;border-radius:5px;font-weight:600;color:" +
@@ -286,31 +437,15 @@ function _renderAssetListContent() {
             ld = loadingAssets[a.id],
             isE = expandedAssets[a.id];
 
-        h += "<div class=\"ar\"><div style=\"width:100%\">";
+        h += "<div class=\"ar\" " + (isEditMode ? "draggable=\"true\" data-aid=\"" + a.id + "\"" : "") +
+          "><div style=\"width:100%\">";
 
         if (isEditMode) {
-          /* Edit-mode asset row */
+          /* Edit-mode asset row (draggable) */
           h += "<div style=\"display:flex;justify-content:space-between;align-items:center\">";
           h += "<div style=\"display:flex;align-items:center;gap:10px\">" +
-            "<div style=\"display:flex;flex-direction:column;gap:2px\">";
-
-          h += "<button style=\"border:none;background:rgba(255,255,255,.06);color:" +
-            (ai > 0 ? "var(--t2)" : "var(--t5)") +
-            ";width:28px;height:22px;border-radius:5px;cursor:" +
-            (ai > 0 ? "pointer" : "default") +
-            ";font-size:12px;font-family:inherit\" " +
-            "onclick=\"moveAsset(" + a.id + ",-1)\"" +
-            (ai <= 0 ? " disabled" : "") + ">▲</button>";
-
-          h += "<button style=\"border:none;background:rgba(255,255,255,.06);color:" +
-            (ai < ca.length - 1 ? "var(--t2)" : "var(--t5)") +
-            ";width:28px;height:22px;border-radius:5px;cursor:" +
-            (ai < ca.length - 1 ? "pointer" : "default") +
-            ";font-size:12px;font-family:inherit\" " +
-            "onclick=\"moveAsset(" + a.id + ",1)\"" +
-            (ai >= ca.length - 1 ? " disabled" : "") + ">▼</button>";
-
-          h += "</div><div>" +
+            "<span class=\"drag-handle\">☰</span>" +
+            "<div>" +
             "<span style=\"font-size:13.5px;font-weight:600;color:var(--t2)\">" +
               escapeHtml(a.name) + "</span>";
           if (has && c.qty > 0) {
@@ -551,6 +686,11 @@ function _renderAssetListContent() {
       "<button class=\"btn btn-p btn-w\" onclick=\"openAddAsset()\">+ 새 자산 추가</button></div>";
 
   el.innerHTML = h;
+
+  /* Setup drag & drop in edit mode */
+  if (isEditMode) {
+    setTimeout(_setupDragAndDrop, 30);
+  }
 
   /* Draw / update list pie chart */
   if (cdL && cdL.length > 0 && totalL > 0) {

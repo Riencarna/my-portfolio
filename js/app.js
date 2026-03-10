@@ -27,6 +27,10 @@ function goTab(tabId) {
       el.classList.remove("tab-animate");
     }
   });
+  // 바텀 네비 동기화
+  document.querySelectorAll(".bnav-item").forEach(function(el) {
+    el.classList.toggle("on", el.dataset.t === tabId);
+  });
   render();
 }
 

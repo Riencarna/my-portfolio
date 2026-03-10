@@ -1,5 +1,5 @@
 /* ===================================================
-   My Portfolio v2.3.0 - Styles
+   My Portfolio v2.4.0 - Styles
    자산 관리 대시보드 스타일시트
    =================================================== */
 
@@ -1051,6 +1051,148 @@ button {
 }
 
 /* --- Responsive --- */
+/* --- Bottom Navigation (Mobile) --- */
+.bnav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  background: var(--card);
+  border-top: 1px solid var(--bd);
+  padding: 4px 8px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.bnav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--t4);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  border-radius: 10px;
+}
+
+.bnav-item.on {
+  color: #60A5FA;
+}
+
+.bnav-item.on .bnav-icon {
+  transform: scale(1.15);
+}
+
+.bnav-icon {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.bnav-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.bnav-item:active {
+  transform: scale(0.9);
+}
+
+:root[data-theme="light"] .bnav {
+  background: rgba(255, 255, 255, 0.92);
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .bnav-item.on {
+  color: #2563EB;
+}
+
+/* --- Drag & Drop Styles --- */
+.drag-handle {
+  cursor: grab;
+  padding: 4px;
+  color: var(--t4);
+  font-size: 14px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.15s;
+}
+
+.drag-handle:hover {
+  color: var(--t2);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.ar[draggable="true"] {
+  cursor: grab;
+}
+
+.ar[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.ar.dragging {
+  opacity: 0.4;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.ar.drag-over {
+  border-top: 2px solid var(--blue);
+}
+
+.cg.dragging {
+  opacity: 0.4;
+}
+
+.cg.drag-over-cat {
+  box-shadow: 0 -2px 0 0 var(--blue);
+}
+
+/* --- Dashboard Grid (Wide screens) --- */
+@media (min-width: 768px) {
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .dash-grid > .dash-full {
+    grid-column: 1 / -1;
+  }
+
+  .period-returns {
+    gap: 8px;
+  }
+}
+
+/* --- Responsive: Tablet (768px) --- */
+@media (max-width: 768px) {
+  .bnav {
+    display: flex;
+  }
+
+  .tabs {
+    display: none;
+  }
+
+  .wrap[style*="padding-bottom"] {
+    padding-bottom: 90px !important;
+  }
+}
+
+/* --- Responsive: Mobile (480px) --- */
 @media (max-width: 480px) {
   .tot-n {
     font-size: 24px;
@@ -1068,17 +1210,16 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .tab:not(.on) .tl {
-    display: none;
+  .hdr-row {
+    gap: 8px;
   }
 
-  .tab:not(.on) {
-    font-size: 16px;
-    padding: 9px 4px;
+  .bnav-icon {
+    font-size: 20px;
   }
 
-  .tab.on {
-    font-size: 11.5px;
+  .bnav-label {
+    font-size: 9px;
   }
 }
 

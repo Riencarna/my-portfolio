@@ -307,9 +307,12 @@ function renderDashboard() {
 
   h += "</div>";
 
+  /* Dashboard grid for side-by-side layout on desktop */
+  h += "<div class=\"dash-grid\">";
+
   /* Auto-update section */
   if (ac > 0) {
-    h += "<div class=\"ai\"><div style=\"display:flex;justify-content:space-between;align-items:center;" +
+    h += "<div class=\"dash-full\"><div class=\"ai\"><div style=\"display:flex;justify-content:space-between;align-items:center;" +
       "flex-wrap:wrap;gap:9px\"><div>" +
       "<div style=\"font-size:13px;font-weight:700;color:var(--green)\">⚡ 가격 자동 최신화</div>" +
       "<div style=\"font-size:11px;color:var(--t3);margin-top:2px\">" + ac + "개 종목 현재가 자동 검색</div>" +
@@ -373,7 +376,7 @@ function renderDashboard() {
       }
       h += "</div>";
     }
-    h += "</div>";
+    h += "</div></div>";
   }
 
   /* Category breakdown map */
@@ -531,7 +534,7 @@ function renderDashboard() {
       "<div style=\"position:relative;height:145px\"><canvas id=\"cL1\"></canvas></div></div>";
   }
 
-  h += "</div>";
+  h += "</div></div>";
 
   /* Inject HTML and draw charts */
   el.innerHTML = h;

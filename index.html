@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- My Portfolio v2.3.0 | 2026-03-10 | 자산 관리 대시보드 -->
+<!-- My Portfolio v2.4.0 | 2026-03-10 | 자산 관리 대시보드 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="My Portfolio">
-<title>My Portfolio v2.3.0 - 자산 관리 대시보드</title>
+<title>My Portfolio v2.4.0 - 자산 관리 대시보드</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="manifest" href="manifest.json">
@@ -53,7 +53,7 @@
       <div class="hdr-row">
         <div>
           <div class="logo-s">My Portfolio</div>
-          <div class="logo">자산 관리 대시보드 <span style="font-size:11px;color:var(--t5);font-weight:400">v2.3.0</span></div>
+          <div class="logo">자산 관리 대시보드 <span style="font-size:11px;color:var(--t5);font-weight:400">v2.4.0</span></div>
         </div>
         <div style="display:flex;gap:7px">
           <button id="btnTheme" class="theme-toggle" onclick="toggleTheme()" title="테마 전환">☀️</button>
@@ -89,6 +89,25 @@
   <div id="pgHist" class="hidden"></div>
   <div id="pgAi" class="hidden"></div>
 </div>
+
+<!-- 모바일 바텀 네비게이션 -->
+<nav class="bnav" id="bnav">
+  <button class="bnav-item on" data-t="dash" onclick="goTab('dash')">
+    <span class="bnav-icon">📊</span><span class="bnav-label">대시보드</span>
+  </button>
+  <button class="bnav-item" data-t="list" onclick="goTab('list')">
+    <span class="bnav-icon">💼</span><span class="bnav-label">자산</span>
+  </button>
+  <button class="bnav-item" data-t="inc" onclick="goTab('inc')">
+    <span class="bnav-icon">💵</span><span class="bnav-label">수입</span>
+  </button>
+  <button class="bnav-item" data-t="hist" onclick="goTab('hist')">
+    <span class="bnav-icon">📈</span><span class="bnav-label">추이</span>
+  </button>
+  <button class="bnav-item" data-t="ai" onclick="goTab('ai')">
+    <span class="bnav-icon">🤖</span><span class="bnav-label">AI</span>
+  </button>
+</nav>
 
 <!-- 모달 -->
 <div class="mbg hidden" id="mBg" onclick="closeModal()">
