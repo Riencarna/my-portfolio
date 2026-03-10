@@ -1,6 +1,6 @@
-/* Service Worker - My Portfolio v2.4.0 */
+/* Service Worker - My Portfolio v2.5.0 */
 
-var CACHE_NAME = "myportfolio-v2.4";
+var CACHE_NAME = "myportfolio-v2.5";
 var STATIC_ASSETS = [
   "./",
   "./index.html",

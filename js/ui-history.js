@@ -108,10 +108,19 @@ function renderHistory() {
   h += "<input type=\"file\" id=\"impFile\" accept=\".json\" style=\"display:none\" onchange=\"importData(this)\">";
   h += "</div>";
 
+  // 내보내기 버튼 (CSV / PDF)
+  h += "<div style=\"margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.04)\">";
+  h += "<div style=\"font-size:11.5px;color:var(--t4);margin-bottom:6px;font-weight:500\">📊 내보내기</div>";
+  h += "<div style=\"display:flex;gap:8px;flex-wrap:wrap\">";
+  h += "<button style=\"flex:1;min-width:90px;padding:9px 12px;border-radius:10px;border:1px solid rgba(245,158,11,.15);background:rgba(245,158,11,.05);color:var(--amber);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px\" onclick=\"exportAssetCSV()\">📋 자산 CSV</button>";
+  h += "<button style=\"flex:1;min-width:90px;padding:9px 12px;border-radius:10px;border:1px solid rgba(139,92,246,.15);background:rgba(139,92,246,.05);color:var(--purple);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px\" onclick=\"exportTransactionCSV()\">📝 거래 CSV</button>";
+  h += "<button style=\"flex:1;min-width:90px;padding:9px 12px;border-radius:10px;border:1px solid rgba(236,72,153,.15);background:rgba(236,72,153,.05);color:var(--pink);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px\" onclick=\"exportPDFReport()\">📄 PDF 리포트</button>";
+  h += "</div></div>";
+
   // 안내 문구
   h += "<div style=\"font-size:11px;color:var(--t5);margin-top:8px;line-height:1.5\">";
   h += "💡 백업 파일에는 자산, 거래 내역, 히스토리, 목표, 수입 기록이 모두 포함됩니다.<br>";
-  h += "다른 기기나 브라우저로 옮기거나, 만약을 위해 정기적으로 백업하세요.";
+  h += "CSV는 엑셀/구글 시트에서, PDF 리포트는 인쇄하거나 저장할 수 있습니다.";
   h += "</div>";
 
   h += "</div></div>";
@@ -307,6 +316,253 @@ function importData(input) {
 /**
  * 백업 복원 실행
  */
+/**
+ * CSV 다운로드 헬퍼
+ */
+function _downloadCSV(filename, csvContent) {
+  var bom = "\uFEFF";
+  var blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function _csvEscape(val) {
+  var s = String(val == null ? "" : val);
+  if (s.indexOf(",") >= 0 || s.indexOf('"') >= 0 || s.indexOf("\n") >= 0) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+/**
+ * 자산 현황 CSV 내보내기
+ */
+function exportAssetCSV() {
+  if (!appState.assets.length) {
+    showToast("❌ 내보낼 자산이 없습니다");
+    return;
+  }
+
+  var headers = ["자산명", "카테고리", "현재가", "보유수량", "평가금액", "총투자금액", "수익/손실", "수익률(%)", "메모"];
+  var rows = [headers.join(",")];
+
+  appState.assets.forEach(function(a) {
+    var c = calcAsset(a);
+    var isCL = isCashLike(a.category);
+    rows.push([
+      _csvEscape(a.name),
+      _csvEscape(a.category),
+      isCL ? "" : a.amount,
+      isCL ? "" : c.qty,
+      c.evalAmt,
+      isCL ? "" : c.totalCost,
+      isCL ? "" : c.profit,
+      isCL ? "" : c.profitPct,
+      _csvEscape(a.note || "")
+    ].join(","));
+  });
+
+  var d = new Date();
+  var fn = "MyPortfolio_자산현황_" + d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    String(d.getDate()).padStart(2, "0") + ".csv";
+
+  _downloadCSV(fn, rows.join("\n"));
+  showToast("✅ 자산 현황 CSV가 저장되었습니다");
+}
+
+/**
+ * 거래 내역 CSV 내보내기
+ */
+function exportTransactionCSV() {
+  var allTxns = [];
+  appState.assets.forEach(function(a) {
+    if (!a.txns || !a.txns.length) return;
+    a.txns.forEach(function(t) {
+      allTxns.push({
+        date: t.date || "",
+        name: a.name,
+        category: a.category,
+        type: t.type === "buy"
+          ? getTransactionLabel(a.category, "buy")
+          : getTransactionLabel(a.category, "sell"),
+        price: t.price,
+        qty: t.qty,
+        account: t.account || "",
+        memo: t.memo || ""
+      });
+    });
+  });
+
+  if (!allTxns.length) {
+    showToast("❌ 내보낼 거래 내역이 없습니다");
+    return;
+  }
+
+  allTxns.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+
+  var headers = ["날짜", "자산명", "카테고리", "유형", "금액", "수량", "계좌", "메모"];
+  var rows = [headers.join(",")];
+
+  allTxns.forEach(function(t) {
+    rows.push([
+      _csvEscape(t.date),
+      _csvEscape(t.name),
+      _csvEscape(t.category),
+      _csvEscape(t.type),
+      t.price,
+      t.qty,
+      _csvEscape(t.account),
+      _csvEscape(t.memo)
+    ].join(","));
+  });
+
+  var d = new Date();
+  var fn = "MyPortfolio_거래내역_" + d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    String(d.getDate()).padStart(2, "0") + ".csv";
+
+  _downloadCSV(fn, rows.join("\n"));
+  showToast("✅ 거래 내역 CSV가 저장되었습니다 (" + allTxns.length + "건)");
+}
+
+/**
+ * PDF 리포트 생성 (인쇄 가능한 새 창)
+ */
+function exportPDFReport() {
+  if (!appState.assets.length) {
+    showToast("❌ 내보낼 자산이 없습니다");
+    return;
+  }
+
+  var total = 0, inv = 0, pf = 0;
+  appState.assets.forEach(function(a) {
+    if (!hasTransactions(a)) return;
+    var c = calcAsset(a);
+    total += c.evalAmt;
+    inv += c.totalCost;
+    pf += c.profit;
+  });
+
+  var catData = CATEGORY_LIST.map(function(cat) {
+    var v = 0;
+    appState.assets.filter(function(a) { return a.category === cat; })
+      .forEach(function(a) { v += getAssetValue(a); });
+    return { n: cat, v: v, ic: CATEGORY_CONFIG[cat].icon };
+  }).filter(function(d) { return d.v > 0; }).sort(function(a, b) { return b.v - a.v; });
+
+  var today = getTodayString();
+  var pp = inv > 0 ? ((pf / inv) * 100).toFixed(2) : "0.00";
+
+  var html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" +
+    "<title>My Portfolio 자산 리포트 - " + today + "</title>" +
+    "<style>" +
+    "* { margin:0; padding:0; box-sizing:border-box; }" +
+    "body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#1a1a2e; padding:40px; max-width:800px; margin:0 auto; }" +
+    "h1 { font-size:22px; margin-bottom:4px; }" +
+    ".sub { color:#666; font-size:12px; margin-bottom:24px; }" +
+    ".summary { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:24px; }" +
+    ".summary-card { padding:16px; background:#f8f9fa; border-radius:10px; border:1px solid #e9ecef; }" +
+    ".summary-card .label { font-size:11px; color:#868e96; margin-bottom:4px; }" +
+    ".summary-card .value { font-size:18px; font-weight:700; }" +
+    ".profit { color:#e03131; }" +
+    ".loss { color:#1971c2; }" +
+    "table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; }" +
+    "th { background:#f1f3f5; padding:8px 10px; text-align:left; font-weight:600; color:#495057; border-bottom:2px solid #dee2e6; }" +
+    "td { padding:8px 10px; border-bottom:1px solid #e9ecef; }" +
+    "tr:hover { background:#f8f9fa; }" +
+    ".text-right { text-align:right; }" +
+    ".section-title { font-size:14px; font-weight:700; margin:20px 0 10px; padding-bottom:6px; border-bottom:2px solid #228be6; }" +
+    ".footer { margin-top:30px; padding-top:14px; border-top:1px solid #e9ecef; font-size:11px; color:#adb5bd; text-align:center; }" +
+    "@media print { body { padding:20px; } .no-print { display:none; } }" +
+    "</style></head><body>";
+
+  // Header
+  html += "<h1>My Portfolio 자산 리포트</h1>";
+  html += "<div class=\"sub\">생성일: " + today + " | " + APP_VERSION + "</div>";
+
+  // Print button
+  html += "<div class=\"no-print\" style=\"margin-bottom:16px\">" +
+    "<button onclick=\"window.print()\" style=\"padding:8px 20px;background:#228be6;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600\">🖨 인쇄 / PDF 저장</button>" +
+    " <button onclick=\"window.close()\" style=\"padding:8px 20px;background:#e9ecef;color:#495057;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600\">닫기</button></div>";
+
+  // Summary
+  html += "<div class=\"summary\">";
+  html += "<div class=\"summary-card\"><div class=\"label\">총 자산</div><div class=\"value\">" + formatCurrency(total) + "</div></div>";
+  html += "<div class=\"summary-card\"><div class=\"label\">총 투자금액</div><div class=\"value\">" + formatCurrency(inv) + "</div></div>";
+  html += "<div class=\"summary-card\"><div class=\"label\">총 수익/손실</div><div class=\"value " + (pf >= 0 ? "profit" : "loss") + "\">" +
+    (pf >= 0 ? "+" : "") + formatCurrency(pf) + " (" + (pf >= 0 ? "+" : "") + pp + "%)</div></div>";
+  html += "</div>";
+
+  // Category breakdown
+  if (catData.length > 0) {
+    html += "<div class=\"section-title\">카테고리별 자산 구성</div>";
+    html += "<table><tr><th>카테고리</th><th class=\"text-right\">평가금액</th><th class=\"text-right\">비중</th></tr>";
+    catData.forEach(function(d) {
+      html += "<tr><td>" + d.ic + " " + d.n + "</td>" +
+        "<td class=\"text-right\">" + formatCurrency(d.v) + "</td>" +
+        "<td class=\"text-right\">" + (total > 0 ? ((d.v / total) * 100).toFixed(1) : "0.0") + "%</td></tr>";
+    });
+    html += "</table>";
+  }
+
+  // Asset detail table
+  html += "<div class=\"section-title\">자산 상세 현황</div>";
+  html += "<table><tr><th>자산명</th><th>카테고리</th><th class=\"text-right\">평가금액</th><th class=\"text-right\">투자금액</th><th class=\"text-right\">수익/손실</th><th class=\"text-right\">수익률</th></tr>";
+
+  var ordCats = getOrderedCategories();
+  ordCats.forEach(function(cat) {
+    appState.assets.filter(function(a) { return a.category === cat; }).forEach(function(a) {
+      var c = calcAsset(a);
+      var isCL = isCashLike(a.category);
+      html += "<tr><td>" + escapeHtml(a.name) + "</td><td>" + a.category + "</td>" +
+        "<td class=\"text-right\">" + formatCurrency(c.evalAmt) + "</td>" +
+        "<td class=\"text-right\">" + (isCL ? "-" : formatCurrency(c.totalCost)) + "</td>" +
+        "<td class=\"text-right " + (!isCL && c.profit >= 0 ? "profit" : !isCL ? "loss" : "") + "\">" +
+          (isCL ? "-" : (c.profit >= 0 ? "+" : "") + formatCurrency(c.profit)) + "</td>" +
+        "<td class=\"text-right " + (!isCL && c.profit >= 0 ? "profit" : !isCL ? "loss" : "") + "\">" +
+          (isCL ? "-" : (c.profit >= 0 ? "+" : "") + c.profitPct + "%") + "</td></tr>";
+    });
+  });
+  html += "</table>";
+
+  // Recent history
+  if (appState.history.length > 0) {
+    var recent = appState.history.slice(-10).reverse();
+    html += "<div class=\"section-title\">최근 자산 변동 (최대 10일)</div>";
+    html += "<table><tr><th>날짜</th><th class=\"text-right\">총 자산</th><th class=\"text-right\">변동</th></tr>";
+    recent.forEach(function(r) {
+      var idx = appState.history.indexOf(r);
+      var prev = idx > 0 ? appState.history[idx - 1] : null;
+      var diff = prev ? r.total - prev.total : null;
+      html += "<tr><td>" + r.date + "</td>" +
+        "<td class=\"text-right\">" + formatCurrency(r.total) + "</td>" +
+        "<td class=\"text-right " + (diff !== null ? (diff >= 0 ? "profit" : "loss") : "") + "\">" +
+          (diff !== null ? (diff >= 0 ? "+" : "") + formatCurrency(diff) : "-") + "</td></tr>";
+    });
+    html += "</table>";
+  }
+
+  // Footer
+  html += "<div class=\"footer\">My Portfolio " + APP_VERSION + " | 생성: " + getNowString() + "</div>";
+  html += "</body></html>";
+
+  var w = window.open("", "_blank");
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    showToast("✅ PDF 리포트가 새 탭에서 열렸습니다. 인쇄 버튼을 눌러 PDF로 저장하세요.");
+  } else {
+    showToast("❌ 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.");
+  }
+}
+
 function doImport() {
   var d = window._pendingImport;
   if (!d) {
