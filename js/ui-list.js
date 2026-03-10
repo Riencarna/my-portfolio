@@ -431,6 +431,28 @@ function _renderAssetListContent() {
                     (c.outCnt || 0) + "건 " +
                     getTransactionLabel(a.category, "sell") + "</div></div>";
                 h += "</div>";
+
+                /* USDT 거래소별 세부 잔고 */
+                if (a.isUsdt && a.usdtDetails && a.usdtDetails.length > 0) {
+                  h += "<div style=\"margin-top:12px;font-size:11.5px;color:var(--t3);" +
+                    "font-weight:600;margin-bottom:6px\">💲 거래소/지갑별 USDT</div>";
+                  var udTotal = 0;
+                  a.usdtDetails.forEach(function(d) {
+                    udTotal += d.qty;
+                    h += "<div class=\"acr\"><div>" +
+                      "<span style=\"font-weight:600;color:var(--t2)\">" +
+                        escapeHtml(d.name) + "</span></div>" +
+                      "<div style=\"font-weight:600;color:var(--t1)\">" +
+                        (d.qty > 0 ? d.qty.toLocaleString(undefined, {maximumFractionDigits:2}) : "0") +
+                        " <span style=\"color:var(--t4);font-weight:400;font-size:11px\">USDT</span>" +
+                      "</div></div>";
+                  });
+                  h += "<div style=\"display:flex;justify-content:space-between;padding:6px 0;" +
+                    "border-top:1px solid rgba(255,255,255,.06);margin-top:4px\">" +
+                    "<span style=\"font-size:11.5px;color:var(--t3);font-weight:600\">합계</span>" +
+                    "<span style=\"font-size:12px;font-weight:700;color:var(--green)\">" +
+                      udTotal.toLocaleString(undefined, {maximumFractionDigits:2}) + " USDT</span></div>";
+                }
               } else {
                 /* Investment detail grid */
                 h += "<div class=\"dgrid\">";

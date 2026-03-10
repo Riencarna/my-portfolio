@@ -2,7 +2,7 @@
    constants.js - 설정 상수 및 정적 데이터
    =================================================== */
 
-var APP_VERSION = "v2.1.0";
+var APP_VERSION = "v2.2.0";
 var STORAGE_KEY = "myportfolio_v9";
 var QUOTE = "'";
 

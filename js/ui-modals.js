@@ -394,11 +394,43 @@ function openBalanceUpdate(assetId) {
       + "<div id=\"bal-usdt-est\" style=\"font-size:11px;color:var(--t4);margin-top:6px\">💲 USDT 환산 조회 중...</div>"
       + "</div>";
 
-    h += "<div class=\"fld\"><label>💲 현재 보유 USDT 수량</label>"
-      + "<input type=\"number\" id=\"bal-uq\" step=\"any\" placeholder=\"예: 500\" data-cur=\"" + curBal + "\" oninput=\"previewUsdtDiff()\">"
-      + "<div id=\"bal-usdt-rate\" style=\"font-size:11.5px;color:var(--t5);margin-top:4px\">💱 USDT 시세 조회 중...</div>"
-      + "<div id=\"bal-usdt-cv\" style=\"font-size:12px;color:var(--green);font-weight:600;margin-top:4px;min-height:18px\"></div>"
-      + "<div id=\"bal-diff\" style=\"font-size:12.5px;font-weight:600;margin-top:6px;min-height:20px\"></div>"
+    // USDT 세부 잔고 관리
+    var details = a.usdtDetails || [];
+    h += "<div class=\"fld\"><label>💲 거래소/지갑별 USDT 잔고</label>"
+      + "<div id=\"usdt-detail-list\">";
+    details.forEach(function(d, i) {
+      h += "<div class=\"usdt-row\" data-idx=\"" + i + "\" style=\"display:flex;gap:6px;align-items:center;margin-bottom:6px\">"
+        + "<input class=\"ud-name\" maxlength=\"50\" value=\"" + escapeHtml(d.name) + "\" placeholder=\"거래소명\" "
+        + "style=\"flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit\">"
+        + "<input class=\"ud-qty\" type=\"number\" step=\"any\" value=\"" + d.qty + "\" placeholder=\"USDT\" "
+        + "style=\"width:90px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit;text-align:right\" oninput=\"recalcUsdtTotal()\">"
+        + "<button onclick=\"this.parentElement.remove();recalcUsdtTotal()\" "
+        + "style=\"border:none;background:rgba(239,68,68,.08);color:var(--red);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;flex-shrink:0\">✕</button>"
+        + "</div>";
+    });
+    h += "</div>";
+
+    // 프리셋 버튼
+    h += "<div style=\"display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;margin-bottom:8px\">";
+    var presets = ["Binance", "BYBIT", "Bitget", "OKX", "Gate.io", "Hashkey", "Flipster"];
+    presets.forEach(function(p) {
+      h += "<button class=\"cchip\" style=\"padding:3px 8px;font-size:11px\" onclick=\"addUsdtDetailRow("
+        + QUOTE + p + QUOTE + ")\">" + p + "</button>";
+    });
+    h += "<button class=\"cchip\" style=\"padding:3px 8px;font-size:11px;border:1px solid rgba(96,165,250,.2);color:#60A5FA\" "
+      + "onclick=\"addUsdtDetailRow(" + QUOTE + QUOTE + ")\">+ 직접 입력</button>";
+    h += "</div>";
+
+    // 합계 표시
+    h += "<div id=\"usdt-total-box\" data-cur=\"" + curBal + "\" style=\"padding:10px 14px;background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.1);border-radius:10px;margin-top:8px\">"
+      + "<div style=\"display:flex;justify-content:space-between;align-items:center\">"
+      + "<span style=\"font-size:12px;color:var(--t3);font-weight:600\">합계</span>"
+      + "<span id=\"usdt-total-qty\" style=\"font-size:15px;font-weight:800;color:var(--t1)\">0 USDT</span>"
+      + "</div>"
+      + "<div id=\"usdt-total-krw\" style=\"font-size:11.5px;color:var(--t4);margin-top:3px;text-align:right\"></div>"
+      + "<div id=\"bal-diff\" style=\"font-size:12.5px;font-weight:600;margin-top:4px;text-align:right;min-height:18px\"></div>"
+      + "</div>"
+      + "<div id=\"bal-usdt-rate\" style=\"font-size:11.5px;color:var(--t5);margin-top:6px\">💱 USDT 시세 조회 중...</div>"
       + "</div>";
   } else {
     // 일반 잔액 표시
@@ -415,23 +447,25 @@ function openBalanceUpdate(assetId) {
       + "</div>";
   }
 
-  // 계좌명
-  h += "<div class=\"fld\"><label>"
-    + (a.category === "예적금" ? "계좌명" : "계좌명 (선택)")
-    + "</label>"
-    + "<input id=\"bal-a\" maxlength=\"50\" placeholder=\""
-    + (isU ? "예: 업비트, 빗썸" : a.category === "예적금" ? "예: 공제회, 청년도약계좌" : "예: 농협은행, 카카오뱅크")
-    + "\">";
-  if (al.length > 0) {
-    h += "<div style=\"margin-top:5px;display:flex;gap:4px;flex-wrap:wrap\">";
-    al.forEach(function(ac) {
-      h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById("
-        + QUOTE + "bal-a" + QUOTE + ").value=" + QUOTE + escapeHtml(ac) + QUOTE + "\">"
-        + escapeHtml(ac) + "</button>";
-    });
+  // 계좌명 (USDT는 세부 항목에서 이미 입력하므로 생략)
+  if (!isU) {
+    h += "<div class=\"fld\"><label>"
+      + (a.category === "예적금" ? "계좌명" : "계좌명 (선택)")
+      + "</label>"
+      + "<input id=\"bal-a\" maxlength=\"50\" placeholder=\""
+      + (a.category === "예적금" ? "예: 공제회, 청년도약계좌" : "예: 농협은행, 카카오뱅크")
+      + "\">";
+    if (al.length > 0) {
+      h += "<div style=\"margin-top:5px;display:flex;gap:4px;flex-wrap:wrap\">";
+      al.forEach(function(ac) {
+        h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById("
+          + QUOTE + "bal-a" + QUOTE + ").value=" + QUOTE + escapeHtml(ac) + QUOTE + "\">"
+          + escapeHtml(ac) + "</button>";
+      });
+      h += "</div>";
+    }
     h += "</div>";
   }
-  h += "</div>";
 
   // 날짜
   h += "<div class=\"fld\"><label>날짜</label>"
@@ -453,7 +487,7 @@ function openBalanceUpdate(assetId) {
 
   openModal(a.name + " 잔액 업데이트", h);
 
-  // USDT 시세 비동기 조회
+  // USDT 시세 비동기 조회 + 합계 초기화
   if (isU) {
     getUsdtExchangeRate().then(function(rt) {
       var src = cachedUsdtRate && cachedUsdtRate.src ? cachedUsdtRate.src : "";
@@ -468,6 +502,7 @@ function openBalanceUpdate(assetId) {
         rEl.innerHTML = "💱 1 USDT ≈ " + Math.round(rt).toLocaleString() + "원"
           + (src ? " (" + src + " 실시간)" : "");
       }
+      recalcUsdtTotal();
     });
   }
 }
@@ -501,43 +536,86 @@ function previewBalanceDiff(v, cur) {
   }
 }
 
-// --- USDT 잔액 변동 미리보기 ---
+// --- USDT 세부 항목 추가 ---
 
-function previewUsdtDiff() {
-  var uq = document.getElementById("bal-uq");
-  var cv = document.getElementById("bal-usdt-cv");
-  var df = document.getElementById("bal-diff");
+function addUsdtDetailRow(name) {
+  var list = document.getElementById("usdt-detail-list");
+  if (!list) return;
+  var rows = list.querySelectorAll(".usdt-row");
+  if (rows.length >= 50) { showToast("⚠️ 최대 50개까지 추가 가능합니다"); return; }
 
-  if (!uq) return;
-  var q = Number(uq.value);
+  var div = document.createElement("div");
+  div.className = "usdt-row";
+  div.style.cssText = "display:flex;gap:6px;align-items:center;margin-bottom:6px";
+  div.innerHTML = "<input class=\"ud-name\" maxlength=\"50\" value=\"" + escapeHtml(name) + "\" placeholder=\"거래소/지갑명\" "
+    + "style=\"flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit\">"
+    + "<input class=\"ud-qty\" type=\"number\" step=\"any\" placeholder=\"USDT\" "
+    + "style=\"width:90px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit;text-align:right\" oninput=\"recalcUsdtTotal()\">"
+    + "<button onclick=\"this.parentElement.remove();recalcUsdtTotal()\" "
+    + "style=\"border:none;background:rgba(239,68,68,.08);color:var(--red);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;flex-shrink:0\">✕</button>";
+  list.appendChild(div);
 
-  if (!q || q < 0) {
-    if (cv) cv.textContent = "";
-    if (df) df.textContent = "";
-    return;
-  }
+  // 이름이 비어있으면 이름 필드에 포커스, 아니면 수량 필드에 포커스
+  var nameInput = div.querySelector(".ud-name");
+  var qtyInput = div.querySelector(".ud-qty");
+  if (!name && nameInput) nameInput.focus();
+  else if (qtyInput) qtyInput.focus();
+}
+
+// --- USDT 합계 재계산 ---
+
+function recalcUsdtTotal() {
+  var list = document.getElementById("usdt-detail-list");
+  if (!list) return;
+
+  var total = 0;
+  var rows = list.querySelectorAll(".usdt-row");
+  rows.forEach(function(row) {
+    var q = Number(row.querySelector(".ud-qty").value) || 0;
+    total += q;
+  });
+
+  var totalEl = document.getElementById("usdt-total-qty");
+  if (totalEl) totalEl.textContent = total.toLocaleString(undefined, {maximumFractionDigits: 2}) + " USDT";
 
   getUsdtExchangeRate().then(function(rt) {
-    var newKrw = Math.round(q * rt);
-    var curBal = Number(uq.getAttribute("data-cur") || 0);
+    var krw = Math.round(total * rt);
+    var krwEl = document.getElementById("usdt-total-krw");
+    if (krwEl) krwEl.textContent = "≈ " + formatCurrency(krw);
 
-    if (cv) {
-      var src = cachedUsdtRate && cachedUsdtRate.src ? cachedUsdtRate.src : "";
-      cv.innerHTML = "≈ " + formatCurrency(newKrw) + " (" + formatShortCurrency(newKrw) + ")"
-        + (src ? " · " + src : "");
-    }
+    // 변동 표시
+    var df = document.getElementById("bal-diff");
+    if (!df) return;
+    var totalBox = document.getElementById("usdt-total-box");
+    var curBal = totalBox ? Number(totalBox.getAttribute("data-cur") || 0) : 0;
 
-    if (df) {
-      var diff = newKrw - curBal;
-      if (diff === 0) {
-        df.innerHTML = "<span style=\"color:var(--t4)\">변동 없음</span>";
-      } else if (diff > 0) {
-        df.innerHTML = "<span style=\"color:var(--green)\">▲ +" + formatCurrency(diff) + " 입금</span>";
-      } else {
-        df.innerHTML = "<span style=\"color:var(--blue)\">▼ " + formatCurrency(diff) + " 출금</span>";
-      }
+    var diff = krw - curBal;
+    if (total === 0) {
+      df.textContent = "";
+    } else if (diff === 0) {
+      df.innerHTML = "<span style=\"color:var(--t4)\">변동 없음</span>";
+    } else if (diff > 0) {
+      df.innerHTML = "<span style=\"color:var(--green)\">▲ +" + formatCurrency(diff) + "</span>";
+    } else {
+      df.innerHTML = "<span style=\"color:var(--blue)\">▼ " + formatCurrency(diff) + "</span>";
     }
   });
+}
+
+// --- USDT 세부 잔고에서 데이터 수집 ---
+
+function collectUsdtDetails() {
+  var list = document.getElementById("usdt-detail-list");
+  if (!list) return [];
+
+  var details = [];
+  var rows = list.querySelectorAll(".usdt-row");
+  rows.forEach(function(row) {
+    var name = (row.querySelector(".ud-name").value || "").trim();
+    var qty = Number(row.querySelector(".ud-qty").value) || 0;
+    if (name) details.push({ name: name, qty: qty });
+  });
+  return details;
 }
 
 // --- 잔액 업데이트 실행 ---
@@ -598,9 +676,12 @@ function doUsdtBalanceUpdate(assetId, currentBalance) {
   appState.assets.forEach(function(x) { if (x.id === assetId) a = x; });
   if (!a) return;
 
-  var uq = Number((document.getElementById("bal-uq") || {}).value);
-  if (!isFinite(uq) || uq < 0) {
-    showToast("❌ 올바른 USDT 수량을 입력하세요");
+  var details = collectUsdtDetails();
+  var uq = 0;
+  details.forEach(function(d) { uq += d.qty; });
+
+  if (details.length === 0) {
+    showToast("❌ 거래소/지갑을 1개 이상 입력하세요");
     return;
   }
 
@@ -609,42 +690,44 @@ function doUsdtBalanceUpdate(assetId, currentBalance) {
     return;
   }
 
+  captureUndo();
+
   getUsdtExchangeRate().then(function(rt) {
     var newKrw = Math.round(uq * rt);
     var diff = newKrw - Math.round(currentBalance);
 
-    if (diff === 0) {
-      showToast("ℹ️ 잔액이 동일합니다");
-      return;
-    }
-
     if (!a.txns) a.txns = [];
 
-    var acctVal = (document.getElementById("bal-a").value || "").trim().slice(0, 50) || null;
     var memoVal = (document.getElementById("bal-m").value || "").trim().slice(0, 200);
     var dateVal = document.getElementById("bal-d").value || getTodayString();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVal)) dateVal = getTodayString();
 
-    var type = diff > 0 ? "buy" : "sell";
-    var amt = Math.abs(diff);
-    var src = cachedUsdtRate && cachedUsdtRate.src ? cachedUsdtRate.src : "";
+    if (diff !== 0) {
+      var type = diff > 0 ? "buy" : "sell";
+      var amt = Math.abs(diff);
+      var src = cachedUsdtRate && cachedUsdtRate.src ? cachedUsdtRate.src : "";
 
-    a.txns.push({
-      id: generateId(),
-      type: type,
-      price: amt,
-      qty: 1,
-      account: acctVal,
-      date: dateVal,
-      memo: memoVal || (uq + " USDT (1USDT=" + Math.round(rt) + "원" + (src ? " " + src : "") + ") 잔액→" + formatCurrency(newKrw))
-    });
+      // 세부 내역 요약 메모
+      var detailSummary = details.map(function(d) { return d.name + ":" + d.qty; }).join(", ");
+
+      a.txns.push({
+        id: generateId(),
+        type: type,
+        price: amt,
+        qty: 1,
+        account: null,
+        date: dateVal,
+        memo: memoVal || (uq + " USDT (1USDT=" + Math.round(rt) + "원" + (src ? " " + src : "") + ") [" + detailSummary + "]")
+      });
+    }
 
     a.usdtQty = uq;
+    a.usdtDetails = details;
     a.lpu = getNowString();
     appState.history = makeSnapshot(appState.assets, appState.history);
     saveData();
     closeModal();
-    showToast("✅ USDT 잔액이 " + formatCurrency(newKrw) + "(" + uq + " USDT)으로 업데이트되었습니다");
+    showToast("✅ USDT 잔액이 " + formatCurrency(newKrw) + " (" + uq + " USDT, " + details.length + "개 거래소)으로 업데이트되었습니다");
     render();
   });
 }

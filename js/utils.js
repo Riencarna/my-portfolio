@@ -303,6 +303,9 @@ function sanitizeAsset(a) {
     krxEtf: !!a.krxEtf,
     isUsdt: !!a.isUsdt,
     usdtQty: a.usdtQty ? sanitizeNum(a.usdtQty) : undefined,
+    usdtDetails: Array.isArray(a.usdtDetails) ? a.usdtDetails.map(function(d) {
+      return { name: sanitizeStr(d.name, 50), qty: sanitizeNum(d.qty) };
+    }).filter(function(d) { return d.name; }).slice(0, 50) : undefined,
     walletCoinId: a.walletCoinId ? sanitizeStr(a.walletCoinId, 80) : undefined,
     txns: Array.isArray(a.txns) ? a.txns.map(function(t) {
       return {
