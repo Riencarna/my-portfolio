@@ -3,15 +3,21 @@
 // --- 모달 열기/닫기 ---
 
 function openModal(title, bodyHtml) {
+  var bg = document.getElementById("mBg");
   document.getElementById("mTi").textContent = title;
   document.getElementById("mBd").innerHTML = bodyHtml;
-  document.getElementById("mBg").classList.remove("hidden");
+  bg.classList.remove("hidden", "closing");
   document.addEventListener("keydown", _modalEscHandler);
 }
 
 function closeModal() {
-  document.getElementById("mBg").classList.add("hidden");
+  var bg = document.getElementById("mBg");
+  bg.classList.add("closing");
   document.removeEventListener("keydown", _modalEscHandler);
+  setTimeout(function() {
+    bg.classList.remove("closing");
+    bg.classList.add("hidden");
+  }, 200);
 }
 
 function _modalEscHandler(e) {

@@ -13,11 +13,20 @@ function goTab(tabId) {
   document.querySelectorAll(".tab").forEach(function(el) {
     el.classList.toggle("on", el.dataset.t === tabId);
   });
-  document.getElementById("pgDash").classList.toggle("hidden", tabId !== "dash");
-  document.getElementById("pgList").classList.toggle("hidden", tabId !== "list");
-  document.getElementById("pgInc").classList.toggle("hidden", tabId !== "inc");
-  document.getElementById("pgHist").classList.toggle("hidden", tabId !== "hist");
-  document.getElementById("pgAi").classList.toggle("hidden", tabId !== "ai");
+  var pages = ["pgDash", "pgList", "pgInc", "pgHist", "pgAi"];
+  var tabMap = { dash: "pgDash", list: "pgList", inc: "pgInc", hist: "pgHist", ai: "pgAi" };
+  pages.forEach(function(pg) {
+    var el = document.getElementById(pg);
+    if (pg === tabMap[tabId]) {
+      el.classList.remove("hidden");
+      el.classList.remove("tab-animate");
+      void el.offsetWidth;
+      el.classList.add("tab-animate");
+    } else {
+      el.classList.add("hidden");
+      el.classList.remove("tab-animate");
+    }
+  });
   render();
 }
 
