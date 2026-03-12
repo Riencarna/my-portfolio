@@ -327,7 +327,7 @@ function openIncomeAdd() {
   if (sl.length > 0) {
     h += "<div style=\"margin-top:5px;display:flex;gap:4px;flex-wrap:wrap\">";
     sl.slice(0, 8).forEach(function(s) {
-      h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById(" + QUOTE + "inc-src" + QUOTE + ").value=" + QUOTE + escapeHtml(s) + QUOTE + "\">" + escapeHtml(s) + "</button>";
+      h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById(" + QUOTE + "inc-src" + QUOTE + ").value=" + QUOTE + escapeJsString(s) + QUOTE + "\">" + escapeHtml(s) + "</button>";
     });
     h += "</div>";
   }

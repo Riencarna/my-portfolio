@@ -63,7 +63,7 @@ function openWalletModal() {
   });
   h += "</div>";
   h += "<div class=\"fld\"><label>지갑 주소 (0x...)</label>";
-  h += "<input id=\"wl-addr\" maxlength=\"42\" value=\"" + escapeHtml(savedAddr) + "\" placeholder=\"0x1234...abcd\" style=\"font-size:13px;font-family:monospace\"></div>";
+  h += "<input id=\"wl-addr\" maxlength=\"42\" value=\"" + escapeAttr(savedAddr) + "\" placeholder=\"0x1234...abcd\" style=\"font-size:13px;font-family:monospace\"></div>";
   h += "<div id=\"wl-result\"></div>";
   h += "<div class=\"mbtn\" id=\"wl-outer-btns\">";
   h += "<button class=\"btn btn-g\" onclick=\"closeModal()\">닫기</button>";

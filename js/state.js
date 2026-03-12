@@ -228,6 +228,11 @@ function createPortfolio(name) {
     showToast("❌ 최대 10개까지 생성 가능합니다");
     return;
   }
+  name = sanitizePortfolioName(name);
+  if (!name) {
+    showToast("❌ 포트폴리오 이름을 입력하세요");
+    return;
+  }
   var id = "pf_" + Date.now();
   meta.list.push({ id: id, name: name });
   _savePortfolioMeta(meta);
@@ -241,6 +246,11 @@ function createPortfolio(name) {
 }
 
 function renamePortfolio(id, newName) {
+  newName = sanitizePortfolioName(newName);
+  if (!newName) {
+    showToast("❌ 포트폴리오 이름을 입력하세요");
+    return;
+  }
   var meta = _getPortfolioMeta();
   meta.list.forEach(function(p) { if (p.id === id) p.name = newName; });
   _savePortfolioMeta(meta);

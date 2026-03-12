@@ -101,7 +101,7 @@ function openTransaction(assetId, type) {
     h += "<div style=\"margin-top:5px;display:flex;gap:4px;flex-wrap:wrap\">";
     al.forEach(function(ac) {
       h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById("
-        + QUOTE + "tx-a" + QUOTE + ").value=" + QUOTE + escapeHtml(ac) + QUOTE + "\">"
+        + QUOTE + "tx-a" + QUOTE + ").value=" + QUOTE + escapeJsString(ac) + QUOTE + "\">"
         + escapeHtml(ac) + "</button>";
     });
     h += "</div>";
@@ -406,7 +406,7 @@ function openBalanceUpdate(assetId) {
       + "<div id=\"usdt-detail-list\">";
     details.forEach(function(d, i) {
       h += "<div class=\"usdt-row\" data-idx=\"" + i + "\" style=\"display:flex;gap:6px;align-items:center;margin-bottom:6px\">"
-        + "<input class=\"ud-name\" maxlength=\"50\" value=\"" + escapeHtml(d.name) + "\" placeholder=\"거래소명\" "
+        + "<input class=\"ud-name\" maxlength=\"50\" value=\"" + escapeAttr(d.name) + "\" placeholder=\"거래소명\" "
         + "style=\"flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit\">"
         + "<input class=\"ud-qty\" type=\"number\" step=\"any\" value=\"" + d.qty + "\" placeholder=\"USDT\" "
         + "style=\"width:90px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit;text-align:right\" oninput=\"recalcUsdtTotal()\">"
@@ -465,7 +465,7 @@ function openBalanceUpdate(assetId) {
       h += "<div style=\"margin-top:5px;display:flex;gap:4px;flex-wrap:wrap\">";
       al.forEach(function(ac) {
         h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById("
-          + QUOTE + "bal-a" + QUOTE + ").value=" + QUOTE + escapeHtml(ac) + QUOTE + "\">"
+          + QUOTE + "bal-a" + QUOTE + ").value=" + QUOTE + escapeJsString(ac) + QUOTE + "\">"
           + escapeHtml(ac) + "</button>";
       });
       h += "</div>";
@@ -553,7 +553,7 @@ function addUsdtDetailRow(name) {
   var div = document.createElement("div");
   div.className = "usdt-row";
   div.style.cssText = "display:flex;gap:6px;align-items:center;margin-bottom:6px";
-  div.innerHTML = "<input class=\"ud-name\" maxlength=\"50\" value=\"" + escapeHtml(name) + "\" placeholder=\"거래소/지갑명\" "
+  div.innerHTML = "<input class=\"ud-name\" maxlength=\"50\" value=\"" + escapeAttr(name) + "\" placeholder=\"거래소/지갑명\" "
     + "style=\"flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit\">"
     + "<input class=\"ud-qty\" type=\"number\" step=\"any\" placeholder=\"USDT\" "
     + "style=\"width:90px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:var(--card2);color:var(--t1);font-size:12.5px;outline:none;font-family:inherit;text-align:right\" oninput=\"recalcUsdtTotal()\">"
@@ -1066,7 +1066,7 @@ function openEditAsset(id) {
 
   if (a.category === "국내주식") {
     ex = "<div class=\"fld\"><label>종목코드</label>"
-      + "<input id=\"e-code\" maxlength=\"20\" value=\"" + escapeHtml(a.stockCode || "") + "\">"
+      + "<input id=\"e-code\" maxlength=\"20\" value=\"" + escapeAttr(a.stockCode || "") + "\">"
       + "</div>"
       + "<div class=\"fld\"><label>시장</label>"
       + "<div class=\"mkt-sel\">"
@@ -1079,7 +1079,7 @@ function openEditAsset(id) {
         + QUOTE + "sel" + QUOTE + ");document.getElementById("
         + QUOTE + "e-mkt" + QUOTE + ").value=" + QUOTE + "KOSDAQ" + QUOTE + "\">KOSDAQ</button>"
       + "</div>"
-      + "<input type=\"hidden\" id=\"e-mkt\" value=\"" + (a.market || "KOSPI") + "\">"
+      + "<input type=\"hidden\" id=\"e-mkt\" value=\"" + escapeAttr(a.market || "KOSPI") + "\">"
       + "</div>";
   }
 
@@ -1087,14 +1087,14 @@ function openEditAsset(id) {
     ex = "<div class=\"fld\"><label>"
       + (a.krxEtf ? "종목코드 (국내 상장)" : "티커")
       + "</label>"
-      + "<input id=\"e-code\" maxlength=\"20\" value=\"" + escapeHtml(a.stockCode || "") + "\">"
+      + "<input id=\"e-code\" maxlength=\"20\" value=\"" + escapeAttr(a.stockCode || "") + "\">"
       + (a.krxEtf ? "<div class=\"ht\">🇰🇷 국내 상장 해외 ETF · 원화 거래</div>" : "")
       + "</div>";
   }
 
   if (a.category === "코인") {
     ex = "<div class=\"fld\"><label>CoinGecko ID</label>"
-      + "<input id=\"e-coinId\" maxlength=\"80\" value=\"" + escapeHtml(a.coinId || "") + "\">"
+      + "<input id=\"e-coinId\" maxlength=\"80\" value=\"" + escapeAttr(a.coinId || "") + "\">"
       + "</div>";
   }
 
@@ -1104,7 +1104,7 @@ function openEditAsset(id) {
     + buildCategoryOptions(a.category)
     + "</select></div></div>"
     + "<div class=\"fld\"><label>자산명</label>"
-    + "<input id=\"e-name\" maxlength=\"100\" value=\"" + escapeHtml(a.name) + "\">"
+    + "<input id=\"e-name\" maxlength=\"100\" value=\"" + escapeAttr(a.name) + "\">"
     + "</div>"
     + ex
     + "<div class=\"fld\"><label>📝 메모 (선택)</label>"

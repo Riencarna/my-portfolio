@@ -710,7 +710,7 @@ function openPortfolioManager() {
     }
 
     h += "<button class=\"ibtn\" style=\"background:rgba(255,255,255,.04);color:var(--t3);width:28px;height:28px\" " +
-      "onclick=\"_renamePortfolioPrompt(" + QUOTE + p.id + QUOTE + "," + QUOTE + escapeHtml(p.name) + QUOTE + ")\">✏️</button>";
+      "onclick=\"_renamePortfolioPrompt(" + QUOTE + p.id + QUOTE + "," + QUOTE + escapeJsString(p.name) + QUOTE + ")\">✏️</button>";
 
     if (p.id !== "default") {
       h += "<button class=\"ibtn\" style=\"background:rgba(239,68,68,.05);color:var(--red);width:28px;height:28px\" " +

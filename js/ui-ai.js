@@ -359,7 +359,7 @@ function renderAI() {
       + "<input id=\"gem-key\" type=\"password\" maxlength=\"60\" placeholder=\"AIzaSy...\" style=\"flex:1\" autocomplete=\"off\">"
       + "<button class=\"btn btn-p\" style=\"flex-shrink:0;padding:0 14px\" onclick=\"saveGeminiApiKey()\">저장</button>"
       + "</div>"
-      + "<div class=\"ht\" style=\"margin-top:6px\">🔒 키는 브라우저 로컬에만 저장되며 Google AI 서버로만 전송됩니다</div></div>";
+      + "<div class=\"ht\" style=\"margin-top:6px\">🔒 키는 현재 브라우저 탭에만 저장되며 Google AI 서버로만 전송됩니다</div></div>";
   } else {
     h += "<div style=\"display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px\">"
       + "<button class=\"btn btn-p\" style=\"font-size:12px\" onclick=\"askGemini('analyze')\" " + (isGeminiLoading ? "disabled" : "") + ">📊 포트폴리오 분석</button>"
@@ -422,7 +422,8 @@ function previewAmount(v) {
 
 function getGeminiApiKey() {
   try {
-    var k = localStorage.getItem("gem_api_key") || "";
+    try { localStorage.removeItem("gem_api_key"); } catch (legacyErr) {}
+    var k = sessionStorage.getItem("gem_api_key") || "";
     return /^[A-Za-z0-9_\-]{20,60}$/.test(k) ? k : "";
   } catch (e) {
     return "";
@@ -436,13 +437,19 @@ function saveGeminiApiKey() {
     showToast("❌ API 키 형식이 올바르지 않습니다");
     return;
   }
-  try { localStorage.setItem("gem_api_key", k); } catch (e) {}
-  showToast("✅ API 키가 저장되었습니다");
+  try {
+    sessionStorage.setItem("gem_api_key", k);
+    localStorage.removeItem("gem_api_key");
+  } catch (e) {}
+  showToast("✅ API 키가 현재 브라우저 탭에만 저장되었습니다");
   renderAI();
 }
 
 function clearGeminiApiKey() {
-  try { localStorage.removeItem("gem_api_key"); } catch (e) {}
+  try {
+    sessionStorage.removeItem("gem_api_key");
+    localStorage.removeItem("gem_api_key");
+  } catch (e) {}
   geminiResult = null;
   showToast("🔑 API 키가 삭제되었습니다");
   renderAI();

@@ -58,8 +58,25 @@ function getNowString() {
 
 function escapeHtml(s) {
   var d = document.createElement("div");
-  d.textContent = s;
+  d.textContent = s == null ? "" : String(s);
   return d.innerHTML;
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s)
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeJsString(s) {
+  return String(s == null ? "" : s)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/</g, "\\x3C")
+    .replace(/>/g, "\\x3E");
 }
 
 // --- 고유 ID 생성 (충돌 방지) ---
@@ -281,6 +298,10 @@ function buildCategoryIndex(assets) {
 function sanitizeStr(s, max) {
   if (typeof s !== "string") return "";
   return s.slice(0, max || 200);
+}
+
+function sanitizePortfolioName(name) {
+  return sanitizeStr(name, 50).trim().replace(/\s+/g, " ");
 }
 
 function sanitizeNum(n) {
