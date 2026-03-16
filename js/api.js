@@ -92,6 +92,19 @@ function fetchYahooFinance(symbol) {
   });
 }
 
+// --- Stooq (해외주식 폴백) ---
+
+function fetchStooq(symbol) {
+  var sym = symbol.toUpperCase() + ".US";
+  var url = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcv&h&e=json";
+  return tryFetch(url, 10000).then(function(d) {
+    if (!d || !d.d || d.d.length < 2) return null;
+    var close = parseFloat(d.d[1][6]);
+    if (close && close > 0) return close;
+    return null;
+  }).catch(function() { return null; });
+}
+
 // --- Naver 주식 ---
 
 function fetchNaver(code) {
@@ -164,9 +177,14 @@ function fetchStockPrice(asset) {
 
   if (asset.category === "해외주식") {
     return fetchYahooFinance(code).then(function(r) {
-      if (!r) return null;
-      if (r.currency !== "KRW") return getExchangeRate().then(function(rt) { return Math.round(r.price * rt); });
-      return r.price;
+      if (r && r.price > 0) {
+        if (r.currency !== "KRW") return getExchangeRate().then(function(rt) { return Math.round(r.price * rt); });
+        return r.price;
+      }
+      return fetchStooq(code).then(function(price) {
+        if (!price) return null;
+        return getExchangeRate().then(function(rt) { return Math.round(price * rt); });
+      });
     });
   }
 
