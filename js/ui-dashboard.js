@@ -1,742 +1,343 @@
-/**
- * ui-dashboard.js
- * Dashboard tab rendering and inline editing functionality.
- * Extracted from index.html lines 99-103, 108-136 with variable/function renames.
- */
-
-/* === Toggle & Inline Editing Helpers === */
-
-function toggleAssetDetail(id) {
-  expandedAssets[id] = !expandedAssets[id];
-  render();
-}
-
-function toggleDashboardCategory(cat) {
-  dashboardCategoryOpen[cat] = !dashboardCategoryOpen[cat];
-  renderDashboard();
-}
-
-function startInlineEdit(cat, curVal) {
-  var el = document.getElementById("diq_" + cat);
-  if (!el) return;
-  el.innerHTML =
-    "<div style=\"display:flex;align-items:center;gap:4px\">" +
-      "<input type=\"number\" id=\"dii_" + cat + "\" value=\"\" " +
-        "placeholder=\"" + Math.round(curVal) + "\" " +
-        "style=\"width:110px;padding:5px 8px;border-radius:7px;" +
-          "border:1px solid rgba(59,130,246,.3);background:var(--card2);" +
-          "color:var(--t1);font-size:13px;font-weight:700;outline:none;" +
-          "font-family:inherit;text-align:right\" " +
-        "onkeydown=\"if(event.key==='Enter')saveInlineEdit(" + QUOTE + cat + QUOTE + "," + curVal + ");" +
-          "if(event.key==='Escape'){renderDashboard()}\" " +
-        "oninput=\"previewInlineChange(" + QUOTE + cat + QUOTE + ",this.value," + curVal + ")\">" +
-      "<button style=\"border:none;background:rgba(16,185,129,.1);color:var(--green);" +
-        "width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:13px;" +
-        "display:flex;align-items:center;justify-content:center\" " +
-        "onclick=\"saveInlineEdit(" + QUOTE + cat + QUOTE + "," + curVal + ")\">✓</button>" +
-    "</div>" +
-    "<div id=\"dip_" + cat + "\" style=\"font-size:11.5px;margin-top:3px;min-height:16px\"></div>";
-  el.onclick = null;
-  setTimeout(function () {
-    var inp = document.getElementById("dii_" + cat);
-    if (inp) inp.focus();
-  }, 30);
-}
-
-function previewInlineChange(cat, val, cur) {
-  var el = document.getElementById("dip_" + cat);
-  if (!el) return;
-  var n = Number(val);
-  if (!n) { el.textContent = ""; return; }
-  var diff = n - cur;
-  if (diff === 0) {
-    el.innerHTML = "<span style=\"color:var(--t4)\">변동 없음</span>";
-  } else if (diff > 0) {
-    el.innerHTML = "<span style=\"color:var(--red)\">▲ +" + formatShortCurrency(diff) + "</span>";
-  } else {
-    el.innerHTML = "<span style=\"color:#60A5FA\">▼ " + formatShortCurrency(diff) + "</span>";
-  }
-}
-
-function saveInlineEdit(cat, curVal) {
-  var inp = document.getElementById("dii_" + cat);
-  if (!inp) return;
-  var newVal = Number(inp.value);
-  if (!isFinite(newVal) || newVal < 0) {
-    showToast("❌ 올바른 금액을 입력하세요");
-    return;
-  }
-  var diff = Math.round(newVal) - Math.round(curVal);
-  if (diff === 0) { renderDashboard(); return; }
-
-  var targets = appState.assets.filter(function (a) { return a.category === cat; });
-  if (!targets.length) {
-    showToast("❌ " + cat + " 자산이 없습니다");
-    return;
-  }
-  var a = targets[0];
-  if (!a.txns) a.txns = [];
-  if (a.txns.length >= 5000) {
-    showToast("⚠️ 거래 내역이 너무 많습니다");
-    return;
-  }
-
-  captureUndo();
-  var type = diff > 0 ? "buy" : "sell";
-  a.txns.push({
-    id: generateId(),
-    type: type,
-    price: Math.abs(diff),
-    qty: 1,
-    account: null,
-    date: getTodayString(),
-    memo: "대시보드 빠른 업데이트 (" +
-      formatCurrency(Math.round(curVal)) + " → " +
-      formatCurrency(Math.round(newVal)) + ")"
-  });
-  appState.history = makeSnapshot(appState.assets, appState.history);
-  saveData();
-  showToast(
-    "✅ " + CATEGORY_CONFIG[cat].icon + " " + cat + " → " +
-    formatCurrency(Math.round(newVal)),
-    true
-  );
-  renderDashboard();
-}
-
-/* === Main Dashboard Render === */
+/* =============================================
+   My Portfolio v3.12.0 — Dashboard UI
+   Cycle 15: Full rebuild from scratch
+   P6 FIX: keyboard handler matches ALL data-action targets
+   ============================================= */
 
 function renderDashboard() {
-  var el = document.getElementById("pgDash"),
-      total = 0,
-      inv = 0,
-      pf = 0;
+  const container = $('#pgDash');
+  if (!container) return;
 
-  /* Destroy old category pie charts */
-  for (var ck in charts.catPies) {
-    try { if (charts.catPies[ck]) charts.catPies[ck].destroy(); } catch (e) {}
-  }
-  charts.catPies = {};
+  const total = calcTotal(appState.assets);
+  const catTotals = calcCategoryTotals(appState.assets);
+  const prevTotal = getPreviousTotal();
+  const change = total - prevTotal;
+  const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
 
-  /* Compute totals */
-  appState.assets.forEach(function (a) {
-    if (!hasTransactions(a)) return;
-    var c = calcAsset(a);
-    total += c.evalAmt;
-    inv += c.totalCost;
-    pf += c.profit;
+  container.innerHTML = `
+    <div class="dash-header" role="region" aria-label="총 자산 현황">
+      <div class="total-card">
+        <div class="total-label">총 자산</div>
+        <div class="total-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
+        <div class="total-change ${profitClass(change)}" aria-label="일일 변동">
+          ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
+        </div>
+        ${appState.saved ? `<div class="total-saved">저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
+      </div>
+    </div>
+
+    ${renderExchangeRateBar()}
+    ${renderBackupReminder()}
+    ${renderAutoUpdateSection()}
+
+    <div class="dash-charts" role="region" aria-label="차트">
+      <div class="card">
+        <div class="card-title">자산 분포</div>
+        <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 분포 차트">
+          <canvas id="chartPie"></canvas>
+        </div>
+        <div id="chartPieAlt"></div>
+        ${renderPieLegend(catTotals, total)}
+      </div>
+      <div class="card">
+        <div class="card-title">
+          자산 추이
+          <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
+            <button class="btn-sm active" data-action="trend" data-days="30" aria-pressed="true">30일</button>
+            <button class="btn-sm" data-action="trend" data-days="90" aria-pressed="false">90일</button>
+            <button class="btn-sm" data-action="trend" data-days="0" aria-pressed="false">전체</button>
+          </div>
+        </div>
+        <div class="chart-wrap chart-wrap-180" role="img" aria-label="자산 추이 차트">
+          <canvas id="chartTrend"></canvas>
+        </div>
+        <div id="chartTrendAlt"></div>
+      </div>
+    </div>
+
+    ${renderCategoryBreakdown(catTotals, total)}
+    ${renderOnboarding()}
+  `;
+
+  requestAnimationFrame(() => {
+    destroyChart('pie');
+    destroyChart('trend');
+    renderPortfolioPie();
+    renderTrendChart(30);
   });
 
-  /* Category data */
-  var cd = CATEGORY_LIST.map(function (c) {
-    var v = 0;
-    appState.assets.filter(function (a) { return a.category === c; })
-      .forEach(function (a) { v += getAssetValue(a); });
-    return { n: c, v: v, c: CATEGORY_CONFIG[c].color, ic: CATEGORY_CONFIG[c].icon };
-  }).filter(function (d) {
-    return d.v > 0;
-  }).sort(function (a, b) {
-    return b.v - a.v;
+  _setupDashboardDelegation(container);
+}
+
+function _setupDashboardDelegation(container) {
+  container.onclick = (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    _handleDashAction(target);
+  };
+
+  // P6 FIX: keyboard handler matches ALL data-action targets, not just a subset
+  container.onkeydown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    e.preventDefault();
+    _handleDashAction(target);
+  };
+}
+
+// P6 FIX: single shared handler for both click and keyboard — covers ALL actions
+function _handleDashAction(target) {
+  const action = target.dataset.action;
+
+  if (action === 'trend') {
+    const days = Number(target.dataset.days);
+    _handleTrendClick(days, target);
+  } else if (action === 'auto-update') {
+    startAutoUpdate();
+  } else if (action === 'toggle-dash-cat') {
+    const catId = target.dataset.cat;
+    if (catId) toggleDashCat(catId);
+  } else if (action === 'open-asset-detail') {
+    const id = target.dataset.id;
+    if (id) openAssetDetail(id);
+  } else if (action === 'go-tab') {
+    const tab = target.dataset.tab;
+    if (tab) goTab(tab);
+  }
+}
+
+function _handleTrendClick(days, btn) {
+  $$('#trendBtns .btn-sm').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-pressed', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
+  renderTrendChart(days);
+}
+
+function getPreviousTotal() {
+  const hist = appState.history;
+  if (hist.length < 2) return calcTotal(appState.assets);
+  return hist[hist.length - 2]?.total || 0;
+}
+
+function renderExchangeRateBar() {
+  if (!cachedRate) return '';
+  return `
+    <div class="rate-bar" role="status" aria-label="환율 정보">
+      <span>💱 USD/KRW: ${escHtml(fmtNum(cachedRate.rate, 2))}</span>
+      ${cachedUsdt ? `<span>USDT: ${escHtml(fmtNum(cachedUsdt.rate, 0))}원 (${escHtml(cachedUsdt.source)})</span>` : ''}
+      <span class="rate-time">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</span>
+    </div>
+  `;
+}
+
+function renderBackupReminder() {
+  if (!appState.saved) return '';
+  const daysSince = Math.floor((Date.now() - new Date(appState.saved).getTime()) / 86400000);
+  if (daysSince < 7) return '';
+  return `
+    <div class="card card-warn" role="alert">
+      <span>💾 마지막 백업이 ${daysSince}일 전입니다.</span>
+      <button class="btn-sm btn-accent" data-action="go-tab" data-tab="pgHist" aria-label="백업 페이지로 이동">백업하기</button>
+    </div>
+  `;
+}
+
+function renderAutoUpdateSection() {
+  return `
+    <div class="card" role="region" aria-label="가격 업데이트">
+      <div class="card-title">
+        가격 업데이트
+        <button class="btn-p" id="btnAutoUpdate" data-action="auto-update"
+          aria-label="전체 가격 업데이트" ${autoUpdateProgress.running ? 'disabled' : ''}>
+          ${autoUpdateProgress.running ? '업데이트 중...' : '🔄 전체 업데이트'}
+        </button>
+      </div>
+      <div id="updateProgressWrap" class="${autoUpdateProgress.running ? 'visible' : 'hidden'}"
+        role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-bar">
+          <div class="progress-fill" id="updateProgressBar"></div>
+        </div>
+        <div class="progress-text" id="updateProgressText" aria-live="polite">준비 중...</div>
+      </div>
+      <div id="updateLogs" class="update-logs" aria-label="업데이트 로그">
+        ${updateLogs.slice(-10).map(l => `
+          <div class="log-item ${l.ok ? 'log-ok' : 'log-fail'}" role="listitem">
+            <span>${escHtml(l.name)}</span>
+            <span>${l.ok ? (l.price ? escHtml(fmtPrice(l.price)) : '✓') : '✗ 실패'}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function startAutoUpdate() {
+  const btn = $('#btnAutoUpdate');
+  if (btn) btn.disabled = true;
+  const wrap = $('#updateProgressWrap');
+  if (wrap) { wrap.classList.remove('hidden'); wrap.classList.add('visible'); }
+
+  const summary = await autoUpdateAll(prog => {
+    const pct = prog.total > 0 ? Math.round((prog.done / prog.total) * 100) : 0;
+    const bar = $('#updateProgressBar');
+    const text = $('#updateProgressText');
+    const progressWrap = $('#updateProgressWrap');
+    if (bar) bar.style.width = pct + '%';
+    if (text) text.textContent = `${prog.done}/${prog.total} 완료 (${pct}%)`;
+    if (progressWrap) progressWrap.setAttribute('aria-valuenow', String(pct));
   });
 
-  /* Previous-day comparison */
-  var prev = appState.history.length >= 2
-    ? appState.history[appState.history.length - 2].total
-    : null;
-  var chg = prev !== null ? total - prev : null;
-  var chgP = prev ? ((chg / prev) * 100).toFixed(2) : null;
-
-  /* Chart history (last 30 days) */
-  var cht = appState.history.slice(-30).map(function (h) {
-    return { d: h.date.slice(5), v: h.total };
-  });
-
-  var ac = appState.assets.filter(canAutoUpdate).length;
-
-  /* --- Build HTML --- */
-  var h = "<div style=\"animation:fadeUp .4s ease\">";
-
-  /* Sandbox warning */
-  if (isSandbox && ac > 0) {
-    h += "<div style=\"background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(239,68,68,.08));" +
-      "border:1px solid rgba(245,158,11,.2);border-radius:14px;padding:16px;margin-bottom:14px\">" +
-      "<div style=\"font-size:13px;font-weight:700;color:var(--amber)\">⚠️ 미리보기 모드</div>" +
-      "<div style=\"font-size:12px;color:var(--t3);margin-top:4px;line-height:1.6\">" +
-        "Claude 미리보기에서는 외부 API가 차단되어 가격 최신화가 불가합니다.<br>" +
-        "<strong style=\"color:var(--t1)\">파일을 다운로드</strong>한 후 " +
-        "<strong style=\"color:var(--t1)\">Chrome/Safari에서 직접 열어주세요.</strong></div>" +
-      "<div style=\"font-size:11px;color:var(--t4);margin-top:6px\">" +
-        "💡 다운로드 → 파일 더블클릭 → 자동 최신화 정상 작동</div></div>";
+  if (summary && summary.total > 0) {
+    const msg = summary.failed > 0
+      ? `가격 업데이트: ${summary.success}/${summary.total} 성공 (실패: ${summary.failed}건)`
+      : `가격 업데이트 완료: ${summary.success}/${summary.total} 성공`;
+    showToast(msg, summary.failed > 0 ? 'info' : 'success');
+  } else {
+    showToast('업데이트할 자산이 없습니다', 'info');
   }
 
-  /* Backup reminder */
-  if (appState.assets.length > 0) {
-    var _lastBk = null;
-    try { _lastBk = Number(localStorage.getItem("mp_last_backup")); } catch (e) {}
-    var _daysSinceBk = _lastBk ? Math.floor((Date.now() - _lastBk) / 86400000) : null;
-    if (_daysSinceBk === null || _daysSinceBk >= 7) {
-      h += "<div style=\"display:flex;align-items:center;gap:10px;padding:11px 14px;" +
-        "background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.12);" +
-        "border-radius:12px;margin-bottom:14px\">" +
-        "<span style=\"font-size:14px\">💾</span>" +
-        "<div style=\"flex:1;font-size:12px;color:var(--t3)\">" +
-          (_daysSinceBk === null
-            ? "아직 백업한 적이 없습니다. 데이터 보호를 위해 백업하세요."
-            : _daysSinceBk + "일 전 마지막 백업. 정기 백업을 권장합니다.") +
-        "</div>" +
-        "<button style=\"border:none;background:rgba(245,158,11,.1);color:var(--amber);" +
-          "padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;" +
-          "cursor:pointer;font-family:inherit;white-space:nowrap\" " +
-          "onclick=\"goTab(" + QUOTE + "hist" + QUOTE + ")\">백업하기</button></div>";
+  renderDashboard();
+}
+
+function renderPieLegend(catTotals, total) {
+  const items = appState.categoryOrder
+    .filter(c => catTotals[c] > 0)
+    .map(c => {
+      const cat = CAT_MAP[c];
+      const val = catTotals[c];
+      const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+      return `
+        <div class="legend-item">
+          <span class="legend-dot" data-color="${escAttr(cat.color)}" aria-hidden="true"></span>
+          <span class="legend-label">${cat.icon} ${escHtml(cat.label)}</span>
+          <span class="legend-value">${escHtml(fmtKRW(val))}</span>
+          <span class="legend-pct">${pct}%</span>
+        </div>
+      `;
+    }).join('');
+  return `<div class="pie-legend" role="list" aria-label="자산 분포 범례">${items}</div>`;
+}
+
+function renderCategoryBreakdown(catTotals, total) {
+  const cats = appState.categoryOrder.filter(c => catTotals[c] > 0);
+  if (cats.length === 0) return '';
+  return `
+    <div class="card" role="region" aria-label="카테고리별 상세">
+      <div class="card-title">카테고리별 상세</div>
+      ${cats.map(c => renderCategorySection(c, catTotals[c], total)).join('')}
+    </div>
+  `;
+}
+
+function renderCategorySection(catId, catTotal, total) {
+  const cat = CAT_MAP[catId];
+  const pct = total > 0 ? ((catTotal / total) * 100).toFixed(1) : 0;
+  const assets = appState.assets.filter(a => a.category === catId);
+  const isOpen = UIState.dashboardCategoryOpen[catId] || false;
+
+  return `
+    <div class="cat-section" id="dashCat-${escAttr(catId)}">
+      <div class="cat-header" data-action="toggle-dash-cat" data-cat="${escAttr(catId)}"
+        role="button" tabindex="0" aria-expanded="${isOpen}">
+        <span>${cat.icon} ${escHtml(cat.label)} (${assets.length})</span>
+        <span>
+          <span class="cat-value">${escHtml(fmtKRW(catTotal))}</span>
+          <span class="cat-pct">${pct}%</span>
+          <span class="chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▸</span>
+        </span>
+      </div>
+      ${isOpen ? `<div class="cat-assets" role="list">${assets.map(a => renderDashAsset(a)).join('')}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderDashAsset(asset) {
+  const v = calcAssetValue(asset);
+  return `
+    <div class="dash-asset" data-action="open-asset-detail" data-id="${asset.id}" role="listitem"
+      tabindex="0"
+      aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
+      <div class="dash-asset-name">${escHtml(asset.name)}</div>
+      <div class="dash-asset-info">
+        <span class="dash-asset-value">${escHtml(fmtKRW(v.value))}</span>
+        <span class="${profitClass(v.profit)}">${escHtml(fmtPct(v.profitPct))}</span>
+      </div>
+    </div>
+  `;
+}
+
+// Targeted DOM update for accordion toggle — no full re-render
+function toggleDashCat(catId) {
+  UIState.dashboardCategoryOpen[catId] = !UIState.dashboardCategoryOpen[catId];
+  const isOpen = UIState.dashboardCategoryOpen[catId];
+
+  const section = $(`#dashCat-${catId}`);
+  if (!section) {
+    renderDashboard();
+    return;
+  }
+
+  const header = section.querySelector('.cat-header');
+  if (header) {
+    header.setAttribute('aria-expanded', String(isOpen));
+    const chevron = header.querySelector('.chevron');
+    if (chevron) {
+      chevron.classList.toggle('open', isOpen);
     }
   }
 
-  /* Exchange rate bar */
-  var hasF = appState.assets.some(function (a) {
-    return a.category === "해외주식" || a.category === "코인";
-  });
-  if (hasF) {
-    var rr = getCurrentExchangeRate();
-    var rOk = cachedExchangeRate && cachedExchangeRate.r;
-    var _rCacheT = null;
-    if (cachedExchangeRate && cachedExchangeRate.t) {
-      _rCacheT = cachedExchangeRate.t;
-    } else {
-      try { var _s = JSON.parse(localStorage.getItem("mp_ex_rate")); if (_s && _s.t) _rCacheT = _s.t; } catch(e) {}
+  const existingBody = section.querySelector('.cat-assets');
+  if (isOpen) {
+    if (!existingBody) {
+      const assets = appState.assets.filter(a => a.category === catId);
+      const assetsDiv = document.createElement('div');
+      assetsDiv.className = 'cat-assets';
+      assetsDiv.setAttribute('role', 'list');
+      assetsDiv.innerHTML = assets.map(a => renderDashAsset(a)).join('');
+      section.appendChild(assetsDiv);
     }
-    var rTime = _rCacheT
-      ? new Date(_rCacheT).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-      : "";
-    h += "<div style=\"display:flex;align-items:center;gap:8px;padding:10px 14px;" +
-      "background:rgba(255,255,255,.02);border:1px solid var(--bd);border-radius:12px;margin-bottom:14px\">" +
-      "<span style=\"font-size:14px\">💱</span>" +
-      "<div style=\"flex:1\">" +
-        "<span style=\"font-size:12.5px;color:var(--t3)\">USD/KRW</span> " +
-        "<span style=\"font-size:14px;font-weight:700;color:var(--t1)\">" +
-          Math.round(rr).toLocaleString() + "원</span> " +
-        (rOk
-          ? "<span style=\"font-size:11px;color:var(--green)\">✓ 실시간</span>"
-          : "<span style=\"font-size:11px;color:var(--amber)\">⚠ " + (_rCacheT ? "캐시" : "기본값") + "</span>") +
-        (rTime
-          ? " <span style=\"font-size:11px;color:var(--t5)\">" + rTime + "</span>"
-          : "") +
-      "</div>" +
-      "<button style=\"border:none;background:rgba(59,130,246,.08);color:#60A5FA;padding:5px 10px;" +
-        "border-radius:7px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600\" " +
-        "onclick=\"refreshExchangeRate()\">🔄 최신화</button></div>";
-  }
-
-  /* Total asset card */
-  h += "<div class=\"tot\"><div class=\"glow\"></div>" +
-    "<div style=\"font-size:12px;color:var(--t3);margin-bottom:5px;font-weight:500\">총 자산</div>" +
-    "<div class=\"tot-n\" id=\"totNum\">" + formatNumber(total) + "</div>";
-
-  if (chg !== null) {
-    h += "<div style=\"display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap\">" +
-      "<span class=\"chg " + (chg >= 0 ? "chg-u" : "chg-d") + "\">" +
-        (chg >= 0 ? "▲" : "▼") + " " + formatShortCurrency(Math.abs(chg)) + "</span>" +
-      "<span style=\"font-size:12px;color:" + (chg >= 0 ? "var(--red)" : "#60A5FA") + "\">" +
-        "(" + (chg >= 0 ? "+" : "") + chgP + "%)</span>" +
-      "<span style=\"font-size:11px;color:var(--t5)\">전일 대비</span></div>";
-  }
-
-  if (inv > 0) {
-    var pp = ((pf / inv) * 100).toFixed(2);
-    h += "<div style=\"display:flex;gap:8px;margin-top:10px;flex-wrap:wrap\">" +
-      "<div style=\"padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.03);font-size:12px\">" +
-        "<span style=\"color:var(--t4)\">총 투자 </span>" +
-        "<span style=\"color:var(--t1);font-weight:600\">" + formatShortCurrency(inv) + "</span></div>" +
-      "<div style=\"padding:8px 12px;border-radius:9px;background:" +
-        (pf >= 0 ? "rgba(239,68,68,.06)" : "rgba(59,130,246,.06)") + ";font-size:12px\">" +
-        "<span style=\"color:var(--t4)\">총 수익 </span>" +
-        "<span style=\"color:" + (pf >= 0 ? "var(--red)" : "var(--blue)") + ";font-weight:700\">" +
-          (pf >= 0 ? "+" : "") + formatShortCurrency(pf) +
-          " (" + (pf >= 0 ? "+" : "") + pp + "%)</span></div></div>";
-  }
-
-  if (!appState.assets.length) {
-    h += "<div class=\"onboard-wrap\">" +
-      "<div style=\"font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px\">시작하기</div>" +
-      "<div style=\"font-size:12px;color:var(--t4);margin-bottom:12px\">3단계로 자산 관리를 시작하세요</div>" +
-      "<div class=\"onboard-step\">" +
-        "<div class=\"onboard-num\">1</div>" +
-        "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">자산 추가</div>" +
-        "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">주식, 코인, 현금, 예적금 등을 등록하세요</div></div></div>" +
-      "<div class=\"onboard-step\">" +
-        "<div class=\"onboard-num\">2</div>" +
-        "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">거래 기록</div>" +
-        "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">매수/매도, 입금/출금 내역을 기록하세요</div></div></div>" +
-      "<div class=\"onboard-step\">" +
-        "<div class=\"onboard-num\">3</div>" +
-        "<div><div style=\"font-size:13px;font-weight:600;color:var(--t2)\">자동 최신화</div>" +
-        "<div style=\"font-size:11.5px;color:var(--t4);margin-top:2px\">가격을 자동으로 업데이트하고 수익률을 확인하세요</div></div></div>" +
-      "<button class=\"btn btn-p\" style=\"width:100%;margin-top:14px\" onclick=\"openAddAsset()\">+ 첫 자산 추가하기</button>" +
-    "</div>";
-  }
-
-  /* Period returns */
-  if (appState.history.length >= 2) {
-    var periods = [
-      { days: 7, label: "1주" },
-      { days: 30, label: "1개월" },
-      { days: 90, label: "3개월" },
-      { days: 180, label: "6개월" },
-      { days: 365, label: "1년" }
-    ];
-    var hasAny = false;
-    var prHtml = "";
-    periods.forEach(function(p) {
-      var r = calcPeriodReturn(p.days);
-      if (r) {
-        hasAny = true;
-        var isUp = r.diff >= 0;
-        prHtml += "<div class=\"period-badge\">" +
-          "<div class=\"pb-label\">" + p.label + "</div>" +
-          "<div class=\"pb-value\" style=\"color:" + (isUp ? "var(--red)" : "var(--blue)") + "\">" +
-            (isUp ? "+" : "") + formatShortCurrency(r.diff) + "</div>" +
-          "<div class=\"pb-pct\" style=\"color:" + (isUp ? "var(--red)" : "var(--blue)") + "\">" +
-            (isUp ? "+" : "") + r.pct + "%</div></div>";
-      }
-    });
-    if (hasAny) {
-      h += "<div style=\"margin-top:12px\">" +
-        "<div style=\"font-size:11px;color:var(--t4);margin-bottom:6px;font-weight:500\">📊 기간별 수익률</div>" +
-        "<div class=\"period-returns\">" + prHtml + "</div></div>";
+  } else {
+    if (existingBody) {
+      existingBody.remove();
     }
   }
+}
 
-  h += "</div>";
+function renderOnboarding() {
+  if (appState.assets.length > 0) return '';
+  return `
+    <div class="card onboarding" role="region" aria-label="시작 가이드">
+      <h3>👋 환영합니다!</h3>
+      <p>자산을 추가하여 포트폴리오를 시작하세요.</p>
+      <div class="onboard-steps">
+        <div class="step"><span class="step-num" aria-hidden="true">1</span><span>자산 탭에서 자산 추가</span></div>
+        <div class="step"><span class="step-num" aria-hidden="true">2</span><span>매수/매도 거래 기록</span></div>
+        <div class="step"><span class="step-num" aria-hidden="true">3</span><span>가격 업데이트로 실시간 관리</span></div>
+      </div>
+      <button class="btn-p" data-action="go-tab" data-tab="pgList" aria-label="자산 추가 페이지로 이동">자산 추가하러 가기 →</button>
+    </div>
+  `;
+}
 
-  /* Dashboard grid for side-by-side layout on desktop */
-  h += "<div class=\"dash-grid\">";
-
-  /* Auto-update section */
-  if (ac > 0) {
-    h += "<div class=\"dash-full\"><div class=\"ai\"><div style=\"display:flex;justify-content:space-between;align-items:center;" +
-      "flex-wrap:wrap;gap:9px\"><div>" +
-      "<div style=\"font-size:13px;font-weight:700;color:var(--green)\">⚡ 가격 자동 최신화</div>" +
-      "<div style=\"font-size:11px;color:var(--t3);margin-top:2px\">" + ac + "개 종목 현재가 자동 검색</div>" +
-      "</div><button class=\"ai-btn\" onclick=\"autoAll()\"" +
-      (isAllLoading ? " disabled" : "") + ">" +
-      (isAllLoading
-        ? "<span class=\"spinner\"></span> 업데이트 중..."
-        : "⚡ 전체 최신화") +
-      "</button></div>";
-
-    if (isAllLoading && autoUpdateProgress.total > 0) {
-      var _pDone = autoUpdateProgress.done;
-      var _pTotal = autoUpdateProgress.total;
-      var _pPct = Math.round((_pDone / _pTotal) * 100);
-      h += "<div class=\"au-prog\">" +
-        "<div style=\"display:flex;justify-content:space-between;align-items:center\">" +
-          "<span style=\"font-size:11.5px;color:var(--t2);font-weight:600\">" + _pDone + "/" + _pTotal + " 완료</span>" +
-          "<span style=\"font-size:11px;color:var(--t4)\">" + _pPct + "%</span></div>" +
-        "<div class=\"au-prog-bar\"><div style=\"width:" + _pPct + "%\"></div></div></div>";
-    }
-
-    if (updateLogs.length > 0) {
-      var okCnt = 0, failCnt = 0;
-      updateLogs.forEach(function (l) { if (l.ok) okCnt++; else failCnt++; });
-
-      h += "<div style=\"margin-top:8px;border-top:1px solid rgba(255,255,255,.04);padding-top:7px\">" +
-        "<div style=\"display:flex;justify-content:space-between;align-items:center;cursor:pointer\" " +
-          "onclick=\"isLogOpen=!isLogOpen;renderDashboard()\">" +
-          "<div style=\"display:flex;align-items:center;gap:8px\">" +
-            "<span style=\"font-size:11px;color:var(--t3)\">결과: </span>" +
-            (okCnt > 0
-              ? "<span style=\"font-size:11px;color:var(--green);font-weight:600\">✅ " + okCnt + "개 성공</span>"
-              : "") +
-            (failCnt > 0
-              ? "<span style=\"font-size:11px;color:var(--red);font-weight:600\">❌ " + failCnt + "개 실패</span>"
-              : "") +
-          "</div>" +
-          "<span style=\"font-size:11px;color:var(--t5)\">" +
-            (isLogOpen ? "▲ 접기" : "▼ 상세") + "</span></div>";
-
-      if (failCnt > 0 && !isAllLoading) {
-        h += "<button style=\"margin-top:6px;border:1px solid rgba(239,68,68,.15);" +
-          "background:rgba(239,68,68,.05);color:var(--red);padding:5px 12px;border-radius:7px;" +
-          "font-size:11px;cursor:pointer;font-family:inherit;font-weight:600\" " +
-          "onclick=\"autoAll._retried=false;retryFailed()\">🔄 실패 " + failCnt + "개 재시도</button>";
-      }
-
-      if (isLogOpen) {
-        h += "<div class=\"lgbox\" style=\"margin-top:6px\">";
-        updateLogs.forEach(function (l) {
-          h += "<div class=\"lgi" + (l.ok ? "" : " bad") + "\">" +
-            (l.ok ? "✅" : "❌") +
-            " <strong style=\"color:var(--t2)\">" + escapeHtml(l.name) + "</strong> " +
-            (l.ok
-              ? formatNumber(l.old) + " → <span style=\"color:var(--green);font-weight:600\">" +
-                formatNumber(l.nu) + "</span>"
-              : (l.msg || "실패")) +
-            "</div>";
-        });
-        h += "</div>";
-      }
-      h += "</div>";
-    }
-    h += "</div></div>";
-  }
-
-  /* Category breakdown map */
-  var catColors = [
-    "#60A5FA", "#A78BFA", "#F472B6", "#34D399", "#FBBF24", "#FB923C",
-    "#38BDF8", "#E879F9", "#818CF8", "#4ADE80", "#FB7185", "#22D3EE"
+function calcPeriodReturns() {
+  const hist = appState.history;
+  if (hist.length < 2) return null;
+  const current = hist[hist.length - 1].total;
+  const periods = [
+    { label: '1주', days: 7 },
+    { label: '1개월', days: 30 },
+    { label: '3개월', days: 90 },
+    { label: '6개월', days: 180 },
+    { label: '1년', days: 365 },
   ];
-
-  var catBreakMap = {};
-  CATEGORY_LIST.forEach(function (cat) {
-    var items = [];
-    appState.assets.filter(function (a) {
-      return a.category === cat && hasTransactions(a);
-    }).forEach(function (a) {
-      var v = getAssetValue(a);
-      if (v > 0) items.push({ name: a.name, v: v });
-    });
-    if (items.length >= 2) {
-      var ct = 0;
-      items.forEach(function (x) { ct += x.v; });
-      items.sort(function (a, b) { return b.v - a.v; });
-      catBreakMap[cat] = { items: items, total: ct };
-    }
+  return periods.map(p => {
+    const idx = Math.max(0, hist.length - p.days - 1);
+    const prev = hist[idx]?.total || current;
+    const ret = prev > 0 ? ((current - prev) / prev) * 100 : 0;
+    return { ...p, ret: safeNum(ret) };
   });
-
-  var prevCat = appState.history.length >= 2
-    ? appState.history[appState.history.length - 2].byCategory
-    : null;
-
-  /* Category composition card */
-  if (cd.length > 0) {
-    h += "<div class=\"card\">" +
-      "<div style=\"font-size:14px;font-weight:700;color:var(--t1);margin-bottom:16px\">자산 구성</div>" +
-      "<div style=\"display:flex;flex-wrap:wrap;gap:16px;align-items:center\">" +
-        "<div style=\"flex:0 0 180px;display:flex;justify-content:center\">" +
-          "<canvas id=\"cPie\" width=\"180\" height=\"180\"></canvas></div>" +
-        "<div style=\"flex:1;min-width:160px\">";
-
-    cd.forEach(function (d, i) {
-      var hasSub = !!catBreakMap[d.n];
-      var isOpen = dashboardCategoryOpen[d.n];
-      var catChg = prevCat && prevCat[d.n] !== undefined
-        ? d.v - (prevCat[d.n] || 0)
-        : null;
-      var isCL = d.n === "현금" || d.n === "예적금";
-
-      h += "<div style=\"" +
-        (i < cd.length - 1 ? "border-bottom:1px solid rgba(255,255,255,.03);" : "") + "\">";
-
-      h += "<div style=\"display:flex;align-items:center;gap:9px;padding:8px 0;" +
-        (hasSub ? "cursor:pointer" : "") + "\" " +
-        (hasSub
-          ? "onclick=\"toggleDashboardCategory(" + QUOTE + d.n + QUOTE + ")\""
-          : "") + ">" +
-        "<div style=\"width:9px;height:9px;border-radius:3px;background:" + d.c + "\"></div>" +
-        "<div style=\"flex:1;font-size:12.5px;color:var(--t2);font-weight:500\">" +
-          d.ic + " " + d.n +
-          (hasSub
-            ? " <span style=\"font-size:9px;color:var(--t5)\">" + (isOpen ? "▲" : "▼") + "</span>"
-            : "") +
-        "</div>" +
-        "<div style=\"text-align:right\">" +
-          (isCL
-            ? "<div id=\"diq_" + d.n + "\" style=\"cursor:pointer\" " +
-              "onclick=\"event.stopPropagation();startInlineEdit(" + QUOTE + d.n + QUOTE + "," + d.v + ")\">" +
-              "<div style=\"font-size:13px;font-weight:700;color:var(--t1);" +
-                "display:flex;align-items:center;justify-content:flex-end;gap:4px\">" +
-                formatShortCurrency(d.v) +
-                " <span style=\"font-size:11px;color:var(--t5)\">✏️</span></div></div>"
-            : "<div style=\"font-size:13px;font-weight:700;color:var(--t1)\">" +
-              formatShortCurrency(d.v) + "</div>") +
-          "<div style=\"font-size:11px;color:var(--t4)\">" +
-            ((d.v / total) * 100).toFixed(1) + "%" +
-            (catChg !== null && catChg !== 0
-              ? " <span style=\"color:" + (catChg > 0 ? "var(--red)" : "#60A5FA") +
-                ";font-weight:600\">" + (catChg > 0 ? "▲" : "▼") +
-                formatShortCurrency(Math.abs(catChg)) + "</span>"
-              : "") +
-          "</div></div></div>";
-
-      /* Sub-breakdown (if open) */
-      if (hasSub && isOpen) {
-        var cb = catBreakMap[d.n];
-        h += "<div style=\"padding:0 0 10px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center\">" +
-          "<div style=\"flex:0 0 110px;display:flex;justify-content:center\">" +
-            "<canvas id=\"cCat_" + i + "\" width=\"110\" height=\"110\"></canvas></div>" +
-          "<div style=\"flex:1;min-width:100px\">";
-        cb.items.forEach(function (it, ii) {
-          var clr = catColors[ii % catColors.length];
-          h += "<div style=\"display:flex;align-items:center;gap:6px;padding:4px 0;" +
-            (ii < cb.items.length - 1 ? "border-bottom:1px solid rgba(255,255,255,.02)" : "") + "\">" +
-            "<div style=\"width:7px;height:7px;border-radius:2px;background:" + clr + "\"></div>" +
-            "<div style=\"flex:1;font-size:11px;color:var(--t3);font-weight:500\">" +
-              escapeHtml(it.name) + "</div>" +
-            "<div style=\"text-align:right;font-size:11px\">" +
-              "<span style=\"font-weight:600;color:var(--t2)\">" + formatShortCurrency(it.v) + "</span> " +
-              "<span style=\"color:var(--t5)\">" + ((it.v / cb.total) * 100).toFixed(1) + "%</span>" +
-            "</div></div>";
-        });
-        h += "</div></div>";
-      }
-
-      h += "</div>";
-    });
-
-    h += "</div></div>";
-
-    /* Day-over-day change breakdown */
-    if (prevCat && chg !== null && chg !== 0) {
-      var chgItems = [];
-      cd.forEach(function (d) {
-        var cc = d.v - (prevCat[d.n] || 0);
-        if (cc !== 0) chgItems.push({ n: d.n, ic: d.ic, c: d.c, v: cc });
-      });
-      CATEGORY_LIST.forEach(function (cat) {
-        if (prevCat[cat] && prevCat[cat] > 0 && !cd.some(function (d) { return d.n === cat; })) {
-          chgItems.push({
-            n: cat,
-            ic: CATEGORY_CONFIG[cat].icon,
-            c: CATEGORY_CONFIG[cat].color,
-            v: -prevCat[cat]
-          });
-        }
-      });
-      chgItems.sort(function (a, b) { return Math.abs(b.v) - Math.abs(a.v); });
-
-      if (chgItems.length > 0) {
-        h += "<div style=\"margin-top:14px;padding:12px 14px;background:rgba(255,255,255,.02);" +
-          "border:1px solid var(--bd);border-radius:11px\">" +
-          "<div style=\"font-size:11.5px;font-weight:600;color:var(--t3);margin-bottom:8px\">" +
-            "📋 전일 대비 변동 내역</div>";
-        chgItems.forEach(function (ci) {
-          h += "<div style=\"display:flex;align-items:center;gap:8px;padding:4px 0\">" +
-            "<div style=\"width:7px;height:7px;border-radius:2px;background:" + ci.c + "\"></div>" +
-            "<span style=\"flex:1;font-size:11.5px;color:var(--t3)\">" + ci.ic + " " + ci.n + "</span>" +
-            "<span style=\"font-size:11.5px;font-weight:600;color:" +
-              (ci.v > 0 ? "var(--red)" : "#60A5FA") + "\">" +
-              (ci.v > 0 ? "▲ +" : "▼ ") + formatShortCurrency(ci.v) + "</span></div>";
-        });
-        h += "</div>";
-      }
-    }
-
-    h += "</div>";
-  }
-
-  /* Asset growth chart (enhanced) */
-  if (appState.history.length >= 2) {
-    var growthData = growthChartDays === 0 ? appState.history : appState.history.slice(-growthChartDays);
-    h += "<div class=\"card\">" +
-      "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px\">" +
-        "<div style=\"font-size:14px;font-weight:700;color:var(--t1)\">📈 자산 성장 그래프</div>" +
-        "<div style=\"display:flex;gap:4px;align-items:center\">" +
-          "<button style=\"padding:3px 8px;border-radius:6px;font-size:10px;font-family:inherit;" +
-            "border:1px solid " + (growthShowCategories ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
-            "background:" + (growthShowCategories ? "rgba(59,130,246,.1)" : "rgba(255,255,255,.03)") + ";" +
-            "color:" + (growthShowCategories ? "#60A5FA" : "var(--t4)") + ";cursor:pointer\" " +
-            "onclick=\"growthShowCategories=!growthShowCategories;renderDashboard()\">카테고리별</button>";
-    [{ d: 30, l: "30일" }, { d: 90, l: "90일" }, { d: 0, l: "전체" }].forEach(function(o) {
-      var sel = growthChartDays === o.d;
-      h += "<button style=\"padding:3px 8px;border-radius:6px;font-size:10px;font-family:inherit;" +
-        "border:1px solid " + (sel ? "rgba(59,130,246,.3)" : "rgba(255,255,255,.06)") + ";" +
-        "background:" + (sel ? "rgba(59,130,246,.1)" : "rgba(255,255,255,.03)") + ";" +
-        "color:" + (sel ? "#60A5FA" : "var(--t4)") + ";cursor:pointer\" " +
-        "onclick=\"growthChartDays=" + o.d + ";renderDashboard()\">" + o.l + "</button>";
-    });
-    h += "</div></div>" +
-      "<div style=\"position:relative;height:200px\"><canvas id=\"cGrowth\"></canvas></div></div>";
-  }
-
-  /* Benchmark comparison */
-  if (appState.history.length >= 2) {
-    h += "<div class=\"card\">" +
-      "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px\">" +
-        "<div style=\"font-size:14px;font-weight:700;color:var(--t1)\">📊 벤치마크 비교</div>" +
-        "<button id=\"btnBench\" style=\"padding:5px 10px;border-radius:7px;font-size:11px;font-family:inherit;" +
-          "border:1px solid rgba(59,130,246,.15);background:rgba(59,130,246,.05);color:#60A5FA;" +
-          "cursor:pointer;font-weight:600\" " +
-          "onclick=\"loadBenchmark()\">🔄 불러오기</button></div>" +
-      "<div id=\"benchContent\">";
-
-    if (cachedBenchmark && (cachedBenchmark.kospi || cachedBenchmark.sp500)) {
-      h += _buildBenchmarkTable();
-    } else {
-      h += "<div style=\"text-align:center;padding:16px;color:var(--t4);font-size:12px\">" +
-        "불러오기 버튼을 눌러 KOSPI · S&P500 수익률과 비교해보세요</div>";
-    }
-
-    h += "</div></div>";
-  }
-
-  h += "</div></div>";
-
-  /* Inject HTML and draw charts */
-  el.innerHTML = h;
-
-  /* Count-up animation */
-  var totEl = document.getElementById("totNum");
-  if (totEl && Math.abs(total - _lastCountUpTotal) > 100) {
-    totEl.dataset.countCurrent = _lastCountUpTotal;
-    animateCountUp(totEl, total, 800);
-  }
-  _lastCountUpTotal = total;
-
-  if (cd.length > 0) drawPie(cd, total);
-
-  /* Draw growth chart */
-  if (appState.history.length >= 2) {
-    var gd = growthChartDays === 0 ? appState.history : appState.history.slice(-growthChartDays);
-    setTimeout(function() { drawGrowthChart("cGrowth", gd, 200, growthShowCategories); }, 40);
-  }
-
-  cd.forEach(function (d, i) {
-    if (dashboardCategoryOpen[d.n] && catBreakMap[d.n]) {
-      setTimeout(function () {
-        drawCatPie(
-          "cCat_" + i,
-          catBreakMap[d.n].items,
-          catBreakMap[d.n].total,
-          catColors
-        );
-      }, 40);
-    }
-  });
-}
-
-/* --- Benchmark helpers --- */
-
-function _buildBenchmarkTable() {
-  var periods = [7, 30, 90, 180, 365];
-  var h = "<div style=\"overflow-x:auto\">" +
-    "<table style=\"width:100%;border-collapse:collapse;font-size:12px\">" +
-    "<tr style=\"border-bottom:1px solid rgba(255,255,255,.06)\">" +
-    "<th style=\"text-align:left;padding:6px 8px;color:var(--t4);font-weight:500\">기간</th>" +
-    "<th style=\"text-align:right;padding:6px 8px;color:var(--t4);font-weight:500\">내 포트폴리오</th>" +
-    "<th style=\"text-align:right;padding:6px 8px;color:var(--t4);font-weight:500\">KOSPI</th>" +
-    "<th style=\"text-align:right;padding:6px 8px;color:var(--t4);font-weight:500\">S&P500</th>" +
-    "</tr>";
-
-  var labels = { 7: "1주", 30: "1개월", 90: "3개월", 180: "6개월", 365: "1년" };
-  periods.forEach(function(days) {
-    var myReturn = calcPeriodReturn(days);
-    var kReturn = cachedBenchmark.kospi && cachedBenchmark.kospi[days] ? cachedBenchmark.kospi[days] : null;
-    var sReturn = cachedBenchmark.sp500 && cachedBenchmark.sp500[days] ? cachedBenchmark.sp500[days] : null;
-
-    if (!myReturn && !kReturn && !sReturn) return;
-
-    h += "<tr style=\"border-bottom:1px solid rgba(255,255,255,.03)\">";
-    h += "<td style=\"padding:7px 8px;color:var(--t2);font-weight:500\">" + labels[days] + "</td>";
-
-    // My portfolio
-    if (myReturn) {
-      var myPct = Number(myReturn.pct);
-      h += "<td style=\"text-align:right;padding:7px 8px;font-weight:700;color:" +
-        (myPct >= 0 ? "var(--red)" : "var(--blue)") + "\">" +
-        (myPct >= 0 ? "+" : "") + myPct.toFixed(2) + "%</td>";
-    } else {
-      h += "<td style=\"text-align:right;padding:7px 8px;color:var(--t5)\">-</td>";
-    }
-
-    // KOSPI
-    if (kReturn) {
-      var kPct = Number(kReturn.pct);
-      h += "<td style=\"text-align:right;padding:7px 8px;color:" +
-        (kPct >= 0 ? "var(--red)" : "var(--blue)") + "\">" +
-        (kPct >= 0 ? "+" : "") + kPct + "%</td>";
-    } else {
-      h += "<td style=\"text-align:right;padding:7px 8px;color:var(--t5)\">-</td>";
-    }
-
-    // S&P500
-    if (sReturn) {
-      var sPct = Number(sReturn.pct);
-      h += "<td style=\"text-align:right;padding:7px 8px;color:" +
-        (sPct >= 0 ? "var(--red)" : "var(--blue)") + "\">" +
-        (sPct >= 0 ? "+" : "") + sPct + "%</td>";
-    } else {
-      h += "<td style=\"text-align:right;padding:7px 8px;color:var(--t5)\">-</td>";
-    }
-
-    h += "</tr>";
-  });
-
-  h += "</table></div>";
-
-  if (cachedBenchmark.t) {
-    var t = new Date(cachedBenchmark.t);
-    h += "<div style=\"font-size:10px;color:var(--t5);margin-top:6px;text-align:right\">" +
-      "기준: " + t.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) + "</div>";
-  }
-
-  return h;
-}
-
-function loadBenchmark() {
-  var btn = document.getElementById("btnBench");
-  if (btn) { btn.disabled = true; btn.textContent = "⏳ 불러오는 중..."; }
-
-  fetchBenchmarkData().then(function(data) {
-    var el = document.getElementById("benchContent");
-    if (el && data) {
-      el.innerHTML = _buildBenchmarkTable();
-    } else if (el) {
-      el.innerHTML = "<div style=\"text-align:center;padding:12px;color:var(--red);font-size:12px\">" +
-        "데이터를 불러올 수 없습니다. 나중에 다시 시도해주세요.</div>";
-    }
-    if (btn) { btn.disabled = false; btn.textContent = "🔄 불러오기"; }
-  });
-}
-
-/* --- Portfolio Management Modal --- */
-
-function openPortfolioManager() {
-  var list = getPortfolioList();
-  var h = "";
-
-  list.forEach(function(p) {
-    var isActive = p.id === currentPortfolioId;
-    h += "<div style=\"display:flex;align-items:center;gap:8px;padding:10px 12px;" +
-      "border-radius:10px;margin-bottom:6px;background:" +
-      (isActive ? "rgba(59,130,246,.08)" : "rgba(255,255,255,.02)") + ";" +
-      "border:1px solid " + (isActive ? "rgba(59,130,246,.2)" : "rgba(255,255,255,.04)") + "\">" +
-      "<div style=\"flex:1\">" +
-        "<div style=\"font-size:13px;font-weight:600;color:" + (isActive ? "#60A5FA" : "var(--t2)") + "\">" +
-          escapeHtml(p.name) + (isActive ? " ✓" : "") + "</div>" +
-      "</div>";
-
-    if (!isActive) {
-      h += "<button class=\"ibtn\" style=\"background:rgba(59,130,246,.08);color:#60A5FA;width:28px;height:28px\" " +
-        "onclick=\"closeModal();switchPortfolio(" + QUOTE + p.id + QUOTE + ")\">→</button>";
-    }
-
-    h += "<button class=\"ibtn\" style=\"background:rgba(255,255,255,.04);color:var(--t3);width:28px;height:28px\" " +
-      "onclick=\"_renamePortfolioPrompt(" + QUOTE + p.id + QUOTE + "," + QUOTE + escapeJsString(p.name) + QUOTE + ")\">✏️</button>";
-
-    if (p.id !== "default") {
-      h += "<button class=\"ibtn\" style=\"background:rgba(239,68,68,.05);color:var(--red);width:28px;height:28px\" " +
-        "onclick=\"if(confirm('정말 삭제하시겠습니까?')){closeModal();deletePortfolio(" + QUOTE + p.id + QUOTE + ")}\">🗑</button>";
-    }
-
-    h += "</div>";
-  });
-
-  h += "<div style=\"margin-top:12px\">" +
-    "<button class=\"btn btn-p btn-w\" onclick=\"_createPortfolioPrompt()\">+ 새 포트폴리오 만들기</button></div>";
-
-  openModal("📂 포트폴리오 관리", h);
-}
-
-function _createPortfolioPrompt() {
-  var name = prompt("새 포트폴리오 이름을 입력하세요:");
-  if (!name || !name.trim()) return;
-  closeModal();
-  createPortfolio(name.trim());
-}
-
-function _renamePortfolioPrompt(id, currentName) {
-  var name = prompt("새 이름을 입력하세요:", currentName);
-  if (!name || !name.trim()) return;
-  renamePortfolio(id, name.trim());
-  closeModal();
-  openPortfolioManager();
 }

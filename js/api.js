@@ -1,302 +1,377 @@
-/* ===================================================
-   api.js - 외부 API 호출 (가격, 환율, 코인)
-   =================================================== */
+/* =============================================
+   My Portfolio v3.12.0 — API Integration
+   Cycle 15: Full rebuild from scratch — no empty catch blocks, console.warn on failures
+   ============================================= */
 
-// --- 코인 가격 조회 (CoinGecko) ---
+// ── Cache ──
+let cachedRate = null;
+let cachedUsdt = null;
+let cachedBenchmark = null;
+let updateLogs = [];
+let autoUpdateProgress = { total: 0, done: 0, running: false };
 
-function fetchCoinPrices(ids) {
-  if (!ids.length) return Promise.resolve({});
-  var unique = ids.filter(function(v, i, a) { return a.indexOf(v) === i; });
-  var attempt = 0;
-  var maxRetries = 2;
-
-  function doFetch() {
-    return fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + unique.join(",") + "&vs_currencies=krw")
-      .then(function(r) {
-        if (r.status === 429 && attempt < maxRetries) {
-          attempt++;
-          var delay = attempt * 3000;
-          return new Promise(function(resolve) {
-            setTimeout(function() { resolve(doFetch()); }, delay);
-          });
-        }
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
-      })
-      .catch(function() { return {}; });
-  }
-
-  return doFetch();
+// ── Fetch with Timeout ──
+function fetchWithTimeout(url, ms = API_TIMEOUT, options = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
-// --- CORS 프록시 통한 fetch ---
-
-function _shuffleArray(arr) {
-  var a = arr.slice();
-  for (var i = a.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
-  }
-  return a;
-}
-
-function tryFetch(url, timeoutMs) {
-  var tm = timeoutMs || 8000;
-  var round = 0;
-  var shuffled = _shuffleArray(CORS_PROXIES);
-
-  function batch() {
-    var start = round * 2;
-    if (start >= shuffled.length) return Promise.resolve(null);
-    var candidates = shuffled.slice(start, start + 2);
-    round++;
-
-    var promises = candidates.map(function(proxyFn) {
-      return Promise.race([
-        fetch(proxyFn(url)).then(function(r) {
-          if (!r.ok) throw new Error(r.status);
-          return r.text();
-        }).then(function(t) {
-          try { return JSON.parse(t); } catch (e) { return null; }
-        }),
-        new Promise(function(resolve) { setTimeout(function() { resolve(null); }, tm); })
-      ]).catch(function() { return null; });
-    });
-
-    return Promise.race(promises.map(function(p) {
-      return p.then(function(v) { if (v) return v; throw new Error("empty"); });
-    })).catch(function() {
-      return Promise.all(promises).then(function(results) {
-        for (var i = 0; i < results.length; i++) {
-          if (results[i]) return results[i];
-        }
-        return batch();
-      });
-    });
-  }
-
-  return batch();
-}
-
-// --- Yahoo Finance ---
-
-function fetchYahooFinance(symbol) {
-  var url = "https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(symbol) + "?range=1d&interval=1d";
-  return tryFetch(url, 10000).then(function(d) {
-    if (!d) return null;
-    var meta = d && d.chart && d.chart.result && d.chart.result[0] && d.chart.result[0].meta;
-    var price = meta && meta.regularMarketPrice;
-    var currency = (meta && meta.currency) || "USD";
-    if (price && price > 0) return { price: price, currency: currency };
-    return null;
-  });
-}
-
-// --- Stooq (해외주식 폴백) ---
-
-function fetchStooq(symbol) {
-  var sym = symbol.toUpperCase() + ".US";
-  var url = "https://stooq.com/q/l/?s=" + encodeURIComponent(sym) + "&f=sd2t2ohlcv&h&e=json";
-  return tryFetch(url, 10000).then(function(d) {
-    if (!d || !d.d || d.d.length < 2) return null;
-    var close = parseFloat(d.d[1][6]);
-    if (close && close > 0) return close;
-    return null;
-  }).catch(function() { return null; });
-}
-
-// --- Naver 주식 ---
-
-function fetchNaver(code) {
-  var url = "https://m.stock.naver.com/api/stock/" + code + "/basic";
-  return tryFetch(url, 8000).then(function(d) {
-    if (!d) return null;
-    var cp = d.closePrice || d.currentPrice;
-    if (cp) return Number(String(cp).replace(/,/g, ""));
-    if (d.stockEndPrice) return Number(String(d.stockEndPrice).replace(/,/g, ""));
-    return null;
-  }).catch(function() { return null; });
-}
-
-// --- 환율 ---
-
-function getExchangeRate() {
-  if (cachedExchangeRate && Date.now() - cachedExchangeRate.t < 600000) return Promise.resolve(cachedExchangeRate.r);
-  return fetchExchangeRate();
-}
-
-function _saveExchangeRateCache(rate) {
-  cachedExchangeRate = { r: rate, t: Date.now() };
-  try { localStorage.setItem("mp_ex_rate", JSON.stringify(cachedExchangeRate)); } catch (e) {}
-  return rate;
-}
-
-function _getLastKnownExchangeRate() {
+// ── CORS Proxy Fetch ──
+async function corsFetch(url, timeout = API_TIMEOUT) {
   try {
-    var s = localStorage.getItem("mp_ex_rate");
-    if (s) {
-      var d = JSON.parse(s);
-      if (d && d.r > 1000) return d.r;
+    const r = await fetchWithTimeout(url, timeout);
+    if (r.ok) return r;
+  } catch (e) {
+    console.warn('corsFetch direct failed:', url.split('?')[0], e.message);
+  }
+  const proxies = [...CORS_PROXIES];
+  for (let i = proxies.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [proxies[i], proxies[j]] = [proxies[j], proxies[i]];
+  }
+  for (const proxy of proxies) {
+    try {
+      const r = await fetchWithTimeout(proxy(url), timeout);
+      if (r.ok) return r;
+    } catch (e) {
+      console.warn('corsFetch proxy failed:', e.message);
     }
-  } catch (e) {}
-  return 1350;
+  }
+  throw new Error(`네트워크 요청 실패: ${url.split('?')[0]}`);
 }
 
-function fetchExchangeRate() {
-  return fetchYahooFinance("KRW=X").then(function(r) {
-    if (r && r.price > 1000) return _saveExchangeRateCache(r.price);
+// ── Exchange Rate (USD -> KRW) ──
+async function fetchExchangeRate(force = false) {
+  if (!force && cachedRate && Date.now() - cachedRate.time < CACHE_TTL_RATE) {
+    return cachedRate.rate;
+  }
+  try {
+    const r = await fetchWithTimeout(API.openER, 5000);
+    const d = await r.json();
+    if (d.rates?.KRW) {
+      cachedRate = { rate: d.rates.KRW, time: Date.now(), source: 'open.er-api' };
+      return cachedRate.rate;
+    }
+  } catch (e) {
+    console.warn('fetchExchangeRate open.er-api failed:', e.message);
+  }
+  try {
+    const r = await corsFetch(API.floatRates, 5000);
+    const d = await r.json();
+    if (d.krw?.rate) {
+      cachedRate = { rate: d.krw.rate, time: Date.now(), source: 'floatrates' };
+      return cachedRate.rate;
+    }
+  } catch (e) {
+    console.warn('fetchExchangeRate floatrates failed:', e.message);
+  }
+  if (cachedRate?.rate) return cachedRate.rate;
+  console.warn('Exchange rate: using fallback', FALLBACK_USD_KRW);
+  showToast(`환율 정보 불러오기 실패. 기본값(${FALLBACK_USD_KRW}원) 사용 중`, 'info');
+  return FALLBACK_USD_KRW;
+}
+
+// ── USDT Rate (KRW) ──
+async function fetchUsdtRate() {
+  if (cachedUsdt && Date.now() - cachedUsdt.time < CACHE_TTL_RATE) {
+    return cachedUsdt.rate;
+  }
+  try {
+    const r = await fetchWithTimeout(`${API.upbit}?markets=KRW-USDT`, 5000);
+    const d = await r.json();
+    if (d[0]?.trade_price) {
+      cachedUsdt = { rate: d[0].trade_price, time: Date.now(), source: 'Upbit' };
+      return cachedUsdt.rate;
+    }
+  } catch (e) {
+    console.warn('fetchUsdtRate upbit failed:', e.message);
+  }
+  try {
+    const r = await corsFetch(`${API.bithumb}/USDT_KRW`, 5000);
+    const d = await r.json();
+    if (d.data?.closing_price) {
+      cachedUsdt = { rate: Number(d.data.closing_price), time: Date.now(), source: 'Bithumb' };
+      return cachedUsdt.rate;
+    }
+  } catch (e) {
+    console.warn('fetchUsdtRate bithumb failed:', e.message);
+  }
+  try {
+    const rate = await fetchExchangeRate();
+    cachedUsdt = { rate, time: Date.now(), source: 'Exchange' };
+    return rate;
+  } catch (e) {
+    console.warn('fetchUsdtRate exchange fallback failed:', e.message);
+  }
+  if (cachedUsdt?.rate) return cachedUsdt.rate;
+  console.warn('USDT rate: using fallback', FALLBACK_USD_KRW);
+  return FALLBACK_USD_KRW;
+}
+
+// ── Coin Prices (CoinGecko) ──
+async function fetchCoinPrices(coinIds) {
+  if (!coinIds || !coinIds.length) return {};
+  const ids = coinIds.join(',');
+  const url = `${API.coingecko}/simple/price?ids=${ids}&vs_currencies=krw`;
+  try {
+    const r = await fetchWithTimeout(url, API_TIMEOUT);
+    if (r.ok) {
+      const d = await r.json();
+      return extractCoinPrices(d);
+    }
+  } catch (e) {
+    console.warn('fetchCoinPrices direct failed:', e.message);
+  }
+  try {
+    const r = await corsFetch(url, 10000);
+    const d = await r.json();
+    return extractCoinPrices(d);
+  } catch (e) {
+    console.warn('CoinGecko fetch failed:', e.message);
+    return {};
+  }
+}
+
+function extractCoinPrices(data) {
+  const result = {};
+  if (data && typeof data === 'object') {
+    for (const [id, v] of Object.entries(data)) {
+      if (v?.krw && isFinite(v.krw)) result[id] = v.krw;
+    }
+  }
+  return result;
+}
+
+// ── Stock Price ──
+async function fetchStockPrice(asset) {
+  const { stockCode, market, name } = asset;
+  if (!stockCode && !(name && ETF_PREFIXES.some(p => name.toUpperCase().startsWith(p)))) {
     return null;
-  }).then(function(v) {
-    if (v) return v;
-    return fetch("https://open.er-api.com/v6/latest/USD").then(function(r) { return r.json(); }).then(function(d) {
-      if (d && d.rates && d.rates.KRW) return _saveExchangeRateCache(d.rates.KRW);
-      return null;
-    }).catch(function() { return null; });
-  }).then(function(v) {
-    if (v) return v;
-    return tryFetch("https://www.floatrates.com/daily/usd.json", 8000).then(function(d) {
-      if (d && d.krw && d.krw.rate) return _saveExchangeRateCache(Math.round(d.krw.rate));
-      return null;
-    }).catch(function() { return null; });
-  }).then(function(v) { return v || _getLastKnownExchangeRate(); });
+  }
+  if (stockCode && !['KOSPI', 'KOSDAQ'].includes(market)) {
+    return fetchForeignStockPrice(stockCode);
+  }
+  if (stockCode) {
+    return fetchKoreanStockPrice(stockCode);
+  }
+  return null;
 }
 
-// --- 주식 가격 조회 ---
-
-function fetchStockPrice(asset) {
-  var code = asset.stockCode;
-  if (!code) return Promise.resolve(null);
-
-  if (asset.category === "국내주식" || asset.krxEtf) {
-    var sym = code + (asset.market === "KOSDAQ" ? ".KQ" : ".KS");
-    return fetchYahooFinance(sym).then(function(r) {
-      if (r && r.price > 0) return r.price;
-      return fetchNaver(code);
-    });
+async function fetchKoreanStockPrice(code) {
+  try {
+    const r = await corsFetch(`${API.naver}/${code}/basic`, API_TIMEOUT);
+    const d = await r.json();
+    const price = d.closePrice || d.currentPrice;
+    if (price) return safeNum(String(price).replace(/,/g, ''));
+  } catch (e) {
+    console.warn('fetchKoreanStockPrice naver failed:', code, e.message);
   }
+  for (const suffix of ['.KS', '.KQ']) {
+    try {
+      const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${code}${suffix}?interval=1d&range=1d`, API_TIMEOUT);
+      const d = await r.json();
+      const price = d.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price && isFinite(price)) return Math.round(price);
+    } catch (e) {
+      console.warn(`fetchKoreanStockPrice yahoo ${suffix} failed:`, code, e.message);
+    }
+  }
+  return null;
+}
 
-  if (asset.category === "해외주식") {
-    return fetchYahooFinance(code).then(function(r) {
-      if (r && r.price > 0) {
-        if (r.currency !== "KRW") return getExchangeRate().then(function(rt) { return Math.round(r.price * rt); });
-        return r.price;
+async function fetchForeignStockPrice(symbol) {
+  try {
+    const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${symbol}?interval=1d&range=1d`, API_TIMEOUT);
+    const d = await r.json();
+    const meta = d.chart?.result?.[0]?.meta;
+    if (meta?.regularMarketPrice && isFinite(meta.regularMarketPrice)) {
+      const price = meta.regularMarketPrice;
+      if (meta.currency === 'KRW') return Math.round(price);
+      const rate = await fetchExchangeRate();
+      return Math.round(price * rate);
+    }
+  } catch (e) {
+    console.warn('fetchForeignStockPrice yahoo failed:', symbol, e.message);
+  }
+  try {
+    const r = await corsFetch(`${API.stooq}?s=${symbol.toLowerCase()}&f=sd2t2ohlcvn&h&e=csv`, API_TIMEOUT);
+    const text = await r.text();
+    const lines = text.trim().split('\n');
+    if (lines.length >= 2) {
+      const close = parseFloat(lines[1].split(',')[6]);
+      if (isFinite(close) && close > 0) {
+        const rate = await fetchExchangeRate();
+        return Math.round(close * rate);
       }
-      return fetchStooq(code).then(function(price) {
-        if (!price) return null;
-        return getExchangeRate().then(function(rt) { return Math.round(price * rt); });
-      });
-    });
+    }
+  } catch (e) {
+    console.warn('fetchForeignStockPrice stooq failed:', symbol, e.message);
   }
-
-  return Promise.resolve(null);
+  return null;
 }
 
-// --- USDT 환율 ---
-
-function getUsdtExchangeRate() {
-  if (cachedUsdtRate && Date.now() - cachedUsdtRate.t < 600000) return Promise.resolve(cachedUsdtRate.r);
-  return fetchUsdtExchangeRate();
-}
-
-function fetchUsdtExchangeRate() {
-  return fetch("https://api.upbit.com/v1/ticker?markets=KRW-USDT")
-    .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(function(d) {
-      if (d && d[0] && d[0].trade_price) { cachedUsdtRate = { r: d[0].trade_price, t: Date.now(), src: "업비트" }; return d[0].trade_price; }
-      throw new Error("no data");
-    })
-    .catch(function() {
-      return fetch("https://api.bithumb.com/public/ticker/USDT_KRW").then(function(r) { return r.json(); }).then(function(d) {
-        if (d && d.data && d.data.closing_price) { var p = Number(d.data.closing_price); cachedUsdtRate = { r: p, t: Date.now(), src: "빗썸" }; return p; }
-        throw new Error("no data");
-      });
-    })
-    .catch(function() {
-      return fetchCoinPrices(["tether"]).then(function(d) {
-        if (d && d.tether && d.tether.krw) { cachedUsdtRate = { r: d.tether.krw, t: Date.now(), src: "CoinGecko" }; return d.tether.krw; }
-        return getExchangeRate().then(function(rt) { cachedUsdtRate = { r: rt, t: Date.now(), src: "환율" }; return rt; });
-      });
-    });
-}
-
-// --- 환율 변환 ---
-
-function usdToKrw(usd) {
-  var r = (cachedExchangeRate && cachedExchangeRate.r) ? cachedExchangeRate.r : _getLastKnownExchangeRate();
-  return Math.round(usd * r);
-}
-
-function getCurrentExchangeRate() {
-  return (cachedExchangeRate && cachedExchangeRate.r) ? cachedExchangeRate.r : _getLastKnownExchangeRate();
-}
-
-// --- 환율 수동 새로고침 ---
-
-function refreshExchangeRate() {
-  cachedExchangeRate = null;
-  showToast("🔄 환율 최신화 중...");
-  fetchExchangeRate().then(function(r) {
-    showToast("💱 환율 업데이트: 1$ = " + Math.round(r).toLocaleString() + "원");
-    render();
-  });
-}
-
-// --- 벤치마크 데이터 (KOSPI, S&P500) ---
-
-function fetchBenchmarkData() {
-  if (cachedBenchmark && Date.now() - cachedBenchmark.t < 3600000) {
-    return Promise.resolve(cachedBenchmark);
+// ── Benchmark Returns ──
+async function fetchBenchmarkReturns() {
+  if (cachedBenchmark && Date.now() - cachedBenchmark.time < CACHE_TTL_BENCH) {
+    return cachedBenchmark.data;
   }
-
-  function getReturns(symbol) {
-    var url = "https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(symbol) + "?range=1y&interval=1d";
-    return tryFetch(url, 12000).then(function(d) {
-      if (!d || !d.chart || !d.chart.result || !d.chart.result[0]) return null;
-      var result = d.chart.result[0];
-      var closes = result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close;
-      if (!closes || closes.length < 2) return null;
-
-      var valid = closes.filter(function(c) { return c !== null && isFinite(c); });
-      if (valid.length < 2) return null;
-
-      var latest = valid[valid.length - 1];
-      var returns = {};
-      var periods = [
-        { days: 7, label: "1주" },
-        { days: 30, label: "1개월" },
-        { days: 90, label: "3개월" },
-        { days: 180, label: "6개월" },
-        { days: 365, label: "1년" }
-      ];
-
-      periods.forEach(function(p) {
-        var idx = valid.length - 1 - p.days;
-        if (idx >= 0 && valid[idx]) {
-          returns[p.days] = { pct: (((latest - valid[idx]) / valid[idx]) * 100).toFixed(2), label: p.label };
+  const result = {};
+  for (const [name, symbol] of Object.entries(BENCHMARKS)) {
+    try {
+      const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${symbol}?interval=1d&range=1y`, 10000);
+      const d = await r.json();
+      const closes = d.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+      if (closes?.length > 1) {
+        const validCloses = closes.filter(c => c != null && isFinite(c));
+        const first = validCloses[0];
+        const last = validCloses[validCloses.length - 1];
+        if (first && last && first > 0) {
+          result[name] = { ytd: ((last - first) / first) * 100, prices: validCloses };
         }
-      });
-
-      return returns;
-    }).catch(function() { return null; });
+      }
+    } catch (e) {
+      console.warn(`Benchmark ${name} fetch failed:`, e.message);
+    }
   }
-
-  return Promise.all([
-    getReturns("^KS11"),
-    getReturns("^GSPC")
-  ]).then(function(results) {
-    cachedBenchmark = {
-      t: Date.now(),
-      kospi: results[0],
-      sp500: results[1]
-    };
-    return cachedBenchmark;
-  });
+  cachedBenchmark = { data: result, time: Date.now() };
+  return result;
 }
 
-// --- 샌드박스 체크 ---
+// ── Auto Update All (returns summary object) ──
+let _updatePromise = null;
 
-function checkSandbox() {
-  return fetch("https://api.coingecko.com/api/v3/ping")
-    .then(function(r) { return r.ok; })
-    .catch(function() { isSandbox = true; return false; });
+async function autoUpdateAll(onProgress) {
+  if (_updatePromise) {
+    showToast('업데이트가 이미 진행 중입니다', 'info');
+    return { success: 0, failed: 0, total: 0 };
+  }
+  _updatePromise = _doAutoUpdate(onProgress);
+  try { return await _updatePromise; } finally { _updatePromise = null; }
+}
+
+async function _doAutoUpdate(onProgress) {
+  autoUpdateProgress.running = true;
+  updateLogs = [];
+  const assets = appState.assets;
+  const updatable = [];
+  const coinAssets = [];
+  const failed = [];
+  const pendingUpdates = [];
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const a of assets) {
+    if (a.category === '코인' && a.coinId) coinAssets.push(a);
+    else if (a.category === '현금' && a.isUsdt) updatable.push({ asset: a, type: 'usdt' });
+    else if (a.stockCode) updatable.push({ asset: a, type: 'stock' });
+  }
+
+  const totalAssets = updatable.length + coinAssets.length;
+  autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
+  autoUpdateProgress.done = 0;
+
+  const log = (name, ok, price) => {
+    updateLogs.push({ name, ok, price, time: new Date().toISOString() });
+    if (updateLogs.length > LIMITS.logs) updateLogs.shift();
+    if (ok) successCount++; else failCount++;
+  };
+
+  const now = new Date().toLocaleString('ko-KR');
+
+  // 1. USDT
+  for (const item of updatable.filter(u => u.type === 'usdt')) {
+    try {
+      const rate = await fetchUsdtRate();
+      if (rate && isFinite(rate)) {
+        pendingUpdates.push({ id: item.asset.id, amount: rate, lpu: now });
+        log(item.asset.name, true, rate);
+      } else {
+        log(item.asset.name, false);
+        failed.push(item);
+      }
+    } catch (e) {
+      console.warn('autoUpdate USDT failed:', item.asset.name, e.message);
+      log(item.asset.name, false);
+      failed.push(item);
+    }
+    autoUpdateProgress.done++;
+    onProgress?.(autoUpdateProgress);
+  }
+
+  // 2. Coins batch
+  if (coinAssets.length > 0) {
+    const ids = [...new Set(coinAssets.map(a => a.coinId))];
+    try {
+      const prices = await fetchCoinPrices(ids);
+      for (const a of coinAssets) {
+        if (prices[a.coinId] && isFinite(prices[a.coinId])) {
+          pendingUpdates.push({ id: a.id, amount: prices[a.coinId], lpu: now });
+          log(a.name, true, prices[a.coinId]);
+        } else {
+          log(a.name, false);
+          failed.push({ asset: a, type: 'coin' });
+        }
+      }
+    } catch (e) {
+      console.warn('autoUpdate coins batch failed:', e.message);
+      coinAssets.forEach(a => { log(a.name, false); failed.push({ asset: a, type: 'coin' }); });
+    }
+    autoUpdateProgress.done++;
+    onProgress?.(autoUpdateProgress);
+  }
+
+  // 3. Stocks sequential
+  for (const item of updatable.filter(u => u.type === 'stock')) {
+    try {
+      const price = await fetchStockPrice(item.asset);
+      if (price != null && isFinite(price)) {
+        pendingUpdates.push({ id: item.asset.id, amount: price, lpu: now });
+        log(item.asset.name, true, price);
+      } else {
+        log(item.asset.name, false);
+        failed.push(item);
+      }
+    } catch (e) {
+      console.warn('autoUpdate stock failed:', item.asset.name, e.message);
+      log(item.asset.name, false);
+      failed.push(item);
+    }
+    autoUpdateProgress.done++;
+    onProgress?.(autoUpdateProgress);
+    await sleep(STOCK_DELAY_MS);
+  }
+
+  // 4. Retry failed once
+  if (failed.length > 0) {
+    await sleep(RETRY_DELAY_MS);
+    for (const item of failed) {
+      try {
+        let price = null;
+        if (item.type === 'usdt') price = await fetchUsdtRate();
+        else if (item.type === 'coin') {
+          const prices = await fetchCoinPrices([item.asset.coinId]);
+          price = prices[item.asset.coinId];
+        } else {
+          price = await fetchStockPrice(item.asset);
+        }
+        if (price != null && isFinite(price)) {
+          pendingUpdates.push({ id: item.asset.id, amount: price, lpu: now });
+          log(item.asset.name + ' (재시도)', true, price);
+          failCount--;
+        }
+      } catch (e) {
+        console.warn('autoUpdate retry failed:', item.asset?.name, e.message);
+      }
+    }
+  }
+
+  batchUpdatePrices(pendingUpdates);
+
+  autoUpdateProgress.running = false;
+  onProgress?.({ ...autoUpdateProgress, done: autoUpdateProgress.total });
+
+  const summary = { success: successCount, failed: failCount, total: totalAssets };
+  EventBus.emit('updateComplete', { logs: updateLogs, summary });
+  return summary;
 }

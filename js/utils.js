@@ -1,343 +1,337 @@
-/* ===================================================
-   utils.js - 포맷팅, 검증, 유틸리티 함수
-   =================================================== */
+/* =============================================
+   My Portfolio v3.12.0 — Utilities
+   Cycle 15: Full rebuild from scratch — uid() uses crypto.randomUUID, Scoped Cleanup
+   ============================================= */
 
-// --- 통화 포맷팅 ---
+// ── HTML Security ──
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escAttr(s) { return escHtml(s); }
 
-// 전체 한글 단위 포맷 (예: 1억 2345만 6789원)
-function formatCurrency(n) {
-  if (!n) return "0원";
-  var abs = Math.abs(n), sign = n < 0 ? "-" : "";
-  if (abs >= 1e8) {
-    var eok = Math.floor(abs / 1e8), rem = abs - eok * 1e8;
-    var man = Math.floor(rem / 1e4), won = Math.round(rem % 1e4);
-    if (man > 0 && won > 0) return sign + eok + "억 " + man + "만 " + won + "원";
-    if (man > 0) return sign + eok + "억 " + man + "만원";
-    if (won > 0) return sign + eok + "억 " + won + "원";
-    return sign + eok + "억원";
-  }
-  if (abs >= 1e4) {
-    var man2 = Math.floor(abs / 1e4), won2 = Math.round(abs % 1e4);
-    if (won2 > 0) return sign + man2 + "만 " + won2 + "원";
-    return sign + man2 + "만원";
-  }
-  return sign + abs + "원";
+function stripHtml(s, max = 200) {
+  if (s == null) return '';
+  return String(s).trim().slice(0, max).replace(/[<>]/g, '');
 }
 
-// 축약 포맷 (예: 1억 2345만원)
-function formatShortCurrency(n) {
-  if (!n) return "0원";
-  var abs = Math.abs(n), sign = n < 0 ? "-" : "";
-  if (abs >= 1e8) {
-    var eok = Math.floor(abs / 1e8), rem = abs - eok * 1e8;
-    var man = Math.floor(rem / 1e4);
-    if (man > 0) return sign + eok + "억 " + man + "만원";
-    return sign + eok + "억원";
-  }
-  if (abs >= 1e4) return sign + Math.floor(abs / 1e4) + "만원";
-  return sign + abs + "원";
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return isFinite(n) ? n : fallback;
 }
 
-// 숫자 포맷 (예: 75,000원)
-function formatNumber(n) {
-  return Math.round(n).toLocaleString() + "원";
+// ── Formatting ──
+function fmtKRW(n) {
+  n = safeNum(n);
+  const abs = Math.abs(n);
+  if (abs >= 1e8) return (n < 0 ? '-' : '') + '₩' + (abs / 1e8).toFixed(1) + '억';
+  if (abs >= 1e4) return (n < 0 ? '-' : '') + '₩' + (abs / 1e4).toFixed(0) + '만';
+  return '₩' + Math.round(n).toLocaleString('ko-KR');
 }
 
-// --- 날짜 유틸 ---
-
-function getTodayString() {
-  var d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+function fmtNum(n, dec = 0) {
+  n = safeNum(n);
+  return n.toLocaleString('ko-KR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
-function getNowString() {
-  return new Date().toLocaleString("ko-KR");
+function fmtPct(n, dec = 2) {
+  n = safeNum(n);
+  return (n >= 0 ? '+' : '') + n.toFixed(dec) + '%';
 }
 
-// --- 보안: HTML 이스케이프 ---
-
-function escapeHtml(s) {
-  var d = document.createElement("div");
-  d.textContent = s == null ? "" : String(s);
-  return d.innerHTML;
+function fmtPrice(n) {
+  n = safeNum(n);
+  const abs = Math.abs(n);
+  if (abs < 1) return n.toFixed(4);
+  if (abs < 100) return n.toFixed(2);
+  return Math.round(n).toLocaleString('ko-KR');
 }
 
-function escapeAttr(s) {
-  return escapeHtml(s)
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`;
 }
 
-function escapeJsString(s) {
-  return String(s == null ? "" : s)
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '\\"')
-    .replace(/\r/g, "\\r")
-    .replace(/\n/g, "\\n")
-    .replace(/</g, "\\x3C")
-    .replace(/>/g, "\\x3E");
+function fmtDateTime(d) {
+  if (!d) return '';
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return `${fmtDate(dt)} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
 }
 
-// --- 고유 ID 생성 (충돌 방지) ---
-
-var _lastId = 0;
-function generateId() {
-  var id = Date.now();
-  if (id <= _lastId) id = _lastId + 1;
-  _lastId = id;
-  return id;
+function fmtRelTime(dateStr) {
+  if (!dateStr) return '';
+  const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return '';
+  const diff = Date.now() - then;
+  if (diff < 60000) return '방금 전';
+  if (diff < 3600000) return Math.floor(diff / 60000) + '분 전';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + '시간 전';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + '일 전';
+  return fmtDate(dateStr);
 }
 
-// --- 숫자 카운트업 애니메이션 ---
+function profitClass(value) { return value >= 0 ? 'positive' : 'negative'; }
 
-var _lastCountUpTotal = 0;
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
-function animateCountUp(el, target, duration) {
-  if (!el) return;
-  var start = Number(el.dataset.countCurrent || 0);
-  var dur = duration || 800;
-  var startTime = null;
+function isValidDate(str) {
+  if (!str || typeof str !== 'string') return false;
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const d = new Date(str);
+  return !isNaN(d.getTime()) && d.getDate() === Number(m[3]);
+}
 
-  if (Math.abs(target - start) < 500) {
-    el.textContent = Math.round(target).toLocaleString() + "원";
-    el.dataset.countCurrent = target;
-    return;
-  }
+function clampDay(year, month, day) {
+  const maxDay = new Date(year, month, 0).getDate();
+  return Math.min(day, maxDay);
+}
 
-  function step(ts) {
-    if (!startTime) startTime = ts;
-    var progress = Math.min((ts - startTime) / dur, 1);
-    var eased = 1 - Math.pow(1 - progress, 3);
-    var current = Math.round(start + (target - start) * eased);
-    el.textContent = Math.round(current).toLocaleString() + "원";
-    if (progress < 1) {
-      requestAnimationFrame(step);
+// ── Calculations (NaN-safe with guards, cached per render cycle) ──
+let _calcCache = null;
+let _calcCacheKey = 0;
+
+function invalidateCalcCache() { _calcCacheKey++; _calcCache = null; }
+
+function calcAssetValue(asset) {
+  const txns = asset.txns || [];
+  let qty = 0, cost = 0;
+  for (const t of txns) {
+    const tPrice = safeNum(t.price);
+    const tQty = safeNum(t.qty);
+    if (t.type === 'buy') {
+      qty += tQty;
+      cost += tPrice * tQty;
     } else {
-      el.textContent = Math.round(target).toLocaleString() + "원";
-      el.dataset.countCurrent = target;
+      if (qty > 0) {
+        const sellQty = Math.min(tQty, qty);
+        const avgCost = cost / qty;
+        cost -= avgCost * sellQty;
+        qty -= sellQty;
+      }
     }
+    qty = Math.max(0, qty);
+    cost = Math.max(0, cost);
   }
-
-  requestAnimationFrame(step);
+  const price = safeNum(asset.amount);
+  const value = safeNum(price * qty);
+  const profit = safeNum(value - cost);
+  const profitPct = cost > 0 ? safeNum((profit / cost) * 100) : 0;
+  const avgPrice = qty > 0 ? safeNum(cost / qty) : 0;
+  return { qty, cost, value, profit, profitPct, avgPrice, price };
 }
 
-// --- 기간별 수익률 계산 ---
-
-function calcPeriodReturn(days) {
-  if (appState.history.length < 2) return null;
-  var latest = appState.history[appState.history.length - 1];
-  var target = new Date();
-  target.setDate(target.getDate() - days);
-  var targetStr = target.getFullYear() + "-" + String(target.getMonth() + 1).padStart(2, "0") + "-" + String(target.getDate()).padStart(2, "0");
-
-  var closest = null;
-  for (var i = appState.history.length - 1; i >= 0; i--) {
-    if (appState.history[i].date <= targetStr) {
-      closest = appState.history[i];
-      break;
-    }
+function _buildCalcCache(assets) {
+  const key = _calcCacheKey;
+  if (_calcCache && _calcCache._key === key && _calcCache._src === assets) return _calcCache;
+  const byAsset = new Map();
+  const byCat = {};
+  let total = 0;
+  for (const cat of CATEGORIES) byCat[cat.id] = 0;
+  for (const a of assets) {
+    const v = calcAssetValue(a);
+    byAsset.set(a.id, v);
+    byCat[a.category] = safeNum(byCat[a.category]) + safeNum(v.value);
+    total += safeNum(v.value);
   }
-
-  if (!closest || closest.date === latest.date) return null;
-  var diff = latest.total - closest.total;
-  var pct = closest.total > 0 ? ((diff / closest.total) * 100).toFixed(2) : "0.00";
-  return { diff: diff, pct: pct };
+  _calcCache = { _key: key, _src: assets, byAsset, byCat, total: safeNum(total) };
+  return _calcCache;
 }
 
-// --- 디바운스 (성능 최적화) ---
-
-function debounce(fn, delay) {
-  var timer = null;
-  return function() {
-    var ctx = this, args = arguments;
-    clearTimeout(timer);
-    timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
-  };
+function calcCategoryTotal(assets, catId) {
+  return _buildCalcCache(assets).byCat[catId] || 0;
 }
 
-// --- 카테고리 select 옵션 생성 ---
-
-function buildCategoryOptions(selected) {
-  return CATEGORY_LIST.map(function(c) {
-    return "<option value=\"" + c + "\"" + (c === selected ? " selected" : "") + ">" + CATEGORY_CONFIG[c].icon + " " + c + "</option>";
-  }).join("");
+function calcTotal(assets) {
+  return _buildCalcCache(assets).total;
 }
 
-// --- 자산 계산 ---
-
-function calcAsset(asset) {
-  var txns = (asset.txns || []).slice().sort(function(x, y) {
-    return (x.date || "").localeCompare(y.date || "");
-  });
-
-  if (isCashLike(asset.category)) {
-    var bal = 0, inCnt = 0, outCnt = 0;
-    txns.forEach(function(t) {
-      if (t.type === "buy") { bal += t.price * t.qty; inCnt += 1; }
-      else { bal -= t.price * t.qty; outCnt += 1; }
-    });
-    return { qty: inCnt + outCnt, avgPrice: 0, totalCost: 0, evalAmt: Math.round(bal), profit: 0, profitPct: 0, accounts: [], inCnt: inCnt, outCnt: outCnt };
-  }
-
-  var totalQty = 0, totalCost = 0;
-  txns.forEach(function(t) {
-    if (t.type === "buy") { totalQty += t.qty; totalCost += t.price * t.qty; }
-    else if (t.type === "sell" && totalQty > 0) {
-      var ratio = Math.min(t.qty, totalQty) / totalQty;
-      totalCost -= totalCost * ratio;
-      totalQty -= Math.min(t.qty, totalQty);
-    }
-  });
-
-  var avgPrice = totalQty > 0 ? Math.round(totalCost / totalQty) : 0;
-  var currentPrice = asset.amount || 0;
-  var evalAmt = currentPrice * totalQty;
-  var profit = evalAmt - totalCost;
-  var profitPct = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(2) : 0;
-
-  var accounts = {};
-  txns.forEach(function(t) {
-    var acctName = t.account || "기본";
-    if (!accounts[acctName]) accounts[acctName] = { qty: 0, cost: 0 };
-    if (t.type === "buy") { accounts[acctName].qty += t.qty; accounts[acctName].cost += t.price * t.qty; }
-    else {
-      var minQty = Math.min(t.qty, accounts[acctName].qty);
-      if (accounts[acctName].qty > 0) accounts[acctName].cost -= accounts[acctName].cost * (minQty / accounts[acctName].qty);
-      accounts[acctName].qty -= minQty;
-    }
-  });
-
-  var accountList = [];
-  for (var k in accounts) {
-    if (accounts[k].qty > 0) {
-      var ap = Math.round(accounts[k].cost / accounts[k].qty);
-      accountList.push({ name: k, qty: accounts[k].qty, avgP: ap, eval: currentPrice * accounts[k].qty, profit: currentPrice * accounts[k].qty - accounts[k].cost });
-    }
-  }
-
-  return { qty: totalQty, avgPrice: avgPrice, totalCost: Math.round(totalCost), evalAmt: Math.round(evalAmt), profit: Math.round(profit), profitPct: profitPct, accounts: accountList };
+function calcCategoryTotals(assets) {
+  return { ..._buildCalcCache(assets).byCat };
 }
 
-// 거래 내역 존재 여부
-function hasTransactions(asset) {
-  return asset.txns && asset.txns.length > 0;
-}
-
-// 자산 평가금액
-function getAssetValue(asset) {
-  if (!hasTransactions(asset)) return 0;
-  return calcAsset(asset).evalAmt;
-}
-
-// 자동 업데이트 가능 여부
-function canAutoUpdate(asset) {
-  return (asset.category === "코인" && asset.coinId) ||
-    ((asset.category === "국내주식" || asset.category === "해외주식") && asset.stockCode) ||
-    (asset.isUsdt && asset.usdtQty > 0);
-}
-
-// --- 거래 라벨 ---
-
-function getTransactionLabel(category, type) {
-  if (category === "현금") return type === "buy" ? "입금" : "출금";
-  if (category === "예적금") return type === "buy" ? "납입" : "인출";
-  return type === "buy" ? "매수" : "매도";
-}
-
-function getTransactionUnit(category) {
-  if (category === "현금" || category === "예적금") return "건";
-  if (category === "코인") return "개";
-  return "주";
-}
-
-function isCashLike(category) {
-  return category === "현금" || category === "예적금";
-}
-
-// --- 히스토리 스냅샷 생성 ---
-
-function makeSnapshot(assets, history) {
-  var today = getTodayString(), total = 0, byCategory = {};
-  CATEGORY_LIST.forEach(function(c) { byCategory[c] = 0; });
-  assets.forEach(function(a) {
-    var v = getAssetValue(a);
-    total += v;
-    byCategory[a.category] += v;
-  });
-  var newHistory = history.filter(function(h) { return h.date !== today; });
-  newHistory.push({ date: today, total: total, byCategory: byCategory });
-  newHistory.sort(function(a, b) { return a.date.localeCompare(b.date); });
-  return newHistory;
-}
-
-// --- 코인 ID 검색 ---
-
-function resolveCoinId(name) {
-  var lower = name.toLowerCase().trim();
-  if (COIN_ID_MAP[lower]) return COIN_ID_MAP[lower];
-  for (var k in COIN_ID_MAP) {
-    if (k.indexOf(lower) >= 0 || lower.indexOf(k) >= 0) return COIN_ID_MAP[k];
-  }
-  return null;
-}
-
-// --- 카테고리 인덱스 빌드 (성능 최적화) ---
-
-function buildCategoryIndex(assets) {
-  var index = {};
-  CATEGORY_LIST.forEach(function(cat) { index[cat] = []; });
-  assets.forEach(function(a) {
-    if (index[a.category]) index[a.category].push(a);
-  });
-  return index;
-}
-
-// --- 데이터 검증 ---
-
-function sanitizeStr(s, max) {
-  if (typeof s !== "string") return "";
-  return s.slice(0, max || 200);
-}
-
-function sanitizePortfolioName(name) {
-  return sanitizeStr(name, 50).trim().replace(/\s+/g, " ");
-}
-
-function sanitizeNum(n) {
-  var v = Number(n);
-  if (!isFinite(v)) return 0;
-  return v;
+// ── Validation ──
+function isValidAsset(a) {
+  return a && typeof a.name === 'string' && a.name.trim().length > 0 &&
+    CAT_IDS.includes(a.category) && Array.isArray(a.txns);
 }
 
 function sanitizeAsset(a) {
-  if (!a || typeof a !== "object") return null;
   return {
-    id: sanitizeNum(a.id),
-    name: sanitizeStr(a.name, 100),
-    category: CATEGORY_LIST.indexOf(a.category) >= 0 ? a.category : "기타",
-    amount: sanitizeNum(a.amount),
-    note: a.note ? sanitizeStr(a.note, 500) : null,
-    stockCode: sanitizeStr(a.stockCode, 20),
-    market: sanitizeStr(a.market, 10),
-    coinId: sanitizeStr(a.coinId, 80),
+    id: a.id || uid(),
+    name: stripHtml(a.name, 100) || '이름 없음',
+    category: CAT_IDS.includes(a.category) ? a.category : '기타',
+    amount: safeNum(a.amount),
+    note: a.note ? stripHtml(a.note, 500) : null,
+    stockCode: a.stockCode ? stripHtml(a.stockCode, 20) : '',
+    market: ['KOSPI','KOSDAQ','NYSE','NASDAQ',''].includes(a.market) ? a.market : '',
+    coinId: a.coinId ? stripHtml(a.coinId, 100) : '',
     krxEtf: !!a.krxEtf,
     isUsdt: !!a.isUsdt,
-    usdtQty: a.usdtQty ? sanitizeNum(a.usdtQty) : undefined,
-    usdtDetails: Array.isArray(a.usdtDetails) ? a.usdtDetails.map(function(d) {
-      return { name: sanitizeStr(d.name, 50), qty: sanitizeNum(d.qty) };
-    }).filter(function(d) { return d.name; }).slice(0, 50) : undefined,
-    walletCoinId: a.walletCoinId ? sanitizeStr(a.walletCoinId, 80) : undefined,
-    txns: Array.isArray(a.txns) ? a.txns.map(function(t) {
-      return {
-        id: sanitizeNum(t.id),
-        type: t.type === "buy" || t.type === "sell" ? t.type : "buy",
-        price: sanitizeNum(t.price),
-        qty: sanitizeNum(t.qty),
-        account: t.account ? sanitizeStr(t.account, 50) : null,
-        date: sanitizeStr(t.date, 10),
-        memo: t.memo ? sanitizeStr(t.memo, 200) : null
-      };
-    }).slice(0, 5000) : []
+    walletCoinId: a.walletCoinId ? stripHtml(String(a.walletCoinId), 100) : undefined,
+    lpu: (a.lpu && typeof a.lpu === 'string') ? stripHtml(a.lpu, 50) : null,
+    txns: Array.isArray(a.txns) ? a.txns.slice(0, LIMITS.txns).map(sanitizeTxn) : [],
   };
 }
+
+function sanitizeTxn(t) {
+  return {
+    id: t.id || uid(),
+    type: t.type === 'sell' ? 'sell' : 'buy',
+    price: safeNum(t.price),
+    qty: Math.max(0, safeNum(t.qty)),
+    account: t.account ? stripHtml(t.account, 50) : null,
+    date: isValidDate(t.date) ? t.date : today(),
+    memo: t.memo ? stripHtml(t.memo, 200) : null,
+  };
+}
+
+// ── DOM Helpers ──
+function $(sel, ctx = document) { return ctx.querySelector(sel); }
+function $$(sel, ctx = document) { return [...ctx.querySelectorAll(sel)]; }
+
+function el(tag, attrs = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (k.startsWith('on')) continue; // Block string on* (XSS defense)
+    else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k === 'dataset') Object.assign(e.dataset, v);
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else if (c instanceof Node) e.appendChild(c);
+  }
+  return e;
+}
+
+function showToast(msg, type = 'info') {
+  const existing = $('.toast');
+  if (existing) existing.remove();
+  const t = el('div', { class: `toast toast-${type}`, text: msg, role: 'alert' });
+  const container = $('#toastContainer') || document.body;
+  container.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), TOAST_FADE_MS);
+  }, TOAST_DURATION_MS);
+}
+
+// ── Chart.js Safety ──
+function isChartReady() {
+  return typeof Chart !== 'undefined';
+}
+
+// ── Misc ──
+function debounce(fn, ms = DEBOUNCE_MS) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
+// uid() uses crypto.randomUUID() — returns a STRING.
+// NEVER wrap uid() results in Number() — they are not numeric.
+function uid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback: timestamp + random hex suffix
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function groupBy(arr, key) {
+  return arr.reduce((g, item) => {
+    const k = typeof key === 'function' ? key(item) : item[key];
+    (g[k] = g[k] || []).push(item);
+    return g;
+  }, {});
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Scoped Cleanup Registry ──
+// Each module gets its own scope. Cleanup.scope('list').add() / Cleanup.scope('list').removeAll()
+const Cleanup = (() => {
+  const _scopes = {};
+
+  function _getScope(name) {
+    if (!_scopes[name]) {
+      _scopes[name] = [];
+    }
+    return _scopes[name];
+  }
+
+  return {
+    scope(name) {
+      return {
+        add(element, event, handler, options) {
+          element.addEventListener(event, handler, options);
+          _getScope(name).push({ element, event, handler, options });
+        },
+        removeAll() {
+          const listeners = _getScope(name);
+          for (const { element, event, handler, options } of listeners) {
+            try { element.removeEventListener(event, handler, options); } catch (e) {
+              console.warn(`Cleanup.scope(${name}).removeAll: failed`, event, e);
+            }
+          }
+          _scopes[name] = [];
+        },
+        removeForElement(el) {
+          const scope = _getScope(name);
+          _scopes[name] = scope.filter(l => {
+            if (l.element === el) {
+              try { l.element.removeEventListener(l.event, l.handler, l.options); } catch (e) {
+                console.warn(`Cleanup.scope(${name}).removeForElement: failed`, l.event, e);
+              }
+              return false;
+            }
+            return true;
+          });
+        },
+      };
+    },
+
+    add(element, event, handler, options) {
+      element.addEventListener(event, handler, options);
+      _getScope('global').push({ element, event, handler, options });
+    },
+
+    removeAll() {
+      for (const name of Object.keys(_scopes)) {
+        for (const { element, event, handler, options } of _scopes[name]) {
+          try { element.removeEventListener(event, handler, options); } catch (e) {
+            console.warn('Cleanup.removeAll: failed', event, e);
+          }
+        }
+        _scopes[name] = [];
+      }
+    },
+
+    removeForElement(targetEl) {
+      for (const name of Object.keys(_scopes)) {
+        _scopes[name] = _scopes[name].filter(l => {
+          if (l.element === targetEl) {
+            try { l.element.removeEventListener(l.event, l.handler, l.options); } catch (e) {
+              console.warn('Cleanup.removeForElement: failed', l.event, e);
+            }
+            return false;
+          }
+          return true;
+        });
+      }
+    },
+  };
+})();

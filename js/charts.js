@@ -1,326 +1,236 @@
-/* charts.js - Chart.js 차트 렌더링 (v2.6.0) */
+/* =============================================
+   My Portfolio v3.12.0 — Charts (Chart.js)
+   Cycle 15: Full rebuild from scratch — CHART_POINT_THRESHOLD, isChartReady() guard
+   ============================================= */
+
+const charts = { pie: null, catPie: null, catPies: {}, trend: null, incBar: null, incPie: null, growth: null };
+
+function getThemeColor(varName) {
+  try {
+    return getComputedStyle(document.body).getPropertyValue(varName).trim() || '#888';
+  } catch (e) {
+    console.warn('getThemeColor failed for', varName, e);
+    return '#888';
+  }
+}
+
+const centerTextPlugin = {
+  id: 'centerText',
+  afterDraw(chart) {
+    const meta = chart.options.plugins?.centerText;
+    if (!meta?.text) return;
+    const { ctx, chartArea: { left, right, top, bottom } } = chart;
+    const cx = (left + right) / 2, cy = (top + bottom) / 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (meta.sub) {
+      ctx.font = `bold ${meta.fontSize || 14}px Pretendard`;
+      ctx.fillStyle = meta.color || getThemeColor('--t1');
+      ctx.fillText(meta.text, cx, cy - 10);
+      ctx.font = `${(meta.fontSize || 14) - 2}px Pretendard`;
+      ctx.fillStyle = meta.subColor || getThemeColor('--t3');
+      ctx.fillText(meta.sub, cx, cy + 12);
+    } else {
+      ctx.font = `bold ${meta.fontSize || 16}px Pretendard`;
+      ctx.fillStyle = meta.color || getThemeColor('--t1');
+      ctx.fillText(meta.text, cx, cy);
+    }
+    ctx.restore();
+  }
+};
 
 function destroyAllCharts() {
-  for (var key in charts) {
+  for (const [key, val] of Object.entries(charts)) {
     if (key === 'catPies') {
-      for (var ck in charts.catPies) {
-        try { if (charts.catPies[ck]) charts.catPies[ck].destroy(); } catch(e) {}
-      }
+      Object.values(val).forEach(c => { try { c?.destroy(); } catch (e) { console.warn('destroyAllCharts catPie:', e); } });
       charts.catPies = {};
-    } else {
-      try { if (charts[key]) charts[key].destroy(); } catch(e) {}
+    } else if (val) {
+      try { val.destroy(); } catch (e) { console.warn('destroyAllCharts:', key, e); }
       charts[key] = null;
     }
   }
 }
 
-function drawPie(data, total) {
-  var ctx = document.getElementById("cPie");
-  if (!ctx) return;
-
-  var lb = data.map(function(d) { return d.ic + " " + d.n; });
-  var dv = data.map(function(d) { return d.v; });
-  var bg = data.map(function(d) { return d.c; });
-
-  if (charts.pie && charts.pie.canvas === ctx) {
-    try {
-      charts.pie.data.labels = lb;
-      charts.pie.data.datasets[0].data = dv;
-      charts.pie.data.datasets[0].backgroundColor = bg;
-      charts.pie.options.plugins.tooltip.callbacks.label = function(c) {
-        return c.label + ": " + formatNumber(c.raw) + " (" + ((c.raw / total) * 100).toFixed(1) + "%)";
-      };
-      charts.pie.update("none");
-      return;
-    } catch(e) {}
+function destroyChart(name) {
+  if (name === 'catPies') {
+    Object.values(charts.catPies).forEach(c => { try { c?.destroy(); } catch (e) { console.warn('destroyChart catPie:', e); } });
+    charts.catPies = {};
+  } else if (charts[name]) {
+    try { charts[name].destroy(); } catch (e) { console.warn('destroyChart:', name, e); }
+    charts[name] = null;
   }
+}
 
-  try { if (charts.pie) charts.pie.destroy(); } catch(e) {}
-  charts.pie = null;
+// ── sr-only table HTML for chart accessibility ──
+function chartAltTable(headers, rows, caption) {
+  if (!rows || rows.length === 0) return '';
+  return `<table class="sr-only" aria-label="${escAttr(caption)}">
+    <caption>${escHtml(caption)}</caption>
+    <thead><tr>${headers.map(h => `<th scope="col">${escHtml(h)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${escHtml(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
 
-  charts.pie = new Chart(ctx, {
-    type: "doughnut",
-    data: {
-      labels: lb,
-      datasets: [{
-        data: dv,
-        backgroundColor: bg,
-        borderWidth: 0,
-        spacing: 2
-      }]
-    },
+function renderDoughnut(canvasId, labels, data, colors, opts = {}) {
+  if (!isChartReady()) { console.warn('Chart.js not loaded — skipping', canvasId); return null; }
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) { console.error(`Canvas not found: ${canvasId}`); return null; }
+  const ctx = canvas.getContext('2d');
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
     options: {
-      cutout: "62%",
-      responsive: false,
+      responsive: true, maintainAspectRatio: false,
+      cutout: opts.cutout || '65%',
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: "#1A1D23",
-          borderColor: "rgba(255,255,255,.1)",
-          borderWidth: 1,
-          titleFont: { family: "Pretendard Variable", size: 12 },
-          bodyFont: { family: "Pretendard Variable", size: 12 },
-          callbacks: {
-            label: function(c) {
-              return c.label + ": " + formatNumber(c.raw) + " (" + ((c.raw / total) * 100).toFixed(1) + "%)";
-            }
-          }
-        }
-      }
+        tooltip: { callbacks: { label: item => {
+          const total = item.dataset.data.reduce((a, b) => a + b, 0);
+          const pct = total > 0 ? ((item.parsed / total) * 100).toFixed(1) : 0;
+          return ` ${item.label}: ${fmtKRW(item.parsed)} (${pct}%)`;
+        }}},
+        centerText: opts.centerText || undefined,
+      },
+      animation: { duration: opts.animate === false ? 0 : 600 },
     },
-    plugins: [{
-      id: "ct",
-      afterDraw: function(ch) {
-        var c = ch.ctx, w = ch.width, hh = ch.height;
-        c.save();
-        c.textAlign = "center";
-        c.fillStyle = "#94A3B8";
-        c.font = "10px Pretendard Variable";
-        c.fillText("총 자산", w / 2, hh / 2 - 5);
-        c.fillStyle = "#F1F5F9";
-        c.font = "bold 13px Pretendard Variable";
-        c.fillText(formatShortCurrency(total), w / 2, hh / 2 + 11);
-        c.restore();
-      }
-    }]
+    plugins: [centerTextPlugin],
   });
 }
 
-function drawCatPie(id, items, total, colors) {
-  var ctx = document.getElementById(id);
-  if (!ctx) return;
-
-  var lb = items.map(function(d) { return d.name; });
-  var dv = items.map(function(d) { return d.v; });
-  var bg = items.map(function(d, i) { return colors[i % colors.length]; });
-
-  if (charts.catPies[id] && charts.catPies[id].canvas === ctx) {
-    try {
-      charts.catPies[id].data.labels = lb;
-      charts.catPies[id].data.datasets[0].data = dv;
-      charts.catPies[id].data.datasets[0].backgroundColor = bg;
-      charts.catPies[id].update("none");
-      return;
-    } catch(e) {}
-  }
-
-  try { if (charts.catPies[id]) charts.catPies[id].destroy(); } catch(e) {}
-  charts.catPies[id] = null;
-
-  charts.catPies[id] = new Chart(ctx, {
-    type: "doughnut",
-    data: {
-      labels: lb,
-      datasets: [{
-        data: dv,
-        backgroundColor: bg,
-        borderWidth: 0,
-        spacing: 2
-      }]
-    },
+function renderLineChart(canvasId, labels, datasets, opts = {}) {
+  if (!isChartReady()) { console.warn('Chart.js not loaded — skipping', canvasId); return null; }
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) { console.error(`Canvas not found: ${canvasId}`); return null; }
+  return new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
     options: {
-      cutout: "58%",
-      responsive: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: "#1A1D23",
-          borderColor: "rgba(255,255,255,.1)",
-          borderWidth: 1,
-          titleFont: { family: "Pretendard Variable", size: 11 },
-          bodyFont: { family: "Pretendard Variable", size: 11 },
-          callbacks: {
-            label: function(c) {
-              return c.label + ": " + formatShortCurrency(c.raw) + " (" + ((c.raw / total) * 100).toFixed(1) + "%)";
-            }
-          }
-        }
-      }
-    },
-    plugins: [{
-      id: "ct2",
-      afterDraw: function(ch) {
-        var c = ch.ctx, w = ch.width, hh = ch.height;
-        c.save();
-        c.textAlign = "center";
-        c.fillStyle = "#94A3B8";
-        c.font = "9px Pretendard Variable";
-        c.fillText(items.length + "종목", w / 2, hh / 2 - 4);
-        c.fillStyle = "#F1F5F9";
-        c.font = "bold 11px Pretendard Variable";
-        c.fillText(formatShortCurrency(total), w / 2, hh / 2 + 10);
-        c.restore();
-      }
-    }]
-  });
-}
-
-function drawLine(id, data, h) {
-  var ctx = document.getElementById(id);
-  if (!ctx) return;
-
-  var key = id === "cL1" ? "l1" : "l2";
-  var lb = data.map(function(d) { return d.d; });
-  var dv = data.map(function(d) { return d.v; });
-
-  if (charts[key] && charts[key].canvas === ctx) {
-    try {
-      charts[key].data.labels = lb;
-      charts[key].data.datasets[0].data = dv;
-      charts[key].update("none");
-      return;
-    } catch(e) {}
-  }
-
-  try { if (charts[key]) charts[key].destroy(); } catch(e) {}
-  charts[key] = null;
-
-  var g = ctx.getContext("2d").createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "rgba(59,130,246,.2)");
-  g.addColorStop(1, "rgba(59,130,246,0)");
-
-  charts[key] = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: lb,
-      datasets: [{
-        data: dv,
-        borderColor: "#3B82F6",
-        borderWidth: 2.5,
-        backgroundColor: g,
-        fill: true,
-        pointRadius: data.length > 15 ? 2 : 3,
-        pointBackgroundColor: "#3B82F6",
-        tension: .35
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       scales: {
-        x: {
-          grid: { color: "rgba(255,255,255,.03)" },
-          ticks: {
-            color: "#475569",
-            font: { size: 10, family: "Pretendard Variable" }
-          },
-          border: { display: false }
-        },
-        y: {
-          grid: { color: "rgba(255,255,255,.03)" },
-          ticks: {
-            color: "#475569",
-            font: { size: 10, family: "Pretendard Variable" },
-            callback: function(v) { return formatShortCurrency(v); }
-          },
-          border: { display: false }
-        }
+        x: { display: opts.showX !== false, grid: { display: false },
+          ticks: { color: getThemeColor('--t4'), font: { size: 10 }, maxTicksLimit: opts.maxXTicks || 6 } },
+        y: { display: opts.showY !== false, grid: { color: 'rgba(128,128,128,0.1)' },
+          ticks: { color: getThemeColor('--t4'), font: { size: 10 }, callback: v => fmtKRW(v) } },
       },
       plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: "#1A1D23",
-          borderColor: "rgba(255,255,255,.1)",
-          borderWidth: 1,
-          titleFont: { family: "Pretendard Variable" },
-          bodyFont: { family: "Pretendard Variable" },
-          callbacks: {
-            label: function(c) { return formatNumber(c.raw); }
-          }
-        }
-      }
-    }
+        legend: { display: !!opts.legend },
+        tooltip: { callbacks: { label: item => ` ${item.dataset.label}: ${fmtKRW(item.parsed.y)}` } },
+      },
+      elements: { line: { tension: 0.35, borderWidth: 2 }, point: { radius: opts.pointRadius ?? 2, hoverRadius: 5 } },
+      animation: { duration: opts.animate === false ? 0 : 600 },
+    },
   });
 }
 
-/* --- Growth Chart (multi-line with categories) --- */
-
-function drawGrowthChart(id, historyData, h, showCategories) {
-  var ctx = document.getElementById(id);
-  if (!ctx) return;
-
-  if (charts.growth) { try { charts.growth.destroy(); } catch(e) {} }
-  charts.growth = null;
-
-  var labels = historyData.map(function(d) { return d.date.slice(5); });
-  var totalData = historyData.map(function(d) { return d.total; });
-
-  var g = ctx.getContext("2d").createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "rgba(59,130,246,.15)");
-  g.addColorStop(1, "rgba(59,130,246,0)");
-
-  var datasets = [{
-    label: "총 자산",
-    data: totalData,
-    borderColor: "#3B82F6",
-    borderWidth: 2.5,
-    backgroundColor: g,
-    fill: true,
-    pointRadius: historyData.length > 30 ? 0 : 2,
-    pointBackgroundColor: "#3B82F6",
-    tension: .35,
-    order: 0
-  }];
-
-  if (showCategories) {
-    var cats = {};
-    historyData.forEach(function(d) {
-      if (!d.byCategory) return;
-      for (var c in d.byCategory) {
-        if (!cats[c]) cats[c] = [];
-      }
-    });
-
-    var catNames = Object.keys(cats);
-    catNames.forEach(function(cat) {
-      var cfg = CATEGORY_CONFIG[cat];
-      if (!cfg) return;
-      var catValues = historyData.map(function(d) {
-        return d.byCategory && d.byCategory[cat] ? d.byCategory[cat] : 0;
-      });
-      if (catValues.every(function(v) { return v === 0; })) return;
-
-      datasets.push({
-        label: (cfg.icon || "") + " " + cat,
-        data: catValues,
-        borderColor: cfg.color,
-        borderWidth: 1.5,
-        borderDash: [4, 3],
-        fill: false,
-        pointRadius: 0,
-        tension: .35,
-        order: 1
-      });
-    });
-  }
-
-  charts.growth = new Chart(ctx, {
-    type: "line",
-    data: { labels: labels, datasets: datasets },
+function renderBarChart(canvasId, labels, data, color) {
+  if (!isChartReady()) { console.warn('Chart.js not loaded — skipping', canvasId); return null; }
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) { console.error(`Canvas not found: ${canvasId}`); return null; }
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(1, color + '33');
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: gradient, borderRadius: 6, borderSkipped: false }] },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        x: {
-          grid: { color: "rgba(255,255,255,.03)" },
-          ticks: { color: "#475569", font: { size: 10, family: "Pretendard Variable" }, maxTicksLimit: 10 },
-          border: { display: false }
-        },
-        y: {
-          grid: { color: "rgba(255,255,255,.03)" },
-          ticks: { color: "#475569", font: { size: 10, family: "Pretendard Variable" }, callback: function(v) { return formatShortCurrency(v); } },
-          border: { display: false }
-        }
+        x: { grid: { display: false }, ticks: { color: getThemeColor('--t4'), font: { size: 10 } } },
+        y: { grid: { color: 'rgba(128,128,128,0.1)' },
+          ticks: { color: getThemeColor('--t4'), font: { size: 10 }, callback: v => fmtKRW(v) } },
       },
-      plugins: {
-        legend: { display: showCategories, position: "bottom", labels: { color: "#94A3B8", font: { size: 10, family: "Pretendard Variable" }, boxWidth: 12, padding: 8 } },
-        tooltip: {
-          backgroundColor: "#1A1D23", borderColor: "rgba(255,255,255,.1)", borderWidth: 1,
-          titleFont: { family: "Pretendard Variable" }, bodyFont: { family: "Pretendard Variable" },
-          callbacks: { label: function(c) { return c.dataset.label + ": " + formatNumber(c.raw); } }
-        }
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => ` ${fmtKRW(item.parsed.y)}` } } },
+      animation: { duration: 600 },
+    },
+  });
+}
+
+function makeGradient(canvas, color, alpha = 0.3) {
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  g.addColorStop(0, color + Math.round(alpha * 255).toString(16).padStart(2, '0'));
+  g.addColorStop(1, color + '00');
+  return g;
+}
+
+function renderPortfolioPie() {
+  destroyChart('pie');
+  const totals = calcCategoryTotals(appState.assets);
+  const cats = appState.categoryOrder.filter(c => totals[c] > 0);
+  if (cats.length === 0) return;
+  const total = cats.reduce((s, c) => s + totals[c], 0);
+  charts.pie = renderDoughnut('chartPie',
+    cats.map(c => CAT_MAP[c].label), cats.map(c => totals[c]), cats.map(c => CAT_MAP[c].color),
+    { centerText: { text: fmtKRW(total), sub: '총 자산', fontSize: 14 } }
+  );
+
+  const altContainer = document.getElementById('chartPieAlt');
+  if (altContainer) {
+    const rows = cats.map(c => {
+      const pct = total > 0 ? ((totals[c] / total) * 100).toFixed(1) + '%' : '0%';
+      return [CAT_MAP[c].label, fmtKRW(totals[c]), pct];
+    });
+    altContainer.innerHTML = chartAltTable(['카테고리', '금액', '비중'], rows, '자산 분포 데이터');
+  }
+}
+
+function renderTrendChart(days = 30) {
+  destroyChart('trend');
+  let history = appState.history;
+  if (days > 0) history = history.slice(-days);
+  if (history.length < 2) return;
+  const canvas = document.getElementById('chartTrend');
+  if (!canvas) return;
+  const labels = history.map(h => fmtDate(h.date).slice(5));
+  const data = history.map(h => h.total);
+  charts.trend = renderLineChart('chartTrend', labels, [{
+    label: '총 자산', data, borderColor: '#3B82F6',
+    backgroundColor: makeGradient(canvas, '#3B82F6'), fill: true,
+  }], { pointRadius: data.length > CHART_POINT_THRESHOLD ? 0 : 2 });
+
+  const altContainer = document.getElementById('chartTrendAlt');
+  if (altContainer) {
+    const step = Math.max(1, Math.floor(history.length / 10));
+    const rows = history.filter((_, i) => i % step === 0 || i === history.length - 1)
+      .map(h => [fmtDate(h.date), fmtKRW(h.total)]);
+    altContainer.innerHTML = chartAltTable(['날짜', '총 자산'], rows, '자산 추이 데이터');
+  }
+}
+
+function renderGrowthChart(days = 0, byCategory = false) {
+  destroyChart('growth');
+  let history = appState.history;
+  if (days > 0) history = history.slice(-days);
+  if (history.length < 2) return;
+  const canvas = document.getElementById('chartGrowth');
+  if (!canvas) return;
+  const labels = history.map(h => fmtDate(h.date).slice(5));
+
+  if (byCategory) {
+    const datasets = [];
+    for (const cat of CATEGORIES) {
+      const data = history.map(h => h.byCategory?.[cat.id] || 0);
+      if (data.some(v => v > 0)) {
+        datasets.push({ label: cat.label, data, borderColor: cat.color,
+          backgroundColor: cat.color + '22', fill: true, borderWidth: 1.5 });
       }
     }
-  });
+    charts.growth = renderLineChart('chartGrowth', labels, datasets, { legend: true, pointRadius: 0 });
+  } else {
+    charts.growth = renderLineChart('chartGrowth', labels, [{
+      label: '총 자산', data: history.map(h => h.total), borderColor: '#8B5CF6',
+      backgroundColor: makeGradient(canvas, '#8B5CF6'), fill: true,
+    }], { pointRadius: history.length > CHART_POINT_THRESHOLD ? 0 : 2 });
+  }
+
+  const altContainer = document.getElementById('chartGrowthAlt');
+  if (altContainer) {
+    const step = Math.max(1, Math.floor(history.length / 10));
+    const rows = history.filter((_, i) => i % step === 0 || i === history.length - 1)
+      .map(h => [fmtDate(h.date), fmtKRW(h.total)]);
+    altContainer.innerHTML = chartAltTable(['날짜', '총 자산'], rows, '자산 성장 데이터');
+  }
 }

@@ -1,329 +1,178 @@
-/* wallet.js - EVM 지갑 연동 */
+/* =============================================
+   My Portfolio v3.12.0 — EVM Wallet Integration
+   Cycle 15: Full rebuild from scratch — no empty catch blocks
+   ============================================= */
 
-var isWalletScanning = false;
-var walletScanResults = [];
+let isWalletScanning = false;
+let walletScanResults = [];
 
-// EVM_CHAINS, EVM_TOKENS 는 constants.js 에 정의
-
-function isValidEvmAddress(address) {
-  return /^0x[0-9a-fA-F]{40}$/.test(address);
-}
-
-function rpcJsonCall(rpcUrl, method, params) {
-  return fetch(rpcUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params })
-  }).then(function (r) {
-    return r.json();
-  }).then(function (d) {
-    return d.result;
+async function rpcCall(rpcUrl, method, params = []) {
+  const response = await fetchWithTimeout(rpcUrl, API_TIMEOUT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message || 'RPC error');
+  return data.result;
 }
 
-function getNativeBalance(chain, addr) {
-  return rpcJsonCall(chain.rpc, "eth_getBalance", [addr, "latest"]).then(function (hex) {
-    if (!hex) return 0;
-    return parseInt(hex, 16) / Math.pow(10, chain.decimals);
-  }).catch(function () {
+async function getNativeBalance(chain, address) {
+  try {
+    const result = await rpcCall(chain.rpc, 'eth_getBalance', [address, 'latest']);
+    if (!result) return 0;
+    return Number(BigInt(result)) / 1e18;
+  } catch (e) {
+    console.warn(`Native balance error on ${chain.name}:`, e.message);
     return 0;
-  });
-}
-
-function getTokenBalance(rpcUrl, contractAddr, walletAddr, decimals) {
-  var data = "0x70a08231000000000000000000000000" + walletAddr.slice(2).toLowerCase();
-  return rpcJsonCall(rpcUrl, "eth_call", [{ to: contractAddr, data: data }, "latest"]).then(function (hex) {
-    if (!hex || hex === "0x") return 0;
-    return parseInt(hex, 16) / Math.pow(10, decimals);
-  }).catch(function () {
-    return 0;
-  });
-}
-
-function fetchWalletPrices(ids) {
-  var u = ids.filter(function (v, i, a) {
-    return a.indexOf(v) === i;
-  }).join(",");
-  return fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + u + "&vs_currencies=krw,usd").then(function (r) {
-    return r.json();
-  }).catch(function () {
-    return {};
-  });
-}
-
-function openWalletModal() {
-  var savedAddr = localStorage.getItem("wl_addr") || "";
-  var h = "<div style=\"padding:2px 0 10px\">";
-  h += "<div style=\"font-size:12px;color:var(--t3);margin-bottom:12px\">";
-  h += "EVM 지갑 주소를 입력하면 <strong style=\"color:var(--t1)\">6개 체인</strong>의 네이티브 코인과 주요 토큰 잔고를 자동으로 스캔합니다.</div>";
-  h += "<div style=\"display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px\">";
-  EVM_CHAINS.forEach(function (c) {
-    h += "<span style=\"font-size:11.5px;padding:3px 8px;background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:6px;color:var(--t3)\">";
-    h += c.icon + " " + c.name + "</span>";
-  });
-  h += "</div>";
-  h += "<div class=\"fld\"><label>지갑 주소 (0x...)</label>";
-  h += "<input id=\"wl-addr\" maxlength=\"42\" value=\"" + escapeAttr(savedAddr) + "\" placeholder=\"0x1234...abcd\" style=\"font-size:13px;font-family:monospace\"></div>";
-  h += "<div id=\"wl-result\"></div>";
-  h += "<div class=\"mbtn\" id=\"wl-outer-btns\">";
-  h += "<button class=\"btn btn-g\" onclick=\"closeModal()\">닫기</button>";
-  h += "<button class=\"btn btn-p\" style=\"flex:2\" id=\"wl-scan-btn\" onclick=\"scanWallet()\">🔍 스캔 시작</button>";
-  h += "</div>";
-  h += "</div>";
-  openModal("🔗 지갑 연동", h);
-}
-
-function scanWallet() {
-  var addr = (document.getElementById("wl-addr").value || "").trim();
-  if (!isValidEvmAddress(addr)) {
-    showToast("❌ 올바른 EVM 주소를 입력하세요 (0x...)");
-    return;
   }
-  localStorage.setItem("wl_addr", addr);
+}
+
+async function getTokenBalance(chain, address, tokenAddr, decimals) {
+  try {
+    const data = '0x70a08231' + address.slice(2).toLowerCase().padStart(64, '0');
+    const result = await rpcCall(chain.rpc, 'eth_call', [{ to: tokenAddr, data }, 'latest']);
+    if (!result || result === '0x') return 0;
+    return Number(BigInt(result)) / (10 ** decimals);
+  } catch (e) {
+    console.warn(`Token balance error (${tokenAddr} on ${chain.name}):`, e.message);
+    return 0;
+  }
+}
+
+function isValidEvmAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
+}
+
+async function scanWallet(address, onProgress) {
+  if (isWalletScanning) return [];
+  if (!isValidEvmAddress(address)) {
+    showToast('올바른 EVM 주소를 입력하세요 (0x...)', 'error');
+    return [];
+  }
+
   isWalletScanning = true;
   walletScanResults = [];
+  const results = [];
+  const totalSteps = EVM_CHAINS.length * (1 + EVM_TOKENS.length);
+  let done = 0;
 
-  var el = document.getElementById("wl-result");
-  var btn = document.getElementById("wl-scan-btn");
-  var ob = document.getElementById("wl-outer-btns");
-  if (ob) ob.style.display = "";
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = "<span class=\"spinner sm\"></span> 스캔 중...";
-  }
+  for (const chain of EVM_CHAINS) {
+    try {
+      const nativeBal = await getNativeBalance(chain, address);
+      if (nativeBal > 0.0001) {
+        results.push({
+          chain: chain.id, chainName: chain.name, symbol: chain.sym,
+          coinId: chain.coinId, balance: nativeBal, isNative: true, decimals: 18,
+        });
+      }
+    } catch (e) {
+      console.warn(`scanWallet native balance failed on ${chain.name}:`, e.message);
+    }
+    done++;
+    onProgress?.({ done, total: totalSteps });
 
-  el.innerHTML = "<div class=\"wl-prog\"><div class=\"wl-prog-bar\" id=\"wl-bar\" style=\"width:0%\"></div></div>"
-    + "<div id=\"wl-items\" style=\"margin-top:8px\"></div>"
-    + "<div style=\"font-size:11px;color:var(--t4);text-align:center;margin-top:4px\" id=\"wl-status\">체인 스캔 준비 중...</div>";
-
-  var totalTasks = 0, doneTasks = 0;
-  EVM_CHAINS.forEach(function (ch) {
-    totalTasks++;
-    EVM_TOKENS.forEach(function (tk) {
-      if (tk.contracts[ch.id]) totalTasks++;
-    });
-  });
-
-  var allIds = EVM_CHAINS.map(function (c) { return c.coingeckoId; });
-  EVM_TOKENS.forEach(function (tk) { allIds.push(tk.coingeckoId); });
-
-  fetchWalletPrices(allIds).then(function (prices) {
-    var chainPromises = EVM_CHAINS.map(function (ch) {
-      return getNativeBalance(ch, addr).then(function (bal) {
-        doneTasks++;
-        updateWalletProgressBar(doneTasks, totalTasks);
-
-        var p = prices[ch.coingeckoId];
-        var krw = p ? p.krw : 0;
-        var usd = p ? p.usd : 0;
-
-        if (bal > 0.0001) {
-          walletScanResults.push({
-            type: "native", chain: ch.id, chainName: ch.name, chainIc: ch.icon,
-            symbol: ch.symbol, name: ch.name + " (" + ch.symbol + ")",
-            balance: bal, priceKrw: krw, priceUsd: usd,
-            valueKrw: bal * krw, coingeckoId: ch.coingeckoId, checked: true
+    for (const token of EVM_TOKENS) {
+      const tokenAddr = token.addr[chain.id];
+      if (!tokenAddr) { done++; onProgress?.({ done, total: totalSteps }); continue; }
+      try {
+        const bal = await getTokenBalance(chain, address, tokenAddr, token.decimals);
+        if (bal > 0.01) {
+          results.push({
+            chain: chain.id, chainName: chain.name, symbol: token.symbol,
+            coinId: token.coinId, balance: bal, isNative: false, decimals: token.decimals,
           });
         }
-
-        var tokenPromises = EVM_TOKENS.filter(function (tk) {
-          return tk.contracts[ch.id];
-        }).map(function (tk) {
-          return getTokenBalance(ch.rpc, tk.contracts[ch.id], addr, tk.decimals).then(function (tbal) {
-            doneTasks++;
-            updateWalletProgressBar(doneTasks, totalTasks);
-            if (tbal > 0.01) {
-              var tp = prices[tk.coingeckoId];
-              var tkrw = tp ? tp.krw : 0;
-              var tusd = tp ? tp.usd : 0;
-              walletScanResults.push({
-                type: "token", chain: ch.id, chainName: ch.name, chainIc: ch.icon,
-                symbol: tk.symbol, name: tk.name + " (" + ch.name + ")",
-                balance: tbal, priceKrw: tkrw, priceUsd: tusd,
-                valueKrw: tbal * tkrw, coingeckoId: tk.coingeckoId,
-                checked: tbal * tusd >= 1
-              });
-            }
-          }).catch(function () {
-            doneTasks++;
-            updateWalletProgressBar(doneTasks, totalTasks);
-          });
-        });
-
-        return Promise.all(tokenPromises);
-      }).catch(function () {
-        doneTasks++;
-        updateWalletProgressBar(doneTasks, totalTasks);
-      });
-    });
-
-    return Promise.all(chainPromises);
-  }).then(function () {
-    isWalletScanning = false;
-    renderWalletResults(addr);
-  }).catch(function (e) {
-    isWalletScanning = false;
-    el.innerHTML = "<div style=\"color:var(--red);font-size:13px;padding:12px;text-align:center\">❌ 스캔 실패: " + escapeHtml(e.message) + "</div>";
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = "🔍 다시 스캔";
-    }
-  });
-}
-
-function updateWalletProgressBar(done, total) {
-  var pct = Math.round(done / total * 100);
-  var bar = document.getElementById("wl-bar");
-  var st = document.getElementById("wl-status");
-  if (bar) bar.style.width = pct + "%";
-  if (st) st.textContent = "스캔 중... " + done + "/" + total + " (" + pct + "%)";
-}
-
-function renderWalletResults(addr) {
-  var el = document.getElementById("wl-result");
-  var btn = document.getElementById("wl-scan-btn");
-  if (btn) {
-    btn.disabled = false;
-    btn.innerHTML = "🔍 다시 스캔";
-  }
-
-  if (!walletScanResults.length) {
-    el.innerHTML = "<div style=\"text-align:center;padding:20px;color:var(--t4);font-size:13px\">😅 잔고가 발견되지 않았습니다</div>";
-    return;
-  }
-
-  walletScanResults.sort(function (a, b) { return b.valueKrw - a.valueKrw; });
-
-  var totalKrw = 0;
-  walletScanResults.forEach(function (r) {
-    if (r.checked) totalKrw += r.valueKrw;
-  });
-
-  var h = "<div style=\"margin:10px 0 8px;padding:10px 12px;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.12);border-radius:10px;display:flex;justify-content:space-between;align-items:center\">";
-  h += "<div><div style=\"font-size:11px;color:var(--green);font-weight:600\">✅ " + walletScanResults.length + "개 자산 발견</div>";
-  h += "<div style=\"font-size:11px;color:var(--t4);margin-top:2px\">" + addr.slice(0, 8) + "..." + addr.slice(-6) + "</div></div>";
-  h += "<div style=\"text-align:right\"><div style=\"font-size:14px;font-weight:700;color:var(--t1)\" id=\"wl-total\">" + formatShortCurrency(Math.round(totalKrw)) + "</div>";
-  h += "<div style=\"font-size:11px;color:var(--t4)\">선택 자산 합계</div></div></div>";
-
-  h += "<div style=\"display:flex;justify-content:flex-end;gap:8px;margin-bottom:6px\">";
-  h += "<button style=\"border:none;background:none;color:#60A5FA;font-size:11px;cursor:pointer;font-family:inherit\" onclick=\"toggleAllWalletAssets(true)\">전체 선택</button>";
-  h += "<button style=\"border:none;background:none;color:var(--t4);font-size:11px;cursor:pointer;font-family:inherit\" onclick=\"toggleAllWalletAssets(false)\">전체 해제</button></div>";
-
-  walletScanResults.forEach(function (r, i) {
-    var balStr = r.balance >= 1 ? r.balance.toFixed(4) : r.balance.toFixed(8);
-    h += "<div class=\"wl-chain" + (r.balance > 0 ? " found" : "") + "\">";
-    h += "<input type=\"checkbox\" class=\"wl-cb\" " + (r.checked ? "checked" : "") + " onchange=\"toggleWalletAsset(" + i + ",this.checked)\">";
-    h += "<div class=\"wl-ic\">" + r.chainIc + "</div>";
-    h += "<div class=\"wl-info\"><div class=\"wl-nm\">" + r.symbol + "<span style=\"font-size:11px;color:var(--t5);margin-left:5px\">" + r.chainName + "</span></div>";
-    h += "<div class=\"wl-bal\">" + balStr + " " + r.symbol + "</div></div>";
-    h += "<div style=\"text-align:right\"><div class=\"wl-val\">" + formatShortCurrency(Math.round(r.valueKrw)) + "</div>";
-    h += "<div class=\"wl-st\">$" + (r.balance * r.priceUsd >= 1 ? (r.balance * r.priceUsd).toFixed(2) : (r.balance * r.priceUsd).toFixed(4)) + "</div></div>";
-    h += "</div>";
-  });
-
-  h += "<div class=\"mbtn\" style=\"margin-top:12px\">";
-  h += "<button class=\"btn btn-g\" onclick=\"closeModal()\">닫기</button>";
-  h += "<button class=\"btn btn-p\" style=\"flex:2\" onclick=\"importWalletAssets()\">📥 선택 자산 가져오기</button>";
-  h += "</div>";
-
-  el.innerHTML = h;
-  var ob = document.getElementById("wl-outer-btns");
-  if (ob) ob.style.display = "none";
-}
-
-function toggleWalletAsset(i, checked) {
-  walletScanResults[i].checked = checked;
-  var totalKrw = 0;
-  walletScanResults.forEach(function (r) {
-    if (r.checked) totalKrw += r.valueKrw;
-  });
-  var te = document.getElementById("wl-total");
-  if (te) te.textContent = formatShortCurrency(Math.round(totalKrw));
-}
-
-function toggleAllWalletAssets(val) {
-  walletScanResults.forEach(function (r) { r.checked = val; });
-  document.querySelectorAll(".wl-cb").forEach(function (cb) { cb.checked = val; });
-  var totalKrw = 0;
-  walletScanResults.forEach(function (r) {
-    if (r.checked) totalKrw += r.valueKrw;
-  });
-  var te = document.getElementById("wl-total");
-  if (te) te.textContent = formatShortCurrency(Math.round(totalKrw));
-}
-
-function importWalletAssets() {
-  var selected = walletScanResults.filter(function (r) { return r.checked; });
-  if (!selected.length) {
-    showToast("⚠️ 가져올 자산을 선택하세요");
-    return;
-  }
-
-  var merged = {};
-  selected.forEach(function (r) {
-    var key = r.coingeckoId;
-    if (!merged[key]) {
-      merged[key] = {
-        symbol: r.symbol, name: r.symbol, coingeckoId: r.coingeckoId,
-        totalBalance: 0, priceKrw: r.priceKrw, chains: []
-      };
-    }
-    merged[key].totalBalance += r.balance;
-    merged[key].chains.push(r.chainName);
-  });
-
-  var added = 0, updated = 0;
-  for (var k in merged) {
-    var m = merged[k];
-    var existing = null;
-    appState.assets.forEach(function (a) {
-      if (a.walletCoinId === k) existing = a;
-    });
-
-    if (existing) {
-      var oldBal = 0;
-      (existing.txns || []).forEach(function (t) {
-        if (t.type === "buy") oldBal += t.qty;
-        else oldBal -= t.qty;
-      });
-      var diff = m.totalBalance - oldBal;
-      if (Math.abs(diff) > 0.0001) {
-        if (!existing.txns) existing.txns = [];
-        existing.txns.push({
-          id: generateId(),
-          type: diff > 0 ? "buy" : "sell",
-          price: Math.round(m.priceKrw),
-          qty: Math.abs(diff),
-          account: "지갑 연동",
-          date: getTodayString(),
-          memo: "지갑 동기화 (" + m.chains.join("+") + ")"
-        });
-        existing.amount = Math.round(m.priceKrw);
-        updated++;
+      } catch (e) {
+        console.warn(`scanWallet token ${token.symbol} on ${chain.name} failed:`, e.message);
       }
-    } else {
-      var coinName = COIN_KOREAN_NAMES[m.coingeckoId] || m.symbol;
-      var item = {
-        name: coinName, category: "코인",
-        amount: Math.round(m.priceKrw),
-        id: generateId(),
-        lpu: null, coinId: m.coingeckoId, stockCode: null,
-        market: null, krxEtf: false, isUsdt: false, walletCoinId: k,
-        txns: [{
-          id: generateId(), type: "buy",
-          price: Math.round(m.priceKrw), qty: m.totalBalance,
-          account: "지갑 연동", date: getTodayString(),
-          memo: "지갑 스캔 (" + m.chains.join("+") + ")"
-        }]
-      };
-      appState.assets.push(item);
-      added++;
+      done++;
+      onProgress?.({ done, total: totalSteps });
     }
   }
 
-  appState.history = makeSnapshot(appState.assets, appState.history);
-  saveData();
-  closeModal();
-  render();
-  showToast("✅ " + added + "개 추가, " + updated + "개 업데이트 완료!");
+  const coinIds = [...new Set(results.map(r => r.coinId))];
+  if (coinIds.length > 0) {
+    try {
+      const prices = await fetchCoinPrices(coinIds);
+      for (const r of results) {
+        r.priceKRW = safeNum(prices[r.coinId]);
+        r.valueKRW = r.balance * r.priceKRW;
+      }
+    } catch (e) {
+      console.warn('scanWallet: failed to fetch prices for wallet assets:', e.message);
+      for (const r of results) { r.priceKRW = 0; r.valueKRW = 0; }
+    }
+  }
+
+  const merged = [];
+  const seen = new Map();
+  for (const r of results) {
+    if (seen.has(r.coinId)) {
+      const existing = seen.get(r.coinId);
+      existing.balance += r.balance;
+      existing.valueKRW += r.valueKRW;
+      existing.chains.push(r.chainName);
+    } else {
+      const entry = { ...r, chains: [r.chainName] };
+      seen.set(r.coinId, entry);
+      merged.push(entry);
+    }
+  }
+  merged.sort((a, b) => b.valueKRW - a.valueKRW);
+
+  walletScanResults = merged;
+  isWalletScanning = false;
+  return merged;
+}
+
+function importWalletAssets(selectedResults) {
+  let imported = 0;
+  for (const r of selectedResults) {
+    const existing = appState.assets.find(
+      a => a.category === '코인' && (a.coinId === r.coinId || a.walletCoinId === r.coinId)
+    );
+    if (existing) {
+      const updatedTxns = [...existing.txns];
+      const walletTxnIdx = updatedTxns.findIndex(t => t.memo === '지갑 잔액');
+      if (walletTxnIdx >= 0) {
+        updatedTxns[walletTxnIdx] = { ...updatedTxns[walletTxnIdx], qty: r.balance, price: r.priceKRW, date: today() };
+      } else {
+        updatedTxns.push(sanitizeTxn({
+          type: 'buy', price: r.priceKRW, qty: r.balance,
+          account: r.chains.join(', '), date: today(), memo: '지갑 잔액',
+        }));
+      }
+      updateAsset(existing.id, {
+        amount: r.priceKRW, walletCoinId: r.coinId,
+        lpu: new Date().toLocaleString('ko-KR'), txns: updatedTxns,
+      });
+    } else {
+      const symbol = COIN_SYM[r.coinId] || r.symbol;
+      addAsset({
+        name: symbol, category: '코인', amount: r.priceKRW,
+        coinId: r.coinId, walletCoinId: r.coinId,
+        txns: [{ type: 'buy', price: r.priceKRW, qty: r.balance,
+          account: r.chains.join(', '), date: today(), memo: '지갑 잔액' }],
+      });
+    }
+    imported++;
+  }
+  return imported;
+}
+
+function saveWalletAddr(addr) {
+  try {
+    if (addr && isValidEvmAddress(addr)) localStorage.setItem(WALLET_KEY, addr);
+    else localStorage.removeItem(WALLET_KEY);
+  } catch (e) {
+    console.warn('saveWalletAddr failed:', e);
+  }
+}
+
+function loadWalletAddr() {
+  try { return localStorage.getItem(WALLET_KEY) || ''; } catch (e) {
+    console.warn('loadWalletAddr failed:', e);
+    return '';
+  }
 }

@@ -1,339 +1,309 @@
-/* ===================================================
-   app.js - 애플리케이션 진입점, 탭 전환, 자동 업데이트
-   =================================================== */
+/* =============================================
+   My Portfolio v3.12.0 — App Entry Point
+   Cycle 15: Full rebuild from scratch
+   P7 FIX: toggleTheme uses rAF delay before chart re-creation
+           so CSS variable values are updated first
+   ============================================= */
 
-// --- 탭 전환 ---
+let currentTab = 'pgDash';
+let _swipeStartX = 0;
+const TAB_ORDER = ['pgDash', 'pgList', 'pgInc', 'pgHist', 'pgAi'];
+const TAB_ICONS = ['📊', '📋', '💰', '📁', '🔍'];
+const TAB_LABELS = ['대시보드', '자산', '수입', '기록', '분석'];
 
-var VALID_TABS = ["dash", "list", "inc", "hist", "ai"];
+// ── Initialization ──
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    loadTheme();
+    initPortfolio();
+    loadData();
+    restoreLastTab();
+    render();
+    removeSplash();
+    registerSW();
 
-function goTab(tabId) {
-  destroyAllCharts();
-  currentTab = tabId;
-  try { localStorage.setItem("mp_last_tab", tabId); } catch (e) {}
-  document.querySelectorAll(".tab").forEach(function(el) {
-    el.classList.toggle("on", el.dataset.t === tabId);
-  });
-  var pages = ["pgDash", "pgList", "pgInc", "pgHist", "pgAi"];
-  var tabMap = { dash: "pgDash", list: "pgList", inc: "pgInc", hist: "pgHist", ai: "pgAi" };
-  pages.forEach(function(pg) {
-    var el = document.getElementById(pg);
-    if (pg === tabMap[tabId]) {
-      el.classList.remove("hidden");
-      el.classList.remove("tab-animate");
-      void el.offsetWidth;
-      el.classList.add("tab-animate");
-    } else {
-      el.classList.add("hidden");
-      el.classList.remove("tab-animate");
+    fetchExchangeRate().catch(e => {
+      console.warn('Initial exchange rate fetch failed:', e.message);
+    });
+    setupSwipe();
+
+    EventBus.on('dataImported', () => render());
+    EventBus.on('dataReset', () => render());
+  } catch (e) {
+    console.error('App initialization failed:', e);
+    const splash = document.getElementById('splash');
+    if (splash) splash.remove();
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      appEl.innerHTML = `
+        <div style="padding:40px 20px;text-align:center;color:#EF4444">
+          <h2>초기화 오류</h2>
+          <p>앱을 시작할 수 없습니다. 브라우저 콘솔을 확인하세요.</p>
+          <p style="font-size:12px;color:#94A3B8;margin-top:8px">${escHtml(String(e.message || e))}</p>
+        </div>
+      `;
     }
+  }
+});
+
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+            showToast('새 버전이 있습니다. 새로고침하면 적용됩니다.', 'info');
+          }
+        });
+      });
+    }).catch(e => {
+      console.warn('Service worker registration failed:', e.message);
+    });
+  }
+}
+
+// ── Theme ──
+function loadTheme() {
+  const theme = localStorage.getItem(THEME_KEY) || 'dark';
+  document.body.dataset.theme = theme;
+  updateThemeMeta(theme);
+}
+
+// P7 FIX: Use requestAnimationFrame delay before re-creating charts after theme change
+// This ensures CSS variable values (colors, borders) are fully updated by the browser
+// before Chart.js reads them for rendering
+function toggleTheme() {
+  const current = document.body.dataset.theme || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.body.dataset.theme = next;
+  localStorage.setItem(THEME_KEY, next);
+  updateThemeMeta(next);
+  destroyAllCharts();
+
+  const themeBtn = $('#themeToggle');
+  if (themeBtn) {
+    themeBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+    themeBtn.setAttribute('aria-label', next === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환');
+  }
+
+  // P7 FIX: rAF ensures the browser has applied the new CSS variable values
+  // before renderTabContent() triggers chart creation that reads those values
+  requestAnimationFrame(() => {
+    renderTabContent();
   });
-  // 바텀 네비 동기화
-  document.querySelectorAll(".bnav-item").forEach(function(el) {
-    el.classList.toggle("on", el.dataset.t === tabId);
-  });
-  render();
+}
+
+function updateThemeMeta(theme) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = theme === 'dark' ? '#0B0D11' : '#F8FAFC';
+}
+
+// ── Tab Routing ──
+function goTab(tabId) {
+  if (!TAB_ORDER.includes(tabId)) return;
+  currentTab = tabId;
+  localStorage.setItem(TAB_KEY, tabId);
+  destroyAllCharts();
+  renderTabContent();
+  syncNav();
 }
 
 function restoreLastTab() {
-  try {
-    var saved = localStorage.getItem("mp_last_tab");
-    if (saved && VALID_TABS.indexOf(saved) >= 0) {
-      goTab(saved);
-      return;
+  const saved = localStorage.getItem(TAB_KEY);
+  if (saved && TAB_ORDER.includes(saved)) currentTab = saved;
+}
+
+function render() {
+  renderHeader();
+  renderTabContent();
+  renderBottomNav();
+  syncNav();
+}
+
+function renderHeader() {
+  const header = $('#appHeader');
+  if (!header) return;
+  const meta = loadPortfolioMeta();
+  const pf = meta.list.find(p => p.id === activePortfolioId);
+  const isDark = document.body.dataset.theme === 'dark';
+
+  header.innerHTML = `
+    <div class="header-left">
+      <h1 class="app-title" data-action="open-portfolio-manager" role="button" tabindex="0"
+        aria-label="${escAttr(pf?.name || APP_NAME)} 포트폴리오${meta.list.length > 1 ? ' (클릭하여 전환)' : ''}">
+        ${escHtml(pf?.name || APP_NAME)}
+        ${meta.list.length > 1 ? '<span class="pf-indicator" aria-hidden="true">▾</span>' : ''}
+      </h1>
+      <span class="app-version" aria-hidden="true">v${APP_VERSION}</span>
+    </div>
+    <div class="header-right" role="toolbar" aria-label="앱 도구">
+      <button class="btn-icon" data-action="open-wallet-scan" aria-label="EVM 지갑 스캔">🔗</button>
+      <button class="btn-icon" id="themeToggle" data-action="toggle-theme"
+        aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}">
+        ${isDark ? '☀️' : '🌙'}
+      </button>
+    </div>
+  `;
+
+  header.onclick = (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    if (action === 'open-portfolio-manager') openPortfolioManager();
+    else if (action === 'open-wallet-scan') openWalletScan();
+    else if (action === 'toggle-theme') toggleTheme();
+  };
+  header.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const target = e.target.closest('[data-action="open-portfolio-manager"]');
+      if (target) { e.preventDefault(); openPortfolioManager(); }
     }
-  } catch (e) {}
+  };
 }
 
-// --- 메인 렌더 디스패처 ---
-
-function render(opts) {
-  document.getElementById("elSaved").textContent = appState.saved ? "마지막 저장: " + appState.saved : "";
-  updatePortfolioSelector();
-  // 자동 최신화 중간 렌더: 대시보드/리스트 탭에서만 업데이트
-  if (opts && opts.priceUpdateOnly && currentTab !== "dash" && currentTab !== "list") return;
-  if (currentTab === "dash") renderDashboard();
-  else if (currentTab === "list") renderAssetList();
-  else if (currentTab === "inc") renderIncome();
-  else if (currentTab === "hist") renderHistory();
-  else if (currentTab === "ai") renderAI();
-}
-
-// --- 전체 가격 자동 업데이트 ---
-
-function autoAll() {
-  var targets = appState.assets.filter(canAutoUpdate);
-  if (!targets.length) return;
-
-  if (isSandbox) {
-    updateLogs = [];
-    targets.forEach(function(a) {
-      updateLogs.push({ name: a.name, ok: false, msg: "미리보기 모드 - 다운로드 후 사용" });
-    });
-    render();
-    return;
+function renderTabContent() {
+  TAB_ORDER.forEach(id => {
+    const page = $(`#${id}`);
+    if (page) {
+      page.classList.add('hidden');
+      page.classList.remove('visible');
+      page.setAttribute('aria-hidden', 'true');
+    }
+  });
+  const page = $(`#${currentTab}`);
+  if (page) {
+    page.classList.remove('hidden');
+    page.classList.add('visible');
+    page.removeAttribute('aria-hidden');
+    page.classList.add('page-enter');
+    setTimeout(() => page.classList.remove('page-enter'), PAGE_ENTER_MS);
   }
 
-  isAllLoading = true;
-  updateLogs = [];
-  autoUpdateProgress = { total: targets.length, done: 0 };
-  render();
-
-  var coins = targets.filter(function(a) { return a.category === "코인" && a.coinId; });
-  var stocks = targets.filter(function(a) {
-    return (a.category === "국내주식" || a.category === "해외주식") && a.stockCode;
-  });
-  var usdtAssets = targets.filter(function(a) { return a.isUsdt && a.usdtQty > 0; });
-
-  // USDT 자산 시세 업데이트
-  var usdtPromise = usdtAssets.length > 0
-    ? getUsdtExchangeRate().then(function(rt) {
-        usdtAssets.forEach(function(a) {
-          var oldEval = calcAsset(a).evalAmt;
-          var newKrw = Math.round(a.usdtQty * rt);
-          var diff = newKrw - oldEval;
-          if (diff !== 0) {
-            if (!a.txns) a.txns = [];
-            a.txns.push({
-              id: generateId(),
-              type: diff > 0 ? "buy" : "sell",
-              price: Math.abs(diff),
-              qty: 1,
-              account: null,
-              date: getTodayString(),
-              memo: a.usdtQty + " USDT × " + Math.round(rt) + "원 (자동 최신화)"
-            });
-          }
-          a.lpu = getNowString();
-          updateLogs.push({ name: a.name, old: oldEval, nu: newKrw, ok: true, aid: a.id });
-          autoUpdateProgress.done++;
-        });
-      }).catch(function() {
-        usdtAssets.forEach(function(a) {
-          updateLogs.push({ name: a.name, ok: false, msg: "USDT 시세 조회 실패", aid: a.id });
-          autoUpdateProgress.done++;
-        });
-      })
-    : Promise.resolve();
-
-  usdtPromise.then(function() {
-    return fetchCoinPrices(coins.map(function(a) { return a.coinId; }));
-  }).then(function(prices) {
-    coins.forEach(function(a) {
-      var d = prices[a.coinId];
-      if (d && d.krw) {
-        var old = a.amount;
-        a.amount = d.krw;
-        a.lpu = getNowString();
-        updateLogs.push({ name: a.name, old: old, nu: d.krw, ok: true, aid: a.id });
-      } else {
-        updateLogs.push({ name: a.name, ok: false, msg: "응답 없음", aid: a.id });
-      }
-      autoUpdateProgress.done++;
-    });
-    render({ priceUpdateOnly: true });
-
-    var i = 0;
-    function processNextStock() {
-      if (i >= stocks.length) {
-        var failed = updateLogs.filter(function(l) { return !l.ok && l.aid; });
-        if (failed.length > 0 && !autoAll._retried) {
-          autoAll._retried = true;
-          retryFailed();
-          return;
-        }
-        autoAll._retried = false;
-        appState.history = makeSnapshot(appState.assets, appState.history);
-        saveData();
-        isAllLoading = false;
-        // 로그 배열 크기 제한 (성능 최적화)
-        if (updateLogs.length > 200) updateLogs = updateLogs.slice(-200);
-        render();
-        return;
-      }
-
-      var a = stocks[i++];
-      loadingAssets[a.id] = true;
-      render({ priceUpdateOnly: true });
-
-      fetchStockPrice(a).then(function(p) {
-        loadingAssets[a.id] = false;
-        if (p && p > 0) {
-          var old = a.amount;
-          a.amount = p;
-          a.lpu = getNowString();
-          updateLogs.push({ name: a.name, old: old, nu: p, ok: true, aid: a.id });
-        } else {
-          updateLogs.push({ name: a.name, ok: false, msg: "응답 없음", aid: a.id });
-        }
-        autoUpdateProgress.done++;
-        render({ priceUpdateOnly: true });
-        setTimeout(processNextStock, 600);
-      });
-    }
-
-    processNextStock();
-  });
-}
-
-// --- 실패 항목 재시도 ---
-
-function retryFailed() {
-  var failed = updateLogs.filter(function(l) { return !l.ok && l.aid; });
-  if (!failed.length) {
-    isAllLoading = false;
-    appState.history = makeSnapshot(appState.assets, appState.history);
-    saveData();
-    render();
-    return;
+  switch (currentTab) {
+    case 'pgDash': renderDashboard(); break;
+    case 'pgList': renderList(); break;
+    case 'pgInc': renderIncome(); break;
+    case 'pgHist': renderHistory(); break;
+    case 'pgAi': renderAnalysis(); break;
   }
 
-  updateLogs = updateLogs.filter(function(l) { return l.ok; });
+  // Apply dynamic colors after content render
+  setTimeout(applyDynamicColors, DYNAMIC_COLOR_DELAY_MS);
+}
 
-  var failedAssets = [];
-  failed.forEach(function(f) {
-    appState.assets.forEach(function(a) { if (a.id === f.aid) failedAssets.push(a); });
-  });
+function renderBottomNav() {
+  const nav = $('#bottomNav');
+  if (!nav) return;
+  nav.innerHTML = TAB_ORDER.map((id, i) => `
+    <button class="nav-btn ${currentTab === id ? 'active' : ''}"
+      data-action="go-tab" data-tab="${id}"
+      role="tab" aria-selected="${currentTab === id}"
+      aria-controls="${id}" aria-label="${TAB_LABELS[i]}"
+      tabindex="${currentTab === id ? '0' : '-1'}">
+      <span class="nav-icon" aria-hidden="true">${TAB_ICONS[i]}</span>
+      <span class="nav-label tl">${TAB_LABELS[i]}</span>
+    </button>
+  `).join('');
 
-  var coins = failedAssets.filter(function(a) { return a.category === "코인" && a.coinId; });
-  var stocks = failedAssets.filter(function(a) {
-    return (a.category === "국내주식" || a.category === "해외주식") && a.stockCode;
-  });
+  // Event delegation for bottom nav clicks
+  nav.onclick = (e) => {
+    const target = e.target.closest('[data-action="go-tab"]');
+    if (!target) return;
+    goTab(target.dataset.tab);
+  };
 
-  fetchCoinPrices(coins.map(function(a) { return a.coinId; })).then(function(prices) {
-    coins.forEach(function(a) {
-      var d = prices[a.coinId];
-      if (d && d.krw) {
-        var old = a.amount;
-        a.amount = d.krw;
-        a.lpu = getNowString();
-        updateLogs.push({ name: a.name, old: old, nu: d.krw, ok: true, aid: a.id });
-      } else {
-        updateLogs.push({ name: a.name, ok: false, msg: "재시도 실패", aid: a.id });
-      }
+  // Left/right arrow key navigation for WAI-ARIA Tabs pattern
+  nav.onkeydown = (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const btns = $$('.nav-btn', nav);
+    const currentIdx = btns.findIndex(b => b.dataset.tab === currentTab);
+    if (currentIdx < 0) return;
+
+    let nextIdx;
+    if (e.key === 'ArrowRight') {
+      nextIdx = (currentIdx + 1) % btns.length;
+    } else {
+      nextIdx = (currentIdx - 1 + btns.length) % btns.length;
+    }
+
+    e.preventDefault();
+    const nextTab = btns[nextIdx].dataset.tab;
+    goTab(nextTab);
+    // Focus the newly activated tab button
+    requestAnimationFrame(() => {
+      const newBtn = $(`[data-tab="${nextTab}"]`, nav);
+      if (newBtn) newBtn.focus();
     });
+  };
+}
 
-    var i = 0;
-    function processNextStock() {
-      if (i >= stocks.length) {
-        appState.history = makeSnapshot(appState.assets, appState.history);
-        saveData();
-        isAllLoading = false;
-        render();
-        return;
-      }
-
-      var a = stocks[i++];
-      loadingAssets[a.id] = true;
-      render({ priceUpdateOnly: true });
-
-      fetchStockPrice(a).then(function(p) {
-        loadingAssets[a.id] = false;
-        if (p && p > 0) {
-          var old = a.amount;
-          a.amount = p;
-          a.lpu = getNowString();
-          updateLogs.push({ name: a.name, old: old, nu: p, ok: true, aid: a.id });
-        } else {
-          updateLogs.push({ name: a.name, ok: false, msg: "재시도 실패", aid: a.id });
-        }
-        render({ priceUpdateOnly: true });
-        setTimeout(processNextStock, 600);
-      });
-    }
-
-    processNextStock();
+function syncNav() {
+  $$('.nav-btn').forEach((btn, i) => {
+    const isActive = TAB_ORDER[i] === currentTab;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', String(isActive));
+    // Roving tabindex for WAI-ARIA Tabs pattern
+    btn.setAttribute('tabindex', isActive ? '0' : '-1');
   });
 }
 
-// --- 모바일 스와이프 탭 전환 ---
-
-(function() {
-  var startX = 0, startY = 0;
-  document.addEventListener("touchstart", function(e) {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-
-  document.addEventListener("touchend", function(e) {
-    var dx = e.changedTouches[0].clientX - startX;
-    var dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
-    // 모달이 열려있으면 무시
-    if (!document.getElementById("mBg").classList.contains("hidden")) return;
-    var idx = VALID_TABS.indexOf(currentTab);
-    if (dx < 0 && idx < VALID_TABS.length - 1) goTab(VALID_TABS[idx + 1]);
-    else if (dx > 0 && idx > 0) goTab(VALID_TABS[idx - 1]);
-  }, { passive: true });
-})();
-
-// --- 테마 토글 ---
-
-function toggleTheme() {
-  var root = document.documentElement;
-  var current = root.getAttribute("data-theme");
-  var next = current === "light" ? "dark" : "light";
-  root.setAttribute("data-theme", next);
-  try { localStorage.setItem("mp_theme", next); } catch (e) {}
-  var btn = document.getElementById("btnTheme");
-  if (btn) btn.textContent = next === "light" ? "🌙" : "☀️";
-  var meta = document.querySelector("meta[name=\"theme-color\"]");
-  if (meta) meta.content = next === "light" ? "#F8FAFC" : "#0B0D11";
+// ── Dynamic color application ──
+function applyDynamicColors() {
+  // Legend dots
+  $$('.legend-dot[data-color]').forEach(dot => {
+    dot.style.background = dot.dataset.color;
+  });
+  // Score circle border — only use data-border-color
+  $$('.score-circle[data-border-color]').forEach(circle => {
+    circle.style.borderColor = circle.dataset.borderColor;
+  });
 }
 
-function loadTheme() {
-  try {
-    var saved = localStorage.getItem("mp_theme");
-    if (saved === "light") {
-      document.documentElement.setAttribute("data-theme", "light");
-      var btn = document.getElementById("btnTheme");
-      if (btn) btn.textContent = "🌙";
-      var meta = document.querySelector("meta[name=\"theme-color\"]");
-      if (meta) meta.content = "#F8FAFC";
-    }
-  } catch (e) {}
+// ── Swipe Navigation ──
+// Check |dx| > |dy| to avoid triggering on vertical scroll
+let _swipeStartY = 0;
+function setupSwipe() {
+  document.addEventListener('touchstart', e => {
+    _swipeStartX = e.touches[0].clientX;
+    _swipeStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _swipeStartX;
+    const dy = e.changedTouches[0].clientY - _swipeStartY;
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+    if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll — ignore
+    if (e.target.closest('input, select, textarea, .drag-handle, canvas, .modal.active')) return;
+
+    const idx = TAB_ORDER.indexOf(currentTab);
+    if (dx > 0 && idx > 0) goTab(TAB_ORDER[idx - 1]);
+    else if (dx < 0 && idx < TAB_ORDER.length - 1) goTab(TAB_ORDER[idx + 1]);
+  }, { passive: true });
 }
 
-// --- 스플래시 제거 ---
-
+// ── Splash Screen ──
 function removeSplash() {
-  var splash = document.getElementById("splash");
+  const splash = $('#splash');
   if (splash) {
-    splash.style.opacity = "0";
-    setTimeout(function() { splash.remove(); }, 400);
+    splash.style.opacity = '0';
+    setTimeout(() => splash.remove(), SPLASH_FADE_MS);
   }
 }
 
-// --- Service Worker 등록 ---
+// ── Keyboard Shortcuts ──
+document.addEventListener('keydown', e => {
+  const el = document.activeElement;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
 
-function registerSW() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(function() {});
+  if (e.key >= '1' && e.key <= '5' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    goTab(TAB_ORDER[Number(e.key) - 1]);
   }
-}
 
-// --- 포트폴리오 초기화 ---
-
-function initPortfolio() {
-  var meta = _getPortfolioMeta();
-  currentPortfolioId = meta.active || "default";
-  _currentStorageKey = _getStorageKeyForPortfolio(currentPortfolioId);
-}
-
-function updatePortfolioSelector() {
-  var el = document.getElementById("pfName");
-  if (el) el.textContent = getActivePortfolioName();
-}
-
-// --- 초기화 ---
-
-loadTheme();
-initPortfolio();
-loadData();
-restoreLastTab();
-render();
-removeSplash();
-registerSW();
-checkSandbox().then(function() {
-  render();
-  fetchExchangeRate().then(function() { render(); });
+  if (e.key === 't' && e.altKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    toggleTheme();
+  }
 });

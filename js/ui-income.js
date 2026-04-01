@@ -1,459 +1,402 @@
-/* ===================================================
-   ui-income.js - 수입 탭 렌더링 및 수입 관리
-   (수입 기록 추가/삭제, 월별 탐색, 반복 수입 복사)
-   =================================================== */
+/* =============================================
+   My Portfolio v3.12.0 — Income UI
+   Cycle 15: Full rebuild from scratch
+   P1 FIX: IDs from uid() are STRINGS — no Number() wrapping
+   P2 FIX: openAddIncome/openEditIncome use _setupModalMainDelegation
+           (NO container.onclick = on #modalMain)
+   ============================================= */
 
-/**
- * 현재 선택된 수입 월 가져오기 (없으면 이번 달로 초기화)
- * @returns {string} "YYYY-MM" 형식
- */
-function getSelectedIncomeMonth() {
-  if (!selectedIncomeMonth) {
-    var d = new Date();
-    selectedIncomeMonth = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-  }
-  return selectedIncomeMonth;
-}
-
-/**
- * 월 문자열을 한국어 라벨로 변환
- * @param {string} ym - "YYYY-MM" 형식
- * @returns {string} 예: "2026년 2월"
- */
-function formatIncomeMonthLabel(ym) {
-  var p = ym.split("-");
-  return p[0] + "년 " + Number(p[1]) + "월";
-}
-
-/**
- * 수입 월 탐색 (이전/다음)
- * @param {number} dir - -1(이전) 또는 1(다음)
- */
-function navigateIncomeMonth(dir) {
-  var ym = getSelectedIncomeMonth().split("-");
-  var y = Number(ym[0]), m = Number(ym[1]) + dir;
-  if (m < 1) { m = 12; y--; }
-  if (m > 12) { m = 1; y++; }
-  selectedIncomeMonth = y + "-" + String(m).padStart(2, "0");
-  renderIncome();
-}
-
-/**
- * 수입 탭 전체 렌더링
- */
 function renderIncome() {
-  var el = document.getElementById("pgInc");
-  var ym = getSelectedIncomeMonth();
+  const container = $('#pgInc');
+  if (!container) return;
 
-  // 해당 월 수입 항목 필터링 및 정렬
-  var items = appState.income.filter(function(x) {
-    return x.date && x.date.slice(0, 7) === ym;
-  }).sort(function(a, b) {
-    return (b.date || "").localeCompare(a.date || "");
-  });
+  const [year, month] = UIState.incomeMonth.split('-').map(Number);
+  const monthStr = `${year}년 ${month}월`;
+  const items = getMonthIncome(year, month);
+  const total = items.reduce((s, i) => s + safeNum(i.amount), 0);
+  const prevItems = getMonthIncome(
+    month === 1 ? year - 1 : year,
+    month === 1 ? 12 : month - 1
+  );
+  const prevTotal = prevItems.reduce((s, i) => s + safeNum(i.amount), 0);
+  const growth = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0;
 
-  // 카테고리별 합계 계산
-  var total = 0, byC = {};
-  INCOME_CATEGORIES.forEach(function(c) { byC[c.id] = 0; });
-  items.forEach(function(x) {
-    total += x.amount;
-    if (byC[x.cat] !== undefined) byC[x.cat] += x.amount;
-    else byC["etc"] += x.amount;
-  });
+  container.innerHTML = `
+    <div class="card">
+      <div class="month-nav" role="navigation" aria-label="월 탐색">
+        <button class="btn-icon" data-action="change-month" data-delta="-1" aria-label="이전 달">◀</button>
+        <span class="month-label" aria-live="polite">${escHtml(monthStr)}</span>
+        <button class="btn-icon" data-action="change-month" data-delta="1" aria-label="다음 달">▶</button>
+      </div>
+      <div class="income-summary">
+        <div class="income-total" aria-label="이번 달 총 수입">${escHtml(fmtKRW(total))}</div>
+        ${prevTotal > 0 ? `
+          <div class="income-growth ${growth >= 0 ? 'positive' : 'negative'}">
+            전월 대비 ${escHtml(fmtPct(growth))}
+          </div>
+        ` : ''}
+      </div>
+    </div>
 
-  var h = "<div class=\"card\" style=\"margin-bottom:10px\">";
+    <div class="card">
+      <div class="card-title">
+        수입 내역
+        <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 추가</button>
+      </div>
+      ${renderIncomeItems(items)}
+      ${prevItems.some(i => i.recurring) ? `
+        <button class="btn-sm btn-mt" data-action="copy-recurring" data-year="${year}" data-month="${month}"
+          aria-label="전월 반복 수입 복사">
+          📋 전월 반복 수입 복사
+        </button>
+      ` : ''}
+    </div>
 
-  // 월 네비게이션 헤더
-  h += "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:16px\">";
-  h += "<button class=\"ibtn\" style=\"background:rgba(255,255,255,.04);color:var(--t3);width:36px;height:36px;font-size:16px\" onclick=\"navigateIncomeMonth(-1)\">◀</button>";
-  h += "<div style=\"text-align:center\">";
-  h += "<div style=\"font-size:16px;font-weight:800;color:var(--t1)\">" + formatIncomeMonthLabel(ym) + "</div>";
-  h += "<div style=\"font-size:11px;color:var(--t5);margin-top:2px\">수입 기록</div>";
-  h += "</div>";
-  h += "<button class=\"ibtn\" style=\"background:rgba(255,255,255,.04);color:var(--t3);width:36px;height:36px;font-size:16px\" onclick=\"navigateIncomeMonth(1)\">▶</button>";
-  h += "</div>";
+    <div class="card">
+      <div class="card-title">카테고리별</div>
+      <div class="chart-wrap chart-wrap-180" role="img" aria-label="수입 카테고리 차트">
+        <canvas id="chartIncPie"></canvas>
+      </div>
+      <div id="chartIncPieAlt"></div>
+      ${renderIncomeCatLegend(items)}
+    </div>
 
-  // 이번 달 총 수입 표시
-  h += "<div style=\"text-align:center;padding:12px 0;margin-bottom:12px;background:rgba(16,185,129,.04);border-radius:12px;border:1px solid rgba(16,185,129,.08)\">";
-  h += "<div style=\"font-size:11px;color:var(--t4)\">이번 달 총 수입</div>";
-  h += "<div style=\"font-size:26px;font-weight:900;color:var(--green);margin-top:4px\">" + (total > 0 ? formatCurrency(total) : "—") + "</div>";
-  if (total > 0) {
-    h += "<div style=\"font-size:11px;color:var(--t5);margin-top:2px\">" + formatShortCurrency(total) + "</div>";
+    <div class="card">
+      <div class="card-title">최근 6개월 추이</div>
+      <div class="chart-wrap chart-wrap-180" role="img" aria-label="6개월 수입 추이 차트">
+        <canvas id="chartIncBar"></canvas>
+      </div>
+      <div id="chartIncBarAlt"></div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => renderIncomeCharts(items, year, month));
+
+  _setupIncomeDelegation(container);
+}
+
+function _setupIncomeDelegation(container) {
+  function handleAction(target) {
+    const action = target.dataset.action;
+    if (action === 'change-month') {
+      changeMonth(Number(target.dataset.delta));
+    } else if (action === 'open-add-income') {
+      openAddIncome();
+    } else if (action === 'edit-income') {
+      // P1 FIX: dataset.id is a STRING from uid() — pass as-is, no Number()
+      openEditIncome(target.dataset.id);
+    } else if (action === 'delete-income') {
+      // P1 FIX: dataset.id is a STRING from uid() — pass as-is, no Number()
+      doDeleteIncome(target.dataset.id);
+    } else if (action === 'copy-recurring') {
+      copyRecurring(Number(target.dataset.year), Number(target.dataset.month));
+    }
   }
-  h += "</div>";
+  container.onclick = (e) => {
+    const target = e.target.closest('[data-action]');
+    if (target) handleAction(target);
+  };
+  container.onkeydown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action]');
+    if (target) { e.preventDefault(); handleAction(target); }
+  };
+}
 
-  // 전월 반복 수입 가져오기 안내
-  var prevP = ym.split("-");
-  var ppy = Number(prevP[0]), ppm = Number(prevP[1]) - 1;
-  if (ppm < 1) { ppm = 12; ppy--; }
-  var prevYmR = ppy + "-" + String(ppm).padStart(2, "0");
+function getMonthIncome(year, month) {
+  const prefix = `${year}-${String(month).padStart(2,'0')}`;
+  return appState.income.filter(i => i.date?.startsWith(prefix));
+}
 
-  var prevRec = appState.income.filter(function(x) {
-    return x.recurring && x.date && x.date.slice(0, 7) === prevYmR;
-  });
-  var curRec = items.filter(function(x) { return x.recurring; });
+function renderIncomeItems(items) {
+  if (items.length === 0) return '<div class="empty-state">이번 달 수입 내역이 없습니다</div>';
+  const sorted = [...items].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return `
+    <div class="income-list" role="list">
+      ${sorted.map(i => {
+        const cat = INCOME_MAP[i.cat] || INCOME_MAP.other;
+        return `
+          <div class="income-item" role="listitem">
+            <div class="income-item-main">
+              <span class="income-cat-icon" aria-hidden="true">${cat.icon}</span>
+              <div>
+                <div class="income-item-source">${escHtml(i.source || cat.label)}</div>
+                <div class="income-item-date">${escHtml(fmtDate(i.date))} ${i.recurring ? '🔄' : ''}</div>
+              </div>
+            </div>
+            <div class="income-item-right">
+              <span class="income-item-amount">${escHtml(fmtKRW(i.amount))}</span>
+              <button class="btn-icon" data-action="edit-income" data-id="${i.id}" aria-label="수입 수정">✎</button>
+              <button class="btn-icon btn-danger" data-action="delete-income" data-id="${i.id}" aria-label="수입 삭제">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
 
-  if (prevRec.length > 0 && curRec.length === 0) {
-    var recTotal = 0;
-    prevRec.forEach(function(x) { recTotal += x.amount; });
+function renderIncomeCatLegend(items) {
+  const byCat = {};
+  for (const i of items) byCat[i.cat] = (byCat[i.cat] || 0) + safeNum(i.amount);
+  const total = items.reduce((s, i) => s + safeNum(i.amount), 0);
+  if (total === 0) return '';
+  return `
+    <div class="pie-legend" role="list" aria-label="수입 카테고리 범례">
+      ${Object.entries(byCat).sort((a,b) => b[1] - a[1]).map(([catId, val]) => {
+        const cat = INCOME_MAP[catId] || INCOME_MAP.other;
+        const pct = ((val / total) * 100).toFixed(1);
+        return `
+          <div class="legend-item" role="listitem">
+            <span class="legend-label">${cat.icon} ${escHtml(cat.label)}</span>
+            <span class="legend-value">${escHtml(fmtKRW(val))}</span>
+            <span class="legend-pct">${pct}%</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
 
-    h += "<div style=\"padding:12px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.12);border-radius:10px;margin-bottom:12px\">";
-    h += "<div style=\"display:flex;justify-content:space-between;align-items:center;gap:8px\">";
-    h += "<div>";
-    h += "<div style=\"font-size:12px;font-weight:600;color:var(--t2)\">🔄 전월 반복 수입 " + prevRec.length + "건</div>";
-    h += "<div style=\"font-size:11px;color:var(--t4);margin-top:2px\">" + formatShortCurrency(recTotal) + " · " + formatIncomeMonthLabel(prevYmR) + "에서 가져오기</div>";
-    h += "</div>";
-    h += "<button style=\"border:1px solid rgba(139,92,246,.2);background:rgba(139,92,246,.1);color:#A78BFA;padding:7px 14px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap\" onclick=\"copyRecurring(" + QUOTE + prevYmR + QUOTE + "," + QUOTE + ym + QUOTE + ")\">가져오기</button>";
-    h += "</div></div>";
-  }
+const INCOME_COLORS = Object.freeze({
+  salary: '#3B82F6', bonus: '#8B5CF6', side: '#F59E0B', invest: '#10B981',
+  rental: '#EC4899', interest: '#06B6D4', other: '#6B7280',
+});
 
-  // 카테고리별 도넛 차트 + 분류 목록
-  if (total > 0) {
-    var cd = [];
-    INCOME_CATEGORIES.forEach(function(c) {
-      if (byC[c.id] > 0) cd.push({ id: c.id, nm: c.label, c: c.color, v: byC[c.id] });
-    });
+function renderIncomeCharts(items, year, month) {
+  destroyChart('incPie');
+  const byCat = {};
+  for (const i of items) byCat[i.cat] = (byCat[i.cat] || 0) + safeNum(i.amount);
+  const catEntries = Object.entries(byCat).filter(([,v]) => v > 0);
+  if (catEntries.length > 0) {
+    charts.incPie = renderDoughnut('chartIncPie',
+      catEntries.map(([id]) => (INCOME_MAP[id]?.label || id)),
+      catEntries.map(([,v]) => v),
+      catEntries.map(([id]) => INCOME_COLORS[id] || '#6B7280'),
+      { centerText: { text: fmtKRW(items.reduce((s,i) => s + safeNum(i.amount), 0)), fontSize: 13 } }
+    );
 
-    h += "<div style=\"display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:14px\">";
-    h += "<div style=\"flex:0 0 140px;display:flex;justify-content:center\"><canvas id=\"incPie\" width=\"140\" height=\"140\"></canvas></div>";
-    h += "<div style=\"flex:1;min-width:140px\">";
-
-    cd.forEach(function(d, i) {
-      h += "<div style=\"display:flex;align-items:center;gap:8px;padding:5px 0;";
-      if (i < cd.length - 1) h += "border-bottom:1px solid rgba(255,255,255,.03);";
-      h += "\">";
-      h += "<div style=\"width:8px;height:8px;border-radius:3px;background:" + d.c + "\"></div>";
-      h += "<div style=\"flex:1;font-size:12px;color:var(--t3)\">" + d.nm + "</div>";
-      h += "<div style=\"text-align:right\">";
-      h += "<div style=\"font-size:12.5px;font-weight:700;color:var(--t1)\">" + formatShortCurrency(d.v) + "</div>";
-      h += "<div style=\"font-size:11px;color:var(--t4)\">" + ((d.v / total) * 100).toFixed(1) + "%</div>";
-      h += "</div></div>";
-    });
-
-    h += "</div></div>";
-  }
-
-  // 전월 대비 변동
-  var prev = ym.split("-");
-  var py = Number(prev[0]), pm = Number(prev[1]) - 1;
-  if (pm < 1) { pm = 12; py--; }
-  var prevYm = py + "-" + String(pm).padStart(2, "0");
-  var prevTotal = 0;
-  appState.income.forEach(function(x) {
-    if (x.date && x.date.slice(0, 7) === prevYm) prevTotal += x.amount;
-  });
-
-  if (prevTotal > 0 && total > 0) {
-    var chg = total - prevTotal;
-    var chgPct = ((chg / prevTotal) * 100).toFixed(1);
-    h += "<div style=\"padding:10px 12px;background:rgba(255,255,255,.02);border-radius:10px;border:1px solid var(--bd);margin-bottom:14px;font-size:11.5px;color:var(--t3)\">";
-    h += "전월 대비 <strong style=\"color:" + (chg >= 0 ? "var(--red)" : "var(--blue)") + "\">";
-    h += (chg >= 0 ? "+" : "") + formatCurrency(chg) + " (" + chgPct + "%)";
-    h += "</strong> · 전월 " + formatShortCurrency(prevTotal);
-    h += "</div>";
-  }
-
-  // 수입 기록 추가 버튼
-  h += "<button class=\"btn btn-p\" style=\"width:100%;padding:12px;font-size:13.5px;margin-bottom:6px\" onclick=\"openIncomeAdd()\">➕ 수입 기록 추가</button>";
-  h += "</div>";
-
-  // 최근 6개월 수입 추이 막대 차트
-  var months = [];
-  for (var mi = 5; mi >= 0; mi--) {
-    var md = new Date();
-    md.setMonth(md.getMonth() - mi);
-    var mk = md.getFullYear() + "-" + String(md.getMonth() + 1).padStart(2, "0");
-    var mt = 0;
-    appState.income.forEach(function(x) {
-      if (x.date && x.date.slice(0, 7) === mk) mt += x.amount;
-    });
-    months.push({ m: String(md.getMonth() + 1) + "월", v: mt });
-  }
-  var maxM = Math.max.apply(null, months.map(function(x) { return x.v; })) || 1;
-
-  if (appState.income.length > 0) {
-    h += "<div class=\"card\">";
-    h += "<div style=\"font-size:13px;font-weight:700;color:var(--t1);margin-bottom:12px\">📊 최근 6개월 수입 추이</div>";
-
-    months.forEach(function(x) {
-      var pct = Math.round((x.v / maxM) * 100);
-      h += "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:6px\">";
-      h += "<span style=\"font-size:11px;color:var(--t4);min-width:32px\">" + x.m + "</span>";
-      h += "<div style=\"flex:1;height:22px;background:rgba(255,255,255,.03);border-radius:6px;overflow:hidden\">";
-      h += "<div style=\"height:100%;width:" + pct + "%;background:linear-gradient(90deg,#10B981,#3B82F6);border-radius:6px;min-width:" + (x.v > 0 ? "2px" : "0") + "\"></div>";
-      h += "</div>";
-      h += "<span style=\"font-size:11px;color:var(--t2);min-width:60px;text-align:right;font-weight:600\">" + (x.v > 0 ? formatShortCurrency(x.v) : "—") + "</span>";
-      h += "</div>";
-    });
-
-    h += "</div>";
-  }
-
-  // 수입 내역 목록
-  if (items.length > 0) {
-    h += "<div class=\"card\">";
-    h += "<div style=\"font-size:13px;font-weight:700;color:var(--t1);margin-bottom:12px\">📋 " + formatIncomeMonthLabel(ym) + " 수입 내역</div>";
-
-    items.forEach(function(x) {
-      var catObj = INCOME_CATEGORIES.find(function(c) { return c.id === x.cat; }) || INCOME_CATEGORIES[6];
-
-      h += "<div style=\"display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.03)\">";
-
-      // 카테고리 아이콘
-      h += "<div style=\"width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0\">";
-      h += catObj.label.slice(0, 2);
-      h += "</div>";
-
-      // 수입 정보
-      h += "<div style=\"flex:1;min-width:0\">";
-      h += "<div style=\"font-size:13px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:4px\">";
-      h += (x.source ? escapeHtml(x.source) : catObj.label);
-      if (x.recurring) {
-        h += "<span style=\"font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(139,92,246,.1);color:#A78BFA;font-weight:600\">반복</span>";
-      }
-      h += "</div>";
-      h += "<div style=\"font-size:11.5px;color:var(--t5);margin-top:2px\">";
-      h += (x.date || "");
-      if (x.memo) h += " · " + escapeHtml(x.memo);
-      h += "</div></div>";
-
-      // 금액
-      h += "<div style=\"text-align:right;flex-shrink:0\">";
-      h += "<div style=\"font-size:14px;font-weight:700;color:var(--green)\">+" + formatCurrency(x.amount) + "</div>";
-      h += "<div style=\"font-size:11px;color:var(--t4)\">" + catObj.label + "</div>";
-      h += "</div>";
-
-      // 삭제 버튼
-      h += "<button class=\"ibtn\" style=\"background:rgba(239,68,68,.05);color:var(--red);width:28px;height:28px;font-size:11px;flex-shrink:0\" onclick=\"deleteIncome(" + x.id + ")\">✕</button>";
-      h += "</div>";
-    });
-
-    h += "</div>";
-  } else {
-    h += "<div class=\"card\" style=\"text-align:center;padding:28px;color:var(--t4);font-size:13px\">";
-    h += "이번 달 수입 기록이 없습니다<br>";
-    h += "<span style=\"font-size:11.5px;color:var(--t5)\">위 버튼으로 추가해보세요</span>";
-    h += "</div>";
-  }
-
-  el.innerHTML = h;
-
-  // 도넛 차트 렌더링
-  if (total > 0) {
-    var cd2 = [];
-    INCOME_CATEGORIES.forEach(function(c) {
-      if (byC[c.id] > 0) cd2.push({ nm: c.label, c: c.color, v: byC[c.id] });
-    });
-
-    setTimeout(function() {
-      var ctx = document.getElementById("incPie");
-      if (!ctx) return;
-      try { if (charts.incPie) charts.incPie.destroy(); } catch (e) {}
-      charts.incPie = null;
-
-      charts.incPie = new Chart(ctx, {
-        type: "doughnut",
-        data: {
-          labels: cd2.map(function(d) { return d.nm; }),
-          datasets: [{
-            data: cd2.map(function(d) { return d.v; }),
-            backgroundColor: cd2.map(function(d) { return d.c; }),
-            borderWidth: 0,
-            spacing: 2
-          }]
-        },
-        options: {
-          cutout: "58%",
-          responsive: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "#1A1D23",
-              borderColor: "rgba(255,255,255,.1)",
-              borderWidth: 1,
-              titleFont: { family: "Pretendard Variable", size: 11 },
-              bodyFont: { family: "Pretendard Variable", size: 11 },
-              callbacks: {
-                label: function(c) {
-                  return c.label + ": " + formatShortCurrency(c.raw) + " (" + ((c.raw / total) * 100).toFixed(1) + "%)";
-                }
-              }
-            }
-          }
-        }
+    const altContainer = document.getElementById('chartIncPieAlt');
+    if (altContainer) {
+      const totalInc = items.reduce((s,i) => s + safeNum(i.amount), 0);
+      const rows = catEntries.map(([id, v]) => {
+        const pct = totalInc > 0 ? ((v / totalInc) * 100).toFixed(1) + '%' : '0%';
+        return [(INCOME_MAP[id]?.label || id), fmtKRW(v), pct];
       });
-    }, 30);
+      altContainer.innerHTML = chartAltTable(['카테고리', '금액', '비중'], rows, '수입 카테고리 데이터');
+    }
+  }
+
+  destroyChart('incBar');
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    let m = month - i, y = year;
+    while (m <= 0) { m += 12; y--; }
+    months.push({ y, m, label: `${m}월` });
+  }
+  const barData = months.map(({ y, m }) =>
+    getMonthIncome(y, m).reduce((s, i) => s + safeNum(i.amount), 0)
+  );
+  if (barData.some(v => v > 0)) {
+    charts.incBar = renderBarChart('chartIncBar', months.map(m => m.label), barData, '#3B82F6');
+
+    const altContainer = document.getElementById('chartIncBarAlt');
+    if (altContainer) {
+      const rows = months.map((m, idx) => [m.label, fmtKRW(barData[idx])]);
+      altContainer.innerHTML = chartAltTable(['월', '수입'], rows, '6개월 수입 추이 데이터');
+    }
   }
 }
 
-/**
- * 수입 추가 모달 열기
- */
-function openIncomeAdd() {
-  var ym = getSelectedIncomeMonth();
-
-  var h = "<div class=\"fld\"><label>수입 분류</label>";
-  h += "<div style=\"display:flex;flex-wrap:wrap;gap:5px\">";
-
-  INCOME_CATEGORIES.forEach(function(c, i) {
-    h += "<button class=\"cchip" + (i === 0 ? " sel" : "") + "\" data-ic=\"" + c.id + "\" onclick=\"selectIncomeCategory(" + QUOTE + c.id + QUOTE + ")\" style=\"padding:5px 10px\">" + c.label + "</button>";
-  });
-
-  h += "</div>";
-  h += "<input type=\"hidden\" id=\"inc-cat\" value=\"salary\">";
-  h += "</div>";
-
-  // 금액 입력
-  h += "<div class=\"fld\"><label>금액 (원)</label>";
-  h += "<input type=\"number\" id=\"inc-amt\" placeholder=\"예: 3500000\" oninput=\"previewAmount(this.value)\">";
-  h += "<div id=\"amt-prev\" style=\"font-size:12px;color:var(--green);font-weight:600;margin-top:4px;min-height:18px\"></div>";
-
-  // 빠른 금액 버튼
-  h += "<div style=\"display:flex;gap:4px;flex-wrap:wrap;margin-top:6px\">";
-  ["100만", "200만", "300만", "500만", "1000만"].forEach(function(lb) {
-    var vals = { "100만": 1e6, "200만": 2e6, "300만": 3e6, "500만": 5e6, "1000만": 1e7 };
-    h += "<button style=\"border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:var(--t3);padding:4px 10px;border-radius:7px;font-size:11px;cursor:pointer;font-family:inherit\" onclick=\"document.getElementById(" + QUOTE + "inc-amt" + QUOTE + ").value=" + vals[lb] + ";previewAmount(" + vals[lb] + ")\">" + lb + "</button>";
-  });
-  h += "</div></div>";
-
-  // 수입처
-  h += "<div class=\"fld\"><label>수입처 (선택)</label>";
-  h += "<input id=\"inc-src\" maxlength=\"100\" placeholder=\"예: 회사명, 클라이언트명\">";
-
-  // 최근 수입처 추천
-  var srcs = {};
-  appState.income.forEach(function(x) { if (x.source) srcs[x.source] = 1; });
-  var sl = Object.keys(srcs);
-  if (sl.length > 0) {
-    h += "<div style=\"margin-top:5px;display:flex;gap:4px;flex-wrap:wrap\">";
-    sl.slice(0, 8).forEach(function(s) {
-      h += "<button class=\"cchip\" style=\"padding:3px 8px\" onclick=\"document.getElementById(" + QUOTE + "inc-src" + QUOTE + ").value=" + QUOTE + escapeJsString(s) + QUOTE + "\">" + escapeHtml(s) + "</button>";
-    });
-    h += "</div>";
-  }
-  h += "</div>";
-
-  // 날짜
-  h += "<div class=\"fld\"><label>날짜</label>";
-  h += "<input type=\"date\" id=\"inc-date\" value=\"" + ym + "-15\">";
-  h += "</div>";
-
-  // 메모
-  h += "<div class=\"fld\"><label>메모 (선택)</label>";
-  h += "<input id=\"inc-memo\" maxlength=\"200\" placeholder=\"메모\">";
-  h += "</div>";
-
-  // 반복 수입 체크박스
-  h += "<div style=\"padding:10px 12px;background:rgba(59,130,246,.04);border-radius:10px;border:1px solid rgba(59,130,246,.08);margin-bottom:10px\">";
-  h += "<label style=\"display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--t3)\">";
-  h += "<input type=\"checkbox\" id=\"inc-rec\" style=\"accent-color:var(--blue)\"> 매월 반복 수입 (고정 수입)";
-  h += "</label></div>";
-
-  // 버튼
-  h += "<div class=\"mbtn\">";
-  h += "<button class=\"btn btn-g\" onclick=\"closeModal()\">취소</button>";
-  h += "<button class=\"btn btn-p\" style=\"flex:2\" onclick=\"doIncomeAdd()\">💵 수입 기록</button>";
-  h += "</div>";
-
-  openModal(formatIncomeMonthLabel(ym) + " 수입 추가", h);
-}
-
-/**
- * 수입 카테고리 칩 선택
- * @param {string} id - 카테고리 ID
- */
-function selectIncomeCategory(id) {
-  document.getElementById("inc-cat").value = id;
-  document.querySelectorAll("[data-ic]").forEach(function(el) {
-    el.classList.toggle("sel", el.dataset.ic === id);
-  });
-}
-
-/**
- * 수입 추가 실행
- */
-function doIncomeAdd() {
-  var amt = Number((document.getElementById("inc-amt") || {}).value);
-  if (!amt || !isFinite(amt) || amt <= 0) {
-    showToast("❌ 금액을 입력하세요");
-    return;
-  }
-
-  var cat = (document.getElementById("inc-cat") || {}).value || "etc";
-  var src = ((document.getElementById("inc-src") || {}).value || "").trim().slice(0, 100);
-  var date = (document.getElementById("inc-date") || {}).value || getTodayString();
-  var memo = ((document.getElementById("inc-memo") || {}).value || "").trim().slice(0, 200);
-  var rec = document.getElementById("inc-rec") && document.getElementById("inc-rec").checked;
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = getTodayString();
-
-  if (appState.income.length >= 5000) {
-    showToast("⚠️ 수입 기록이 너무 많습니다");
-    return;
-  }
-
-  captureUndo();
-
-  appState.income.push({
-    id: generateId(),
-    date: date,
-    amount: Math.round(amt),
-    cat: cat,
-    source: src || null,
-    memo: memo || null,
-    recurring: rec
-  });
-
-  saveData();
-  closeModal();
-  showToast("✅ " + formatCurrency(Math.round(amt)) + " 수입이 기록되었습니다", true);
+function changeMonth(delta) {
+  let [y, m] = UIState.incomeMonth.split('-').map(Number);
+  m += delta;
+  if (m > 12) { m = 1; y++; }
+  if (m < 1) { m = 12; y--; }
+  UIState.incomeMonth = `${y}-${String(m).padStart(2,'0')}`;
   renderIncome();
 }
 
-/**
- * 수입 기록 삭제
- * @param {number} id - 수입 항목 ID
- */
-function deleteIncome(id) {
-  if (!confirm("이 수입 기록을 삭제하시겠습니까?")) return;
+// ── Add Income Modal ──
+// P2 FIX: Uses _setupModalMainDelegation — NO container.onclick = on #modalMain
+function openAddIncome() {
+  _modalCleanup.removeAll();
 
-  captureUndo();
-  appState.income = appState.income.filter(function(x) { return x.id !== id; });
-  saveData();
-  showToast("🗑 수입 기록이 삭제되었습니다", true);
+  const [year, month] = UIState.incomeMonth.split('-').map(Number);
+  const day = Math.min(new Date().getDate(), new Date(year, month, 0).getDate());
+  const defaultDate = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+  const container = $('#modalMain');
+  container.innerHTML = `
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>수입 추가</h3>
+        <button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label id="incCatLabel">카테고리</label>
+          ${renderIncomeCatSelector('salary', 'incCatLabel')}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="incAmount">금액 *</label>
+            <input type="number" id="incAmount" placeholder="0" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="incDate">날짜</label>
+            <input type="date" id="incDate" value="${defaultDate}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="incSource">출처</label>
+          <input type="text" id="incSource" placeholder="예: 회사, 알바 등" maxlength="100">
+        </div>
+        <div class="form-group">
+          <label for="incMemo">메모</label>
+          <input type="text" id="incMemo" placeholder="선택사항" maxlength="200">
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="incRecurring"> 매월 반복</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button>
+          <button class="btn-p" data-action="do-add-income">추가</button>
+        </div>
+      </div>
+    </div>
+  `;
+  openModal('modalMain');
+
+  // P2 FIX: Route through unified _setupModalMainDelegation (addEventListener via Cleanup)
+  // This handles close-modal, select-inc-cat, do-add-income actions
+  _setupModalMainDelegation(container);
+}
+
+function doAddIncome() {
+  const amount = safeNum($('#incAmount')?.value);
+  if (amount <= 0) { showToast('금액을 입력하세요 (0보다 큰 값)', 'error'); return; }
+  const cat = $('#modalMain .cat-btn.active')?.dataset?.cat || 'other';
+
+  addIncome({
+    amount, cat,
+    date: $('#incDate')?.value || today(),
+    source: $('#incSource')?.value.trim() || '',
+    memo: $('#incMemo')?.value.trim() || '',
+    recurring: $('#incRecurring')?.checked || false,
+  });
+
+  closeModal('modalMain');
+  showToast('수입 추가됨', 'success');
   renderIncome();
 }
 
-/**
- * 전월 반복 수입을 현재 월로 복사
- * @param {string} fromYm - 복사 원본 월 ("YYYY-MM")
- * @param {string} toYm   - 복사 대상 월 ("YYYY-MM")
- */
-function copyRecurring(fromYm, toYm) {
-  var recs = appState.income.filter(function(x) {
-    return x.recurring && x.date && x.date.slice(0, 7) === fromYm;
+function doDeleteIncome(id) {
+  openConfirmModal('이 수입 기록을 삭제하시겠습니까?', () => {
+    deleteIncome(id);
+    renderIncome();
+    showToast('삭제됨');
   });
-  if (!recs.length) return;
+}
 
-  captureUndo();
+// ── Edit Income Modal ──
+// P2 FIX: Uses _setupModalMainDelegation — NO container.onclick = on #modalMain
+function openEditIncome(id) {
+  // P1 FIX: id is a STRING from uid() — string comparison works correctly
+  const item = appState.income.find(i => i.id === id);
+  if (!item) return;
+  const cat = item.cat || 'other';
 
-  var cnt = 0;
-  recs.forEach(function(x) {
-    if (appState.income.length >= 5000) return;
-    var newDate = toYm + x.date.slice(7);
-    appState.income.push({
-      id: generateId(),
-      date: newDate,
-      amount: x.amount,
-      cat: x.cat,
-      source: x.source,
-      memo: x.memo,
-      recurring: true
-    });
-    cnt++;
+  _modalCleanup.removeAll();
+
+  const container = $('#modalMain');
+  container.innerHTML = `
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>수입 수정</h3>
+        <button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label id="editIncCatLabel">카테고리</label>
+          ${renderIncomeCatSelector(cat, 'editIncCatLabel')}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editIncAmount">금액 *</label>
+            <input type="number" id="editIncAmount" value="${safeNum(item.amount)}" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="editIncDate">날짜</label>
+            <input type="date" id="editIncDate" value="${escAttr(item.date || '')}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="editIncSource">출처</label>
+          <input type="text" id="editIncSource" value="${escAttr(item.source || '')}" maxlength="100">
+        </div>
+        <div class="form-group">
+          <label for="editIncMemo">메모</label>
+          <input type="text" id="editIncMemo" value="${escAttr(item.memo || '')}" maxlength="200">
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="editIncRecurring" ${item.recurring ? 'checked' : ''}> 매월 반복</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button>
+          <button class="btn-p" data-action="do-edit-income" data-id="${id}">저장</button>
+        </div>
+      </div>
+    </div>
+  `;
+  openModal('modalMain');
+
+  // P2 FIX: Route through unified _setupModalMainDelegation (addEventListener via Cleanup)
+  // This handles close-modal, select-inc-cat, do-edit-income actions
+  _setupModalMainDelegation(container);
+}
+
+// P1 FIX: id parameter is a STRING from uid() — no Number() conversion
+function doEditIncome(id) {
+  const amount = safeNum($('#editIncAmount')?.value);
+  if (amount <= 0) { showToast('금액을 입력하세요 (0보다 큰 값)', 'error'); return; }
+  const cat = $('#modalMain .cat-btn.active')?.dataset?.cat || 'other';
+
+  updateIncome(id, {
+    amount, cat,
+    date: $('#editIncDate')?.value || today(),
+    source: $('#editIncSource')?.value.trim() || '',
+    memo: $('#editIncMemo')?.value.trim() || '',
+    recurring: $('#editIncRecurring')?.checked || false,
   });
 
-  saveData();
-  showToast("✅ 반복 수입 " + cnt + "건이 복사되었습니다", true);
+  closeModal('modalMain');
+  showToast('수입 수정됨', 'success');
+  renderIncome();
+}
+
+// ── Copy Recurring ──
+function copyRecurring(year, month) {
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const recurring = getMonthIncome(prevYear, prevMonth).filter(i => i.recurring);
+  if (recurring.length === 0) { showToast('복사할 반복 수입이 없습니다', 'info'); return; }
+
+  let count = 0;
+  for (const r of recurring) {
+    const exists = getMonthIncome(year, month).find(
+      i => i.cat === r.cat && i.source === r.source && Math.abs(safeNum(i.amount) - safeNum(r.amount)) < 1
+    );
+    if (!exists) {
+      const origDay = Number((r.date || '').split('-')[2]) || 1;
+      const safeDay = clampDay(year, month, origDay);
+      const newDate = `${year}-${String(month).padStart(2,'0')}-${String(safeDay).padStart(2,'0')}`;
+      addIncome({ ...r, date: newDate, id: undefined });
+      count++;
+    }
+  }
+  showToast(count > 0 ? `${count}건 복사됨` : '이미 모두 복사됨', count > 0 ? 'success' : 'info');
   renderIncome();
 }
