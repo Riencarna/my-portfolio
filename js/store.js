@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v3.12.0 — State Management
+   My Portfolio v3.12.1 — State Management
    Cycle 15: Full rebuild from scratch — debouncedSave, import recovery, income cat validation
    NOTE: All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -157,12 +157,23 @@ function deletePortfolio(pid) {
   return true;
 }
 
+// ── Migration: v2.6.x short keys → v3.x full keys ──
+function _migrateOldFormat(d) {
+  if (d.a && !d.assets) d.assets = d.a;
+  if (d.h && !d.history) d.history = d.h;
+  if (d.s && !d.saved) d.saved = d.s;
+  if (d.co && !d.categoryOrder) d.categoryOrder = d.co;
+  if (d.cpl !== undefined && d.coinShowProfitLoss === undefined) d.coinShowProfitLoss = d.cpl;
+  if (d.inc && !d.income) d.income = d.inc;
+  return d;
+}
+
 // ── Data Persistence ──
 function loadData() {
   try {
     const raw = localStorage.getItem(getStorageKey(activePortfolioId));
     if (raw) {
-      const parsed = JSON.parse(raw);
+      const parsed = _migrateOldFormat(JSON.parse(raw));
       appState = { ...defaultState(), ...parsed };
       if (!Array.isArray(appState.assets)) appState.assets = [];
       if (!Array.isArray(appState.history)) appState.history = [];
@@ -416,7 +427,7 @@ function importData(json, merge = false) {
   const backup = JSON.stringify(appState);
   try {
     const imported = typeof json === 'string' ? JSON.parse(json) : json;
-    const data = imported.data || imported;
+    const data = _migrateOldFormat(imported.data || imported);
     if (!data || (!data.assets && !Array.isArray(data))) {
       showToast('유효하지 않은 백업 파일', 'error');
       return false;
