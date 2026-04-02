@@ -318,6 +318,7 @@ function toggleListCat(catId) {
 function setupDragAndDrop() {
   $$('.list-asset[draggable]').forEach(el => {
     _listCleanup.add(el, 'dragstart', e => {
+      e.stopPropagation();
       _dragAssetId = el.dataset.id;
       _dragCatName = el.dataset.cat;
       el.classList.add('dragging');
@@ -345,8 +346,10 @@ function setupDragAndDrop() {
   $$('.list-cat[draggable]').forEach(el => {
     _listCleanup.add(el, 'dragstart', e => {
       if (!e.target.closest('.cat-drag')) { e.preventDefault(); return; }
+      _dragAssetId = null;
       _dragCatName = el.dataset.cat;
       el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
     });
     _listCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
@@ -361,7 +364,7 @@ function setupDragAndDrop() {
       e.preventDefault();
       el.classList.remove('drag-over');
       const targetCat = el.dataset.cat;
-      if (_dragCatName && _dragCatName !== targetCat) onReorderCategory(_dragCatName, targetCat);
+      if (_dragCatName && !_dragAssetId && _dragCatName !== targetCat) onReorderCategory(_dragCatName, targetCat);
     });
   });
 
