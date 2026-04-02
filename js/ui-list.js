@@ -323,6 +323,7 @@ function setupDragAndDrop() {
       _dragCatName = el.dataset.cat;
       el.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
     });
     _listCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
@@ -350,6 +351,7 @@ function setupDragAndDrop() {
       _dragCatName = el.dataset.cat;
       el.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
     });
     _listCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
