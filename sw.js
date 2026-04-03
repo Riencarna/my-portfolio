@@ -1,7 +1,7 @@
-/* Service Worker - My Portfolio v3.12.1
+/* Service Worker - My Portfolio v3.12.2
    Offline fallback page for navigation requests */
 
-var CACHE_NAME = "myportfolio-v3.12.1";
+var CACHE_NAME = "myportfolio-v3.12.2";
 
 var STATIC_ASSETS = [
   "./",

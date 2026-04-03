@@ -3,7 +3,7 @@
    Cycle 15: Full rebuild from scratch
    ============================================= */
 
-const APP_VERSION = '3.12.1';
+const APP_VERSION = '3.12.2';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
