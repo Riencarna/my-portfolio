@@ -9,6 +9,7 @@ let _touchDragEl = null;
 let _touchClone = null;
 
 const _listCleanup = Cleanup.scope('list');
+const _dragCleanup = Cleanup.scope('drag');
 
 function renderList() {
   const container = $('#pgList');
@@ -226,9 +227,9 @@ function renderListAsset(asset) {
         ${hasProfit ? `<div class="asset-profit ${profitClass(v.profit)}">${escHtml(fmtKRW(v.profit))} (${escHtml(fmtPct(v.profitPct))})</div>` : ''}
       </div>
       ${UIState.isEditMode ? `
-        <div class="edit-actions">
-          <button class="btn-icon" data-action="edit-asset" data-id="${asset.id}" aria-label="${escAttr(asset.name)} 수정">✎</button>
-          <button class="btn-icon btn-danger" data-action="delete-asset" data-id="${asset.id}" aria-label="${escAttr(asset.name)} 삭제">🗑</button>
+        <div class="edit-actions" draggable="false">
+          <button class="btn-icon" data-action="edit-asset" data-id="${asset.id}" draggable="false" aria-label="${escAttr(asset.name)} 수정">✎</button>
+          <button class="btn-icon btn-danger" data-action="delete-asset" data-id="${asset.id}" draggable="false" aria-label="${escAttr(asset.name)} 삭제">🗑</button>
         </div>
       ` : ''}
     </div>
@@ -282,8 +283,11 @@ function toggleListCat(catId) {
 
 // ── Drag & Drop ──
 function setupDragAndDrop() {
+  _dragCleanup.removeAll();
+
   $$('.list-asset[draggable]').forEach(el => {
-    _listCleanup.add(el, 'dragstart', e => {
+    _dragCleanup.add(el, 'dragstart', e => {
+      if (!e.target.closest('.drag-handle')) { e.preventDefault(); return; }
       e.stopPropagation();
       _dragAssetId = el.dataset.id;
       _dragCatName = el.dataset.cat;
@@ -291,16 +295,16 @@ function setupDragAndDrop() {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', '');
     });
-    _listCleanup.add(el, 'dragend', () => {
+    _dragCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
       $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
     });
-    _listCleanup.add(el, 'dragover', e => {
+    _dragCleanup.add(el, 'dragover', e => {
       e.preventDefault();
       if (el.dataset.cat === _dragCatName) el.classList.add('drag-over');
     });
-    _listCleanup.add(el, 'dragleave', () => el.classList.remove('drag-over'));
-    _listCleanup.add(el, 'drop', e => {
+    _dragCleanup.add(el, 'dragleave', () => el.classList.remove('drag-over'));
+    _dragCleanup.add(el, 'drop', e => {
       e.preventDefault();
       el.classList.remove('drag-over');
       const targetId = el.dataset.id;
@@ -311,7 +315,7 @@ function setupDragAndDrop() {
   });
 
   $$('.list-cat[draggable]').forEach(el => {
-    _listCleanup.add(el, 'dragstart', e => {
+    _dragCleanup.add(el, 'dragstart', e => {
       if (!e.target.closest('.cat-drag')) { e.preventDefault(); return; }
       _dragAssetId = null;
       _dragCatName = el.dataset.cat;
@@ -319,16 +323,16 @@ function setupDragAndDrop() {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', '');
     });
-    _listCleanup.add(el, 'dragend', () => {
+    _dragCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
       $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
     });
-    _listCleanup.add(el, 'dragover', e => {
+    _dragCleanup.add(el, 'dragover', e => {
       e.preventDefault();
       if (_dragCatName && el.dataset.cat !== _dragCatName) el.classList.add('drag-over');
     });
-    _listCleanup.add(el, 'dragleave', () => el.classList.remove('drag-over'));
-    _listCleanup.add(el, 'drop', e => {
+    _dragCleanup.add(el, 'dragleave', () => el.classList.remove('drag-over'));
+    _dragCleanup.add(el, 'drop', e => {
       e.preventDefault();
       el.classList.remove('drag-over');
       const targetCat = el.dataset.cat;
@@ -349,7 +353,7 @@ function setupTouchDrag() {
     $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
     if (target && target !== _touchDragEl) target.classList.add('drag-over');
   };
-  _listCleanup.add(document, 'touchmove', touchMoveHandler, { passive: false });
+  _dragCleanup.add(document, 'touchmove', touchMoveHandler, { passive: false });
 
   const touchEndHandler = () => {
     if (!_touchClone) return;
@@ -369,10 +373,10 @@ function setupTouchDrag() {
     }
     cleanupTouchDrag();
   };
-  _listCleanup.add(document, 'touchend', touchEndHandler);
+  _dragCleanup.add(document, 'touchend', touchEndHandler);
 
   $$('.drag-handle').forEach(handle => {
-    _listCleanup.add(handle, 'touchstart', e => {
+    _dragCleanup.add(handle, 'touchstart', e => {
       e.preventDefault();
       const target = handle.closest('.list-asset') || handle.closest('.list-cat');
       if (!target) return;
