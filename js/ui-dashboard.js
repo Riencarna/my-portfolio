@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v3.12.0 — Dashboard UI
-   Cycle 15: Full rebuild from scratch
-   P6 FIX: keyboard handler matches ALL data-action targets
+   My Portfolio v3.13.2 — Dashboard UI
+   Desktop UI Overhaul: Grid layout, stat cards, wide charts
+   Fix: empty state hides hero/charts, hero card bg, gradient value
    ============================================= */
 
 function renderDashboard() {
@@ -13,22 +13,49 @@ function renderDashboard() {
   const prevTotal = getPreviousTotal();
   const change = total - prevTotal;
   const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
+  const assetCount = appState.assets.length;
+  const hasAssets = assetCount > 0;
 
-  container.innerHTML = `
-    <div class="dash-header" role="region" aria-label="총 자산 현황">
-      <div class="total-card">
-        <div class="total-label">총 자산</div>
-        <div class="total-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
-        <div class="total-change ${profitClass(change)}" aria-label="일일 변동">
-          ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
-        </div>
-        ${appState.saved ? `<div class="total-saved">저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
+  container.innerHTML = hasAssets ? `
+    <div class="dash-hero" role="region" aria-label="총 자산 현황">
+      <div class="dash-hero-label">총 자산</div>
+      <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
+      <div class="dash-hero-change ${profitClass(change)}" aria-label="일일 변동">
+        ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
       </div>
+      ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
     </div>
 
-    ${renderExchangeRateBar()}
+    <div class="dash-stats" role="region" aria-label="요약 통계">
+      <div class="stat-card">
+        <div class="stat-label">보유 자산</div>
+        <div class="stat-value">${assetCount}개</div>
+        <div class="stat-sub">${appState.categoryOrder.filter(c => catTotals[c] > 0).length}개 카테고리</div>
+      </div>
+      ${cachedRate ? `
+        <div class="stat-card">
+          <div class="stat-label">USD/KRW 환율</div>
+          <div class="stat-value">${escHtml(fmtNum(cachedRate.rate, 2))}</div>
+          <div class="stat-sub">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</div>
+        </div>
+      ` : ''}
+      ${cachedUsdt ? `
+        <div class="stat-card">
+          <div class="stat-label">USDT</div>
+          <div class="stat-value">${escHtml(fmtNum(cachedUsdt.rate, 0))}원</div>
+          <div class="stat-sub">${escHtml(cachedUsdt.source)}</div>
+        </div>
+      ` : ''}
+      ${appState.history.length >= 2 ? `
+        <div class="stat-card">
+          <div class="stat-label">기록 일수</div>
+          <div class="stat-value">${appState.history.length}일</div>
+          <div class="stat-sub">최초: ${escHtml(fmtDate(appState.history[0]?.date))}</div>
+        </div>
+      ` : ''}
+    </div>
+
     ${renderBackupReminder()}
-    ${renderAutoUpdateSection()}
 
     <div class="dash-charts" role="region" aria-label="차트">
       <div class="card">
@@ -48,23 +75,25 @@ function renderDashboard() {
             <button class="btn-sm" data-action="trend" data-days="0" aria-pressed="false">전체</button>
           </div>
         </div>
-        <div class="chart-wrap chart-wrap-180" role="img" aria-label="자산 추이 차트">
+        <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 추이 차트">
           <canvas id="chartTrend"></canvas>
         </div>
         <div id="chartTrendAlt"></div>
       </div>
     </div>
 
+    ${renderAutoUpdateSection()}
     ${renderCategoryBreakdown(catTotals, total)}
-    ${renderOnboarding()}
-  `;
+  ` : `${renderOnboarding()}`;
 
-  requestAnimationFrame(() => {
-    destroyChart('pie');
-    destroyChart('trend');
-    renderPortfolioPie();
-    renderTrendChart(30);
-  });
+  if (hasAssets) {
+    requestAnimationFrame(() => {
+      destroyChart('pie');
+      destroyChart('trend');
+      renderPortfolioPie();
+      renderTrendChart(30);
+    });
+  }
 
   _setupDashboardDelegation(container);
 }
@@ -75,8 +104,6 @@ function _setupDashboardDelegation(container) {
     if (!target) return;
     _handleDashAction(target);
   };
-
-  // P6 FIX: keyboard handler matches ALL data-action targets, not just a subset
   container.onkeydown = (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target.closest('[data-action]');
@@ -86,13 +113,10 @@ function _setupDashboardDelegation(container) {
   };
 }
 
-// P6 FIX: single shared handler for both click and keyboard — covers ALL actions
 function _handleDashAction(target) {
   const action = target.dataset.action;
-
   if (action === 'trend') {
-    const days = Number(target.dataset.days);
-    _handleTrendClick(days, target);
+    _handleTrendClick(Number(target.dataset.days), target);
   } else if (action === 'auto-update') {
     startAutoUpdate();
   } else if (action === 'toggle-dash-cat') {
@@ -121,17 +145,6 @@ function getPreviousTotal() {
   const hist = appState.history;
   if (hist.length < 2) return calcTotal(appState.assets);
   return hist[hist.length - 2]?.total || 0;
-}
-
-function renderExchangeRateBar() {
-  if (!cachedRate) return '';
-  return `
-    <div class="rate-bar" role="status" aria-label="환율 정보">
-      <span>💱 USD/KRW: ${escHtml(fmtNum(cachedRate.rate, 2))}</span>
-      ${cachedUsdt ? `<span>USDT: ${escHtml(fmtNum(cachedUsdt.rate, 0))}원 (${escHtml(cachedUsdt.source)})</span>` : ''}
-      <span class="rate-time">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</span>
-    </div>
-  `;
 }
 
 function renderBackupReminder() {
@@ -176,7 +189,7 @@ function renderAutoUpdateSection() {
 }
 
 async function startAutoUpdate() {
-  const btn = $('#btnAutoUpdate');
+  const btn = $('#btnAutoUpdate') || $('#btnAutoUpdateHeader');
   if (btn) btn.disabled = true;
   const wrap = $('#updateProgressWrap');
   if (wrap) { wrap.classList.remove('hidden'); wrap.classList.add('visible'); }
@@ -201,6 +214,7 @@ async function startAutoUpdate() {
   }
 
   renderDashboard();
+  renderPageHeader();
 }
 
 function renderPieLegend(catTotals, total) {
@@ -259,8 +273,7 @@ function renderDashAsset(asset) {
   const v = calcAssetValue(asset);
   return `
     <div class="dash-asset" data-action="open-asset-detail" data-id="${asset.id}" role="listitem"
-      tabindex="0"
-      aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
+      tabindex="0" aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
       <div class="dash-asset-name">${escHtml(asset.name)}</div>
       <div class="dash-asset-info">
         <span class="dash-asset-value">${escHtml(fmtKRW(v.value))}</span>
@@ -270,24 +283,17 @@ function renderDashAsset(asset) {
   `;
 }
 
-// Targeted DOM update for accordion toggle — no full re-render
 function toggleDashCat(catId) {
   UIState.dashboardCategoryOpen[catId] = !UIState.dashboardCategoryOpen[catId];
   const isOpen = UIState.dashboardCategoryOpen[catId];
-
   const section = $(`#dashCat-${catId}`);
-  if (!section) {
-    renderDashboard();
-    return;
-  }
+  if (!section) { renderDashboard(); return; }
 
   const header = section.querySelector('.cat-header');
   if (header) {
     header.setAttribute('aria-expanded', String(isOpen));
     const chevron = header.querySelector('.chevron');
-    if (chevron) {
-      chevron.classList.toggle('open', isOpen);
-    }
+    if (chevron) chevron.classList.toggle('open', isOpen);
   }
 
   const existingBody = section.querySelector('.cat-assets');
@@ -301,9 +307,7 @@ function toggleDashCat(catId) {
       section.appendChild(assetsDiv);
     }
   } else {
-    if (existingBody) {
-      existingBody.remove();
-    }
+    if (existingBody) existingBody.remove();
   }
 }
 

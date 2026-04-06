@@ -1,7 +1,7 @@
-/* Service Worker - My Portfolio v3.12.1
+/* Service Worker - My Portfolio v3.13.2
    Offline fallback page for navigation requests */
 
-var CACHE_NAME = "myportfolio-v3.12.1";
+var CACHE_NAME = "myportfolio-v3.13.2";
 
 var STATIC_ASSETS = [
   "./",
@@ -44,7 +44,7 @@ var OFFLINE_HTML = '<!DOCTYPE html>'
   + '<title>오프라인 - My Portfolio</title>'
   + '<style>'
   + 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
-  + 'background:#0B0D11;color:#E2E8F0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'
+  + 'background:#0a0a0f;color:#E2E8F0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'
   + 'text-align:center;padding:20px;box-sizing:border-box;}'
   + '.offline-box{max-width:400px;}'
   + '.offline-icon{font-size:64px;margin-bottom:16px;}'

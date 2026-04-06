@@ -1,7 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — History & Export UI
-   Cycle 15: Full rebuild from scratch
-   P4 FIX: _setupHistoryDelegation has onkeydown handler for Enter/Space
+   My Portfolio v3.13.2 — History & Export UI
+   Desktop UI Overhaul: Grid layout, wide charts
    ============================================= */
 
 function renderHistory() {
@@ -65,7 +64,7 @@ function renderHistory() {
         <button class="btn-sm" data-action="growth-view" data-days="90" data-by-cat="false" aria-pressed="false">90일</button>
         <button class="btn-sm" data-action="growth-view" data-days="0" data-by-cat="true" aria-pressed="false">카테고리별</button>
       </div>
-      <div class="chart-wrap chart-wrap-200" role="img" aria-label="자산 성장 차트">
+      <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 성장 차트">
         <canvas id="chartGrowth"></canvas>
       </div>
       <div id="chartGrowthAlt"></div>
@@ -77,7 +76,6 @@ function renderHistory() {
   _setupHistoryDelegation(container);
 }
 
-// P4 FIX: Added onkeydown handler for Enter/Space keyboard accessibility
 function _setupHistoryDelegation(container) {
   function handleAction(target) {
     const action = target.dataset.action;
@@ -108,7 +106,6 @@ function _setupHistoryDelegation(container) {
     if (target) handleAction(target);
   };
 
-  // P4 FIX: keyboard handler for Enter/Space — was missing in previous version
   container.onkeydown = (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target.closest('[data-action]');
@@ -281,10 +278,10 @@ function doExportPDF() {
     const total = calcTotal(appState.assets);
     const catTotals = calcCategoryTotals(appState.assets);
     let html = `<html><head><meta charset="utf-8"><title>My Portfolio Report</title>
-    <style>body{font-family:sans-serif;padding:40px;color:#333}h1{color:#1E293B;border-bottom:2px solid #3B82F6;padding-bottom:8px}
+    <style>body{font-family:sans-serif;padding:40px;color:#333}h1{color:#1E293B;border-bottom:2px solid #6366f1;padding-bottom:8px}
     h2{color:#475569;margin-top:24px}table{width:100%;border-collapse:collapse;margin:12px 0}
     th,td{border:1px solid #E2E8F0;padding:8px 12px;text-align:left}th{background:#F1F5F9;font-weight:600}
-    .total{font-size:24px;font-weight:700;color:#3B82F6}.positive{color:#10B981}.negative{color:#EF4444}
+    .total{font-size:24px;font-weight:700;color:#6366f1}.positive{color:#10B981}.negative{color:#EF4444}
     .footer{margin-top:40px;color:#94A3B8;font-size:12px}</style></head><body>
     <h1>${escHtml(APP_NAME)} 리포트</h1>
     <p>생성일: ${escHtml(fmtDate(new Date()))} | 버전: v${escHtml(APP_VERSION)}</p>
@@ -319,9 +316,23 @@ function doResetAll() {
     '⚠️ 모든 데이터가 영구 삭제됩니다. 백업을 먼저 하시는 것을 권장합니다. 정말 초기화하시겠습니까?',
     () => {
       openConfirmModal('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', () => {
+        // 앱 데이터 삭제
         resetAllData();
-        showToast('초기화 완료', 'success');
-        render();
+        localStorage.clear();
+        sessionStorage.clear();
+        // 서비스 워커 해제 + 캐시 삭제
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            regs.forEach(r => r.unregister());
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+          });
+        }
+        // 새로고침으로 완전 초기 상태
+        setTimeout(() => location.reload(), 500);
       });
     }
   );

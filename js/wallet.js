@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — EVM Wallet Integration
-   Cycle 15: Full rebuild from scratch — no empty catch blocks
+   My Portfolio v3.13.2 — EVM Wallet Integration
+   Desktop UI Overhaul: no empty catch blocks
    ============================================= */
 
 let isWalletScanning = false;

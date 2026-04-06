@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — Charts (Chart.js)
-   Cycle 15: Full rebuild from scratch — CHART_POINT_THRESHOLD, isChartReady() guard
+   My Portfolio v3.13.2 — Charts (Chart.js)
+   Desktop UI Overhaul: CHART_POINT_THRESHOLD, isChartReady() guard
    ============================================= */
 
 const charts = { pie: null, catPie: null, catPies: {}, trend: null, incBar: null, incPie: null, growth: null };

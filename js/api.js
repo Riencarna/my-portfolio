@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — API Integration
-   Cycle 15: Full rebuild from scratch — no empty catch blocks, console.warn on failures
+   My Portfolio v3.13.2 — API Integration
+   Desktop UI Overhaul: no empty catch blocks, console.warn on failures
    ============================================= */
 
 // ── Cache ──

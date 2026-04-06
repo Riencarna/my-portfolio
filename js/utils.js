@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — Utilities
-   Cycle 15: Full rebuild from scratch — uid() uses crypto.randomUUID, Scoped Cleanup
+   My Portfolio v3.13.2 — Utilities
+   Desktop UI Overhaul: uid() uses crypto.randomUUID, Scoped Cleanup
    ============================================= */
 
 // ── HTML Security ──

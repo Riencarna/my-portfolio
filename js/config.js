@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v3.12.0 — Configuration
-   Cycle 15: Full rebuild from scratch
+   My Portfolio v3.13.2 — Configuration
+   Desktop UI Overhaul: Full rebuild from scratch
    ============================================= */
 
-const APP_VERSION = '3.12.1';
+const APP_VERSION = '3.13.2';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -76,13 +76,13 @@ const FALLBACK_USD_KRW = 1350;
 
 // Asset categories
 const CATEGORIES = Object.freeze([
-  { id: '국내주식', icon: '🇰🇷', color: '#3B82F6', label: '국내주식' },
-  { id: '해외주식', icon: '🌍', color: '#8B5CF6', label: '해외주식' },
-  { id: '코인',     icon: '₿',  color: '#F59E0B', label: '코인' },
-  { id: '현금',     icon: '💵', color: '#10B981', label: '현금' },
-  { id: '예적금',   icon: '🏦', color: '#06B6D4', label: '예적금' },
-  { id: '부동산',   icon: '🏠', color: '#EC4899', label: '부동산' },
-  { id: '기타',     icon: '📦', color: '#6B7280', label: '기타' },
+  { id: '국내주식', icon: '🇰🇷', color: '#6366f1', label: '국내주식' },
+  { id: '해외주식', icon: '🌍', color: '#8b5cf6', label: '해외주식' },
+  { id: '코인',     icon: '₿',  color: '#f59e0b', label: '코인' },
+  { id: '현금',     icon: '💵', color: '#22c55e', label: '현금' },
+  { id: '예적금',   icon: '🏦', color: '#06b6d4', label: '예적금' },
+  { id: '부동산',   icon: '🏠', color: '#ec4899', label: '부동산' },
+  { id: '기타',     icon: '📦', color: '#6b7280', label: '기타' },
 ]);
 const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c])));
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));

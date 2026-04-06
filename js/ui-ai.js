@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — Analysis UI
-   Cycle 15: Full rebuild from scratch
+   My Portfolio v3.13.2 — Analysis UI
+   Desktop UI Overhaul: Grid layout, wide cards
    ============================================= */
 
 function renderAnalysis() {
@@ -151,7 +151,6 @@ function renderDiversificationSection(catTotals, total) {
 }
 
 // ── Risk Analysis ──
-// Uses ANALYSIS_THRESHOLDS config object instead of magic numbers
 function renderRiskSection(catTotals, total) {
   if (total === 0) return '';
   const risks = [];
@@ -263,7 +262,6 @@ async function loadBenchmark() {
 }
 
 // ── Strategies ──
-// Uses ANALYSIS_THRESHOLDS config object instead of magic numbers
 function renderStrategySection(catTotals, total) {
   if (total === 0) return '';
   const strategies = [];

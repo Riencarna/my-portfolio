@@ -1,12 +1,12 @@
 /* =============================================
-   My Portfolio v3.12.0 — App Entry Point
-   Cycle 15: Full rebuild from scratch
-   P7 FIX: toggleTheme uses rAF delay before chart re-creation
-           so CSS variable values are updated first
+   My Portfolio v3.13.2 — App Entry Point
+   Desktop UI Overhaul: Sidebar navigation, centered modals
+   Fix: ARIA tablist structure, tab-switch animation
    ============================================= */
 
 let currentTab = 'pgDash';
 let _swipeStartX = 0;
+let _swipeStartY = 0;
 const TAB_ORDER = ['pgDash', 'pgList', 'pgInc', 'pgHist', 'pgAi'];
 const TAB_ICONS = ['📊', '📋', '💰', '📁', '🔍'];
 const TAB_LABELS = ['대시보드', '자산', '수입', '기록', '분석'];
@@ -71,9 +71,6 @@ function loadTheme() {
   updateThemeMeta(theme);
 }
 
-// P7 FIX: Use requestAnimationFrame delay before re-creating charts after theme change
-// This ensures CSS variable values (colors, borders) are fully updated by the browser
-// before Chart.js reads them for rendering
 function toggleTheme() {
   const current = document.body.dataset.theme || 'dark';
   const next = current === 'dark' ? 'light' : 'dark';
@@ -81,23 +78,23 @@ function toggleTheme() {
   localStorage.setItem(THEME_KEY, next);
   updateThemeMeta(next);
   destroyAllCharts();
-
-  const themeBtn = $('#themeToggle');
-  if (themeBtn) {
-    themeBtn.textContent = next === 'dark' ? '☀️' : '🌙';
-    themeBtn.setAttribute('aria-label', next === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환');
-  }
-
-  // P7 FIX: rAF ensures the browser has applied the new CSS variable values
-  // before renderTabContent() triggers chart creation that reads those values
+  updateSidebarThemeBtn(next);
   requestAnimationFrame(() => {
     renderTabContent();
   });
 }
 
+function updateSidebarThemeBtn(theme) {
+  const btn = $('#sidebarThemeBtn');
+  if (btn) {
+    btn.querySelector('.sidebar-action-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+    btn.querySelector('span:not(.sidebar-action-icon)').textContent = theme === 'dark' ? '라이트 모드' : '다크 모드';
+  }
+}
+
 function updateThemeMeta(theme) {
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0B0D11' : '#F8FAFC';
+  if (meta) meta.content = theme === 'dark' ? '#0a0a0f' : '#f5f7fa';
 }
 
 // ── Tab Routing ──
@@ -108,6 +105,7 @@ function goTab(tabId) {
   destroyAllCharts();
   renderTabContent();
   syncNav();
+  renderPageHeader();
 }
 
 function restoreLastTab() {
@@ -116,34 +114,113 @@ function restoreLastTab() {
 }
 
 function render() {
-  renderHeader();
+  renderSidebar();
+  renderPageHeader();
   renderTabContent();
   renderBottomNav();
   syncNav();
 }
 
-function renderHeader() {
-  const header = $('#appHeader');
-  if (!header) return;
+// ── Sidebar (Desktop/Tablet) ──
+function renderSidebar() {
+  const sidebar = $('#sidebar');
+  if (!sidebar) return;
   const meta = loadPortfolioMeta();
   const pf = meta.list.find(p => p.id === activePortfolioId);
   const isDark = document.body.dataset.theme === 'dark';
 
-  header.innerHTML = `
-    <div class="header-left">
-      <h1 class="app-title" data-action="open-portfolio-manager" role="button" tabindex="0"
-        aria-label="${escAttr(pf?.name || APP_NAME)} 포트폴리오${meta.list.length > 1 ? ' (클릭하여 전환)' : ''}">
-        ${escHtml(pf?.name || APP_NAME)}
-        ${meta.list.length > 1 ? '<span class="pf-indicator" aria-hidden="true">▾</span>' : ''}
-      </h1>
-      <span class="app-version" aria-hidden="true">v${APP_VERSION}</span>
+  sidebar.innerHTML = `
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">${escHtml(APP_NAME)}</div>
+      <div class="sidebar-version">v${APP_VERSION}</div>
+      ${meta.list.length > 0 ? `
+        <div class="sidebar-pf" data-action="open-portfolio-manager"
+          role="button" tabindex="0" aria-label="포트폴리오 전환: ${escAttr(pf?.name || '기본')}">
+          <span class="sidebar-pf-icon">📂</span>
+          <span>${escHtml(pf?.name || '기본 포트폴리오')}</span>
+          ${meta.list.length > 1 ? '<span style="margin-left:auto;color:var(--t4)">▾</span>' : ''}
+        </div>
+      ` : ''}
     </div>
-    <div class="header-right" role="toolbar" aria-label="앱 도구">
-      <button class="btn-icon" data-action="open-wallet-scan" aria-label="EVM 지갑 스캔">🔗</button>
-      <button class="btn-icon" id="themeToggle" data-action="toggle-theme"
+
+    <nav class="sidebar-nav" role="tablist" aria-orientation="vertical" aria-label="메인 탐색">
+      ${TAB_ORDER.map((id, i) => `
+        <div class="nav-item ${currentTab === id ? 'active' : ''}"
+          data-action="go-tab" data-tab="${id}"
+          role="tab" tabindex="${currentTab === id ? '0' : '-1'}"
+          aria-selected="${currentTab === id}" aria-controls="${id}" aria-label="${TAB_LABELS[i]}">
+          <span class="nav-item-icon">${TAB_ICONS[i]}</span>
+          <span class="nav-item-label">${TAB_LABELS[i]}</span>
+        </div>
+      `).join('')}
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-action" data-action="open-wallet-scan" role="button" tabindex="0" aria-label="EVM 지갑 스캔">
+        <span class="sidebar-action-icon">🔗</span><span>지갑 스캔</span>
+      </div>
+      <div class="sidebar-action" id="sidebarThemeBtn" data-action="toggle-theme" role="button" tabindex="0"
         aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}">
-        ${isDark ? '☀️' : '🌙'}
-      </button>
+        <span class="sidebar-action-icon">${isDark ? '☀️' : '🌙'}</span><span>${isDark ? '라이트 모드' : '다크 모드'}</span>
+      </div>
+    </div>
+  `;
+
+  sidebar.onclick = (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    if (action === 'go-tab') goTab(target.dataset.tab);
+    else if (action === 'open-portfolio-manager') openPortfolioManager();
+    else if (action === 'open-wallet-scan') openWalletScan();
+    else if (action === 'toggle-theme') toggleTheme();
+  };
+
+  sidebar.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const target = e.target.closest('[data-action]');
+      if (target) { e.preventDefault(); target.click(); }
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const items = $$('.nav-item', sidebar);
+      const current = items.findIndex(i => i.dataset.tab === currentTab);
+      if (current < 0) return;
+      e.preventDefault();
+      const next = e.key === 'ArrowDown'
+        ? (current + 1) % items.length
+        : (current - 1 + items.length) % items.length;
+      goTab(items[next].dataset.tab);
+      requestAnimationFrame(() => items[next].focus());
+    }
+  };
+}
+
+// ── Page Header (contextual) ──
+function renderPageHeader() {
+  const header = $('#appHeader');
+  if (!header) return;
+  const idx = TAB_ORDER.indexOf(currentTab);
+  const meta = loadPortfolioMeta();
+  const pf = meta.list.find(p => p.id === activePortfolioId);
+
+  header.innerHTML = `
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span class="page-title">${TAB_LABELS[idx] || '대시보드'}</span>
+      <span class="page-subtitle">${escHtml(pf?.name || APP_NAME)}</span>
+    </div>
+    <div class="header-actions">
+      ${currentTab === 'pgDash' ? `
+        <button class="btn-p" id="btnAutoUpdateHeader" data-action="auto-update"
+          aria-label="전체 가격 업데이트" ${autoUpdateProgress.running ? 'disabled' : ''}>
+          ${autoUpdateProgress.running ? '업데이트 중...' : '🔄 가격 업데이트'}
+        </button>
+      ` : ''}
+      ${currentTab === 'pgList' ? `
+        <button class="btn-p" data-action="open-add-asset" aria-label="자산 추가">+ 자산 추가</button>
+      ` : ''}
+      ${currentTab === 'pgInc' ? `
+        <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 수입 추가</button>
+      ` : ''}
     </div>
   `;
 
@@ -151,15 +228,9 @@ function renderHeader() {
     const target = e.target.closest('[data-action]');
     if (!target) return;
     const action = target.dataset.action;
-    if (action === 'open-portfolio-manager') openPortfolioManager();
-    else if (action === 'open-wallet-scan') openWalletScan();
-    else if (action === 'toggle-theme') toggleTheme();
-  };
-  header.onkeydown = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      const target = e.target.closest('[data-action="open-portfolio-manager"]');
-      if (target) { e.preventDefault(); openPortfolioManager(); }
-    }
+    if (action === 'auto-update') startAutoUpdate();
+    else if (action === 'open-add-asset') openAddAsset();
+    else if (action === 'open-add-income') openAddIncome();
   };
 }
 
@@ -175,10 +246,11 @@ function renderTabContent() {
   const page = $(`#${currentTab}`);
   if (page) {
     page.classList.remove('hidden');
-    page.classList.add('visible');
+    page.classList.add('visible', 'page-enter');
     page.removeAttribute('aria-hidden');
-    page.classList.add('page-enter');
-    setTimeout(() => page.classList.remove('page-enter'), PAGE_ENTER_MS);
+    requestAnimationFrame(() => {
+      setTimeout(() => page.classList.remove('page-enter'), PAGE_ENTER_MS);
+    });
   }
 
   switch (currentTab) {
@@ -189,10 +261,10 @@ function renderTabContent() {
     case 'pgAi': renderAnalysis(); break;
   }
 
-  // Apply dynamic colors after content render
   setTimeout(applyDynamicColors, DYNAMIC_COLOR_DELAY_MS);
 }
 
+// ── Bottom Nav (mobile fallback) ──
 function renderBottomNav() {
   const nav = $('#bottomNav');
   if (!nav) return;
@@ -203,67 +275,61 @@ function renderBottomNav() {
       aria-controls="${id}" aria-label="${TAB_LABELS[i]}"
       tabindex="${currentTab === id ? '0' : '-1'}">
       <span class="nav-icon" aria-hidden="true">${TAB_ICONS[i]}</span>
-      <span class="nav-label tl">${TAB_LABELS[i]}</span>
+      <span class="nav-label">${TAB_LABELS[i]}</span>
     </button>
   `).join('');
 
-  // Event delegation for bottom nav clicks
   nav.onclick = (e) => {
     const target = e.target.closest('[data-action="go-tab"]');
     if (!target) return;
     goTab(target.dataset.tab);
   };
 
-  // Left/right arrow key navigation for WAI-ARIA Tabs pattern
   nav.onkeydown = (e) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     const btns = $$('.nav-btn', nav);
     const currentIdx = btns.findIndex(b => b.dataset.tab === currentTab);
     if (currentIdx < 0) return;
-
-    let nextIdx;
-    if (e.key === 'ArrowRight') {
-      nextIdx = (currentIdx + 1) % btns.length;
-    } else {
-      nextIdx = (currentIdx - 1 + btns.length) % btns.length;
-    }
-
     e.preventDefault();
-    const nextTab = btns[nextIdx].dataset.tab;
-    goTab(nextTab);
-    // Focus the newly activated tab button
+    const nextIdx = e.key === 'ArrowRight'
+      ? (currentIdx + 1) % btns.length
+      : (currentIdx - 1 + btns.length) % btns.length;
+    goTab(btns[nextIdx].dataset.tab);
     requestAnimationFrame(() => {
-      const newBtn = $(`[data-tab="${nextTab}"]`, nav);
+      const newBtn = $(`[data-tab="${btns[nextIdx].dataset.tab}"]`, nav);
       if (newBtn) newBtn.focus();
     });
   };
 }
 
 function syncNav() {
-  $$('.nav-btn').forEach((btn, i) => {
-    const isActive = TAB_ORDER[i] === currentTab;
+  // Sidebar nav items
+  $$('.sidebar .nav-item').forEach(item => {
+    const isActive = item.dataset.tab === currentTab;
+    item.classList.toggle('active', isActive);
+    item.setAttribute('aria-selected', String(isActive));
+    item.setAttribute('tabindex', isActive ? '0' : '-1');
+  });
+  // Bottom nav buttons (mobile)
+  $$('.bottom-nav .nav-btn').forEach(btn => {
+    const isActive = btn.dataset.tab === currentTab;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-selected', String(isActive));
-    // Roving tabindex for WAI-ARIA Tabs pattern
     btn.setAttribute('tabindex', isActive ? '0' : '-1');
   });
 }
 
 // ── Dynamic color application ──
 function applyDynamicColors() {
-  // Legend dots
   $$('.legend-dot[data-color]').forEach(dot => {
     dot.style.background = dot.dataset.color;
   });
-  // Score circle border — only use data-border-color
   $$('.score-circle[data-border-color]').forEach(circle => {
     circle.style.borderColor = circle.dataset.borderColor;
   });
 }
 
-// ── Swipe Navigation ──
-// Check |dx| > |dy| to avoid triggering on vertical scroll
-let _swipeStartY = 0;
+// ── Swipe Navigation (mobile) ──
 function setupSwipe() {
   document.addEventListener('touchstart', e => {
     _swipeStartX = e.touches[0].clientX;
@@ -274,7 +340,7 @@ function setupSwipe() {
     const dx = e.changedTouches[0].clientX - _swipeStartX;
     const dy = e.changedTouches[0].clientY - _swipeStartY;
     if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
-    if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll — ignore
+    if (Math.abs(dy) > Math.abs(dx)) return;
     if (e.target.closest('input, select, textarea, .drag-handle, canvas, .modal.active')) return;
 
     const idx = TAB_ORDER.indexOf(currentTab);

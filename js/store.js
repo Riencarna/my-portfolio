@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.1 — State Management
-   Cycle 15: Full rebuild from scratch — debouncedSave, import recovery, income cat validation
+   My Portfolio v3.13.2 — State Management
+   Desktop UI Overhaul: debouncedSave, import recovery, income cat validation
    NOTE: All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
 

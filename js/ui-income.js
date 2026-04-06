@@ -1,9 +1,8 @@
 /* =============================================
-   My Portfolio v3.12.0 — Income UI
-   Cycle 15: Full rebuild from scratch
-   P1 FIX: IDs from uid() are STRINGS — no Number() wrapping
-   P2 FIX: openAddIncome/openEditIncome use _setupModalMainDelegation
-           (NO container.onclick = on #modalMain)
+   My Portfolio v3.13.2 — Income UI
+   Desktop UI Overhaul: Grid layout, centered modals
+   IDs from uid() are STRINGS — no Number() wrapping
+   openAddIncome/openEditIncome use _setupModalMainDelegation
    ============================================= */
 
 function renderIncome() {
@@ -52,21 +51,22 @@ function renderIncome() {
       ` : ''}
     </div>
 
-    <div class="card">
-      <div class="card-title">카테고리별</div>
-      <div class="chart-wrap chart-wrap-180" role="img" aria-label="수입 카테고리 차트">
-        <canvas id="chartIncPie"></canvas>
+    <div class="dash-charts">
+      <div class="card">
+        <div class="card-title">카테고리별</div>
+        <div class="chart-wrap chart-wrap-220" role="img" aria-label="수입 카테고리 차트">
+          <canvas id="chartIncPie"></canvas>
+        </div>
+        <div id="chartIncPieAlt"></div>
+        ${renderIncomeCatLegend(items)}
       </div>
-      <div id="chartIncPieAlt"></div>
-      ${renderIncomeCatLegend(items)}
-    </div>
-
-    <div class="card">
-      <div class="card-title">최근 6개월 추이</div>
-      <div class="chart-wrap chart-wrap-180" role="img" aria-label="6개월 수입 추이 차트">
-        <canvas id="chartIncBar"></canvas>
+      <div class="card">
+        <div class="card-title">최근 6개월 추이</div>
+        <div class="chart-wrap chart-wrap-220" role="img" aria-label="6개월 수입 추이 차트">
+          <canvas id="chartIncBar"></canvas>
+        </div>
+        <div id="chartIncBarAlt"></div>
       </div>
-      <div id="chartIncBarAlt"></div>
     </div>
   `;
 
@@ -83,10 +83,8 @@ function _setupIncomeDelegation(container) {
     } else if (action === 'open-add-income') {
       openAddIncome();
     } else if (action === 'edit-income') {
-      // P1 FIX: dataset.id is a STRING from uid() — pass as-is, no Number()
       openEditIncome(target.dataset.id);
     } else if (action === 'delete-income') {
-      // P1 FIX: dataset.id is a STRING from uid() — pass as-is, no Number()
       doDeleteIncome(target.dataset.id);
     } else if (action === 'copy-recurring') {
       copyRecurring(Number(target.dataset.year), Number(target.dataset.month));
@@ -159,8 +157,8 @@ function renderIncomeCatLegend(items) {
 }
 
 const INCOME_COLORS = Object.freeze({
-  salary: '#3B82F6', bonus: '#8B5CF6', side: '#F59E0B', invest: '#10B981',
-  rental: '#EC4899', interest: '#06B6D4', other: '#6B7280',
+  salary: '#6366f1', bonus: '#8b5cf6', side: '#f59e0b', invest: '#10B981',
+  rental: '#ec4899', interest: '#06b6d4', other: '#6b7280',
 });
 
 function renderIncomeCharts(items, year, month) {
@@ -198,7 +196,7 @@ function renderIncomeCharts(items, year, month) {
     getMonthIncome(y, m).reduce((s, i) => s + safeNum(i.amount), 0)
   );
   if (barData.some(v => v > 0)) {
-    charts.incBar = renderBarChart('chartIncBar', months.map(m => m.label), barData, '#3B82F6');
+    charts.incBar = renderBarChart('chartIncBar', months.map(m => m.label), barData, '#6366f1');
 
     const altContainer = document.getElementById('chartIncBarAlt');
     if (altContainer) {
@@ -218,7 +216,6 @@ function changeMonth(delta) {
 }
 
 // ── Add Income Modal ──
-// P2 FIX: Uses _setupModalMainDelegation — NO container.onclick = on #modalMain
 function openAddIncome() {
   _modalCleanup.removeAll();
 
@@ -269,8 +266,6 @@ function openAddIncome() {
   `;
   openModal('modalMain');
 
-  // P2 FIX: Route through unified _setupModalMainDelegation (addEventListener via Cleanup)
-  // This handles close-modal, select-inc-cat, do-add-income actions
   _setupModalMainDelegation(container);
 }
 
@@ -301,9 +296,7 @@ function doDeleteIncome(id) {
 }
 
 // ── Edit Income Modal ──
-// P2 FIX: Uses _setupModalMainDelegation — NO container.onclick = on #modalMain
 function openEditIncome(id) {
-  // P1 FIX: id is a STRING from uid() — string comparison works correctly
   const item = appState.income.find(i => i.id === id);
   if (!item) return;
   const cat = item.cat || 'other';
@@ -353,12 +346,9 @@ function openEditIncome(id) {
   `;
   openModal('modalMain');
 
-  // P2 FIX: Route through unified _setupModalMainDelegation (addEventListener via Cleanup)
-  // This handles close-modal, select-inc-cat, do-edit-income actions
   _setupModalMainDelegation(container);
 }
 
-// P1 FIX: id parameter is a STRING from uid() — no Number() conversion
 function doEditIncome(id) {
   const amount = safeNum($('#editIncAmount')?.value);
   if (amount <= 0) { showToast('금액을 입력하세요 (0보다 큰 값)', 'error'); return; }

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- My Portfolio v3.12.1 | 2026-04-01 | 자산 관리 대시보드 -->
+<!-- My Portfolio v3.13.2 | 2026-04-06 | 자산 관리 대시보드 — Desktop UI Overhaul -->
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
-  <meta name="theme-color" content="#0B0D11">
+  <meta name="theme-color" content="#0a0a0f">
   <meta name="description" content="My Portfolio - 개인 자산 관리 대시보드">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self';
@@ -20,7 +20,7 @@
       https://api.avax.network;
     img-src 'self' data:;">
 
-  <title>My Portfolio v3.12.1</title>
+  <title>My Portfolio v3.13.2</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,8 +37,8 @@
 </head>
 <body data-theme="dark">
 
-  <!-- Skip to content (a11y) — must be first focusable element -->
-  <a href="#pgDash" class="skip-link">본문으로 건너뛰기</a>
+  <!-- Skip to content (a11y) -->
+  <a href="#main" class="skip-link">본문으로 건너뛰기</a>
 
   <!-- Splash Screen -->
   <div id="splash" class="splash" role="status" aria-label="앱 로딩 중">
@@ -49,20 +49,26 @@
     </div>
   </div>
 
-  <!-- App Shell -->
-  <div id="app">
-    <header id="appHeader" class="app-header" role="banner"></header>
+  <!-- Sidebar (desktop/tablet) -->
+  <aside id="sidebar" class="sidebar" aria-label="사이드바">
+    <!-- Rendered by app.js -->
+  </aside>
 
-    <main class="app-main" role="main">
+  <!-- App Shell -->
+  <div id="app" class="app-layout">
+    <header id="appHeader" class="page-header" role="banner"></header>
+
+    <main id="main" class="main-content" role="main">
       <div id="pgDash" class="page" role="tabpanel" aria-label="대시보드"></div>
       <div id="pgList" class="page hidden" role="tabpanel" aria-label="자산 목록" aria-hidden="true"></div>
       <div id="pgInc" class="page hidden" role="tabpanel" aria-label="수입 관리" aria-hidden="true"></div>
       <div id="pgHist" class="page hidden" role="tabpanel" aria-label="기록 및 내보내기" aria-hidden="true"></div>
       <div id="pgAi" class="page hidden" role="tabpanel" aria-label="분석" aria-hidden="true"></div>
     </main>
-
-    <nav id="bottomNav" class="bottom-nav" role="tablist" aria-label="메인 탐색"></nav>
   </div>
+
+  <!-- Bottom Nav (mobile only) -->
+  <nav id="bottomNav" class="bottom-nav" role="tablist" aria-label="메인 탐색"></nav>
 
   <!-- Modals -->
   <div id="modalMain" class="modal" aria-hidden="true"></div>

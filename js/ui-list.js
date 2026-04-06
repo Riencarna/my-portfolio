@@ -1,7 +1,6 @@
 /* =============================================
-   My Portfolio v3.12.0 — Asset List UI
-   Cycle 15: Full rebuild from scratch
-   P5 FIX: showMoreAssets appends to existing DOM instead of full re-render
+   My Portfolio v3.13.2 — Asset List UI
+   Desktop UI Overhaul: Full rebuild from scratch
    ============================================= */
 
 let _dragAssetId = null;
@@ -62,7 +61,6 @@ function renderList() {
   });
 
   _setupListDelegation(container);
-
   if (UIState.isEditMode) setupDragAndDrop();
 }
 
@@ -72,7 +70,6 @@ function _setupListDelegation(container) {
     if (!target) return;
     _handleListAction(target, e);
   };
-
   container.onkeydown = (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target.closest('[data-action]');
@@ -84,14 +81,10 @@ function _setupListDelegation(container) {
 
 function _handleListAction(target, e) {
   const action = target.dataset.action;
-
-  if (action === 'clear-search') {
-    clearSearch();
-  } else if (action === 'toggle-edit') {
-    toggleEditMode();
-  } else if (action === 'open-add-asset') {
-    openAddAsset();
-  } else if (action === 'toggle-list-cat') {
+  if (action === 'clear-search') clearSearch();
+  else if (action === 'toggle-edit') toggleEditMode();
+  else if (action === 'open-add-asset') openAddAsset();
+  else if (action === 'toggle-list-cat') {
     const catId = target.dataset.cat;
     if (catId) toggleListCat(catId);
   } else if (action === 'show-more') {
@@ -132,12 +125,10 @@ function toggleEditMode() {
   renderList();
 }
 
-// Lazy render — only show LAZY_RENDER_THRESHOLD assets initially
 function renderListCategory(catId, assets) {
   const cat = CAT_MAP[catId];
   const isOpen = UIState.listCategoryOpen[catId] !== false;
   const total = assets.reduce((s, a) => s + calcAssetValue(a).value, 0);
-
   const shownCount = UIState.listCategoryShown[catId] || LAZY_RENDER_THRESHOLD;
   const visibleAssets = assets.slice(0, shownCount);
   const hasMore = assets.length > shownCount;
@@ -169,47 +160,32 @@ function renderListCategory(catId, assets) {
   `;
 }
 
-// P5 FIX: Append additional items to existing category body instead of full re-render
 function showMoreAssets(catId) {
   const oldShown = UIState.listCategoryShown[catId] || LAZY_RENDER_THRESHOLD;
   const newShown = oldShown + LAZY_RENDER_PAGE;
   UIState.listCategoryShown[catId] = newShown;
 
   const section = $(`#listCat-${catId}`);
-  if (!section) {
-    // Fallback: full re-render if section not found
-    renderList();
-    return;
-  }
-
+  if (!section) { renderList(); return; }
   const body = section.querySelector('.list-cat-body');
-  if (!body) {
-    renderList();
-    return;
-  }
+  if (!body) { renderList(); return; }
 
-  // Get the filtered assets for this category
   const assets = filterAssets(appState.assets, UIState.listSearchQuery).filter(a => a.category === catId);
   const newItems = assets.slice(oldShown, newShown);
   const hasMore = assets.length > newShown;
   const cat = CAT_MAP[catId];
 
-  // Remove the old "show more" button
   const oldBtn = body.querySelector('.show-more-btn');
   if (oldBtn) oldBtn.remove();
 
-  // Append new asset items
   const fragment = document.createDocumentFragment();
   for (const a of newItems) {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = renderListAsset(a);
-    while (wrapper.firstChild) {
-      fragment.appendChild(wrapper.firstChild);
-    }
+    while (wrapper.firstChild) fragment.appendChild(wrapper.firstChild);
   }
   body.appendChild(fragment);
 
-  // Add new "show more" button if needed
   if (hasMore) {
     const btnWrapper = document.createElement('div');
     btnWrapper.innerHTML = `
@@ -221,7 +197,6 @@ function showMoreAssets(catId) {
     body.appendChild(btnWrapper.firstElementChild);
   }
 
-  // Re-setup drag if in edit mode
   if (UIState.isEditMode) setupDragAndDrop();
 }
 
@@ -260,24 +235,18 @@ function renderListAsset(asset) {
   `;
 }
 
-// Targeted DOM update for list category toggle — no full re-render
 function toggleListCat(catId) {
   const newOpen = UIState.listCategoryOpen[catId] === false ? true : false;
   UIState.listCategoryOpen[catId] = newOpen;
 
   const section = $(`#listCat-${catId}`);
-  if (!section) {
-    renderList();
-    return;
-  }
+  if (!section) { renderList(); return; }
 
   const header = section.querySelector('.list-cat-header');
   if (header) {
     header.setAttribute('aria-expanded', String(newOpen));
     const chevron = header.querySelector('.chevron');
-    if (chevron) {
-      chevron.classList.toggle('open', newOpen);
-    }
+    if (chevron) chevron.classList.toggle('open', newOpen);
   }
 
   const existingBody = section.querySelector('.list-cat-body');
@@ -304,13 +273,10 @@ function toggleListCat(catId) {
         ` : ''}
       `;
       section.appendChild(bodyDiv);
-
       if (UIState.isEditMode) setupDragAndDrop();
     }
   } else {
-    if (existingBody) {
-      existingBody.remove();
-    }
+    if (existingBody) existingBody.remove();
   }
 }
 
@@ -373,7 +339,6 @@ function setupDragAndDrop() {
   setupTouchDrag();
 }
 
-// Touch drag handlers via scoped Cleanup
 function setupTouchDrag() {
   const touchMoveHandler = e => {
     if (!_touchClone) return;
