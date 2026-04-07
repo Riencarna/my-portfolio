@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v4.2.1
+/* Service Worker - My Portfolio v4.2.2
    Planner-Creator-Evaluator Cycle 2
    Added: SKIP_WAITING message handler for click-to-refresh */
 
-var CACHE_NAME = "myportfolio-v4.2.1";
+var CACHE_NAME = "myportfolio-v4.2.2";
 
 var STATIC_ASSETS = [
   "./",

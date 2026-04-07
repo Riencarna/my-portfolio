@@ -198,7 +198,6 @@ function _setupModalSubDelegation(container, extraHandler) {
 }
 
 // ── Form Fields ──
-const INVESTMENT_CATS = ['국내주식', '해외주식', '코인'];
 const NAME_PLACEHOLDER = {
   '국내주식': '예: 삼성전자, SK하이닉스',
   '해외주식': '예: AAPL, QQQ, TSLA',
@@ -328,26 +327,34 @@ function openAssetDetail(id) {
   const asset = getAsset(id);
   if (!asset) return;
   const v = calcAssetValue(asset);
+  const isInv = INVESTMENT_CATS.includes(asset.category);
   _modalCleanup.removeAll();
   const container = $('#modalMain');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box modal-large"><div class="modal-header"><h3>${escHtml(asset.name)}</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
     <div class="detail-grid">
       <div class="detail-item"><span class="detail-label">카테고리</span><span>${CAT_MAP[asset.category]?.icon || ''} ${escHtml(asset.category)}</span></div>
-      <div class="detail-item"><span class="detail-label">현재가</span><span>${escHtml(fmtPrice(v.price))}</span></div>
-      <div class="detail-item"><span class="detail-label">수량</span><span>${escHtml(fmtNum(v.qty, v.qty % 1 !== 0 ? 4 : 0))}</span></div>
-      <div class="detail-item"><span class="detail-label">평균 단가</span><span>${escHtml(fmtPrice(v.avgPrice))}</span></div>
-      <div class="detail-item"><span class="detail-label">평가금액</span><span class="value-lg">${escHtml(fmtKRW(v.value))}</span></div>
-      <div class="detail-item"><span class="detail-label">투자금액</span><span>${escHtml(fmtKRW(v.cost))}</span></div>
-      <div class="detail-item"><span class="detail-label">손익</span><span class="${profitClass(v.profit)}">${escHtml(fmtKRW(v.profit))} (${escHtml(fmtPct(v.profitPct))})</span></div>
+      ${isInv ? `
+        <div class="detail-item"><span class="detail-label">현재가</span><span>${escHtml(fmtPrice(v.price))}</span></div>
+        <div class="detail-item"><span class="detail-label">수량</span><span>${escHtml(fmtNum(v.qty, v.qty % 1 !== 0 ? 4 : 0))}</span></div>
+        <div class="detail-item"><span class="detail-label">평균 단가</span><span>${escHtml(fmtPrice(v.avgPrice))}</span></div>
+        <div class="detail-item"><span class="detail-label">평가금액</span><span class="value-lg">${escHtml(fmtKRW(v.value))}</span></div>
+        <div class="detail-item"><span class="detail-label">투자금액</span><span>${escHtml(fmtKRW(v.cost))}</span></div>
+        <div class="detail-item"><span class="detail-label">손익</span><span class="${profitClass(v.profit)}">${escHtml(fmtKRW(v.profit))} (${escHtml(fmtPct(v.profitPct))})</span></div>
+      ` : `
+        <div class="detail-item"><span class="detail-label">금액</span><span class="value-lg">${escHtml(fmtKRW(v.value))}</span></div>
+      `}
       ${asset.lpu ? `<div class="detail-item"><span class="detail-label">최근 업데이트</span><span>${escHtml(asset.lpu)}</span></div>` : ''}
       ${asset.stockCode ? `<div class="detail-item"><span class="detail-label">종목코드</span><span>${escHtml(asset.stockCode)} (${escHtml(asset.market)})</span></div>` : ''}
       ${asset.note ? `<div class="detail-item"><span class="detail-label">메모</span><span>${escHtml(asset.note)}</span></div>` : ''}
     </div>
     <div class="detail-actions">
-      <button class="btn-p" data-action="open-transaction" data-id="${id}" data-type="buy">매수</button>
-      <button class="btn-s" data-action="open-transaction" data-id="${id}" data-type="sell">매도</button>
+      ${isInv ? `
+        <button class="btn-p" data-action="open-transaction" data-id="${id}" data-type="buy">매수</button>
+        <button class="btn-s" data-action="open-transaction" data-id="${id}" data-type="sell">매도</button>
+      ` : ''}
       <button class="btn-sm" data-action="edit-asset-from-detail" data-id="${id}">수정</button>
     </div>
+    ${isInv ? `
     <div class="txn-section" role="region" aria-label="거래 내역"><h4>거래 내역 (${asset.txns.length}건)</h4><div class="txn-list" role="list">
       ${asset.txns.length > 0
         ? asset.txns.slice().reverse().map(t => `<div class="txn-item" role="listitem">
@@ -365,7 +372,9 @@ function openAssetDetail(id) {
               data-action="delete-txn" data-asset-id="${id}" data-txn-id="${t.id}">✕</button>
           </div>`).join('')
         : '<div class="empty-state">거래 내역이 없습니다</div>'}
-    </div></div></div></div>`;
+    </div></div>
+    ` : ''}
+    </div></div>`;
   openModal('modalMain');
   _setupModalMainDelegation(container);
 }

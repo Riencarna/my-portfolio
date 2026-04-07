@@ -3,7 +3,7 @@
    Planner-Creator-Evaluator Cycle 2
    ============================================= */
 
-const APP_VERSION = '4.2.1';
+const APP_VERSION = '4.2.2';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -86,6 +86,7 @@ const CATEGORIES = Object.freeze([
 ]);
 const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c])));
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));
+const INVESTMENT_CATS = Object.freeze(['국내주식', '해외주식', '코인']);
 
 // Income categories
 const INCOME_CATS = Object.freeze([

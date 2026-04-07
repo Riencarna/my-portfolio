@@ -206,7 +206,8 @@ function showMoreAssets(catId) {
 
 function renderListAsset(asset) {
   const v = calcAssetValue(asset);
-  const hasProfit = v.cost > 0;
+  const isInv = INVESTMENT_CATS.includes(asset.category);
+  const hasProfit = isInv && v.cost > 0;
 
   return `
     <div class="list-asset" data-id="${asset.id}" data-cat="${escAttr(asset.category)}"
@@ -221,8 +222,8 @@ function renderListAsset(asset) {
           ${asset.stockCode ? `<span class="asset-code">${escHtml(asset.stockCode)}</span>` : ''}
         </div>
         <div class="asset-sub">
-          ${v.qty > 0 ? `${escHtml(fmtNum(v.qty, v.qty % 1 !== 0 ? 4 : 0))}주` : ''}
-          ${asset.lpu ? `· ${escHtml(fmtRelTime(asset.lpu))}` : ''}
+          ${isInv && v.qty > 0 ? `${escHtml(fmtNum(v.qty, v.qty % 1 !== 0 ? 4 : 0))}주` : ''}
+          ${asset.lpu ? `${isInv && v.qty > 0 ? '· ' : ''}${escHtml(fmtRelTime(asset.lpu))}` : ''}
         </div>
       </div>
       <div class="asset-values">
