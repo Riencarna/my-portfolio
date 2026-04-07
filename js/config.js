@@ -3,7 +3,7 @@
    Planner-Creator-Evaluator Cycle 2
    ============================================= */
 
-const APP_VERSION = '4.2.3';
+const APP_VERSION = '4.3.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──

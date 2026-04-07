@@ -31,6 +31,16 @@ function fmtKRW(n) {
   return '₩' + Math.round(n).toLocaleString('ko-KR');
 }
 
+function fmtAmountHint(n) {
+  n = safeNum(n);
+  if (n <= 0) return '';
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return '= ' + (n / 1e12).toFixed(2) + '조원';
+  if (abs >= 1e8) return '= ' + (n / 1e8).toFixed(2) + '억원';
+  if (abs >= 1e4) return '= ' + (n / 1e4).toFixed(0) + '만원';
+  return '= ' + Math.round(n).toLocaleString('ko-KR') + '원';
+}
+
 function fmtNum(n, dec = 0) {
   n = safeNum(n);
   return n.toLocaleString('ko-KR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
