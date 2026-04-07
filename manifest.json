@@ -1,7 +1,7 @@
 {
   "name": "My Portfolio - 자산 관리 대시보드",
   "short_name": "My Portfolio",
-  "description": "개인 자산 관리 대시보드 v4.2.2",
+  "description": "개인 자산 관리 대시보드 v4.2.3",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

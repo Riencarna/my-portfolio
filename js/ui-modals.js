@@ -306,17 +306,24 @@ function openEditAsset(id) {
 }
 
 function doEditAsset(id) {
-  const cat = $$('#modalMain .cat-btn.active')[0]?.dataset?.cat;
-  updateAsset(id, {
+  const cat = $$('#modalMain .cat-btn.active')[0]?.dataset?.cat || '기타';
+  const newAmount = safeNum($('#editPrice')?.value);
+  const updates = {
     name: $('#editName')?.value.trim() || '이름 없음',
-    category: cat || '기타',
+    category: cat,
     stockCode: $('#assetCode')?.value.trim() || '',
     market: $('#assetMarket')?.value || '',
     coinId: $('#coinSelect')?.value || '',
     isUsdt: $('#isUsdt')?.checked || false,
-    amount: safeNum($('#editPrice')?.value),
+    amount: newAmount,
     note: $('#editNote')?.value.trim() || null,
-  });
+  };
+  if (!INVESTMENT_CATS.includes(cat)) {
+    updates.txns = newAmount > 0
+      ? [{ id: uid(), type: 'buy', price: newAmount, qty: 1, date: today(), account: null, memo: null }]
+      : [];
+  }
+  updateAsset(id, updates);
   closeModal('modalMain');
   showToast('수정되었습니다', 'success');
   render();

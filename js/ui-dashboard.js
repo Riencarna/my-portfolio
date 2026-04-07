@@ -275,13 +275,14 @@ function renderCategorySection(catId, catTotal, total) {
 
 function renderDashAsset(asset) {
   const v = calcAssetValue(asset);
+  const isInv = INVESTMENT_CATS.includes(asset.category);
   return `
     <div class="dash-asset" data-action="open-asset-detail" data-id="${asset.id}" role="listitem"
       tabindex="0" aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
       <div class="dash-asset-name">${escHtml(asset.name)}</div>
       <div class="dash-asset-info">
         <span class="dash-asset-value">${escHtml(fmtKRW(v.value))}</span>
-        <span class="${profitClass(v.profit)}">${escHtml(fmtPct(v.profitPct))}</span>
+        ${isInv ? `<span class="${profitClass(v.profit)}">${escHtml(fmtPct(v.profitPct))}</span>` : ''}
       </div>
     </div>
   `;
