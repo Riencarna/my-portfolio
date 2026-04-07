@@ -245,8 +245,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 .fab-menu-item:hover{background:var(--card-hover);border-color:var(--bd-glow);box-shadow:var(--shadow-glow)}
 .fab-menu-item span{font-size:18px}
 .fab-backdrop{
-  display:none;position:fixed;inset:0;z-index:1;background:transparent}
-.fab-container.open .fab-backdrop{display:block}
+  display:none;position:fixed;inset:0;z-index:149;background:transparent}
 
 /* =============================================
    CARDS (Glassmorphism)

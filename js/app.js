@@ -368,19 +368,23 @@ function renderFAB() {
 function toggleFAB() {
   const container = $('#fabContainer');
   const btn = $('#fabBtn');
+  const backdrop = $('#fabBackdrop');
   if (!container || !btn) return;
   const isOpen = container.classList.toggle('open');
   btn.classList.toggle('open', isOpen);
   btn.setAttribute('aria-expanded', String(isOpen));
+  if (backdrop) backdrop.style.display = isOpen ? 'block' : 'none';
 }
 
 function closeFAB() {
   const container = $('#fabContainer');
   const btn = $('#fabBtn');
+  const backdrop = $('#fabBackdrop');
   if (!container || !btn) return;
   container.classList.remove('open');
   btn.classList.remove('open');
   btn.setAttribute('aria-expanded', 'false');
+  if (backdrop) backdrop.style.display = 'none';
 }
 
 function syncNav() {
