@@ -198,14 +198,22 @@ function _setupModalSubDelegation(container, extraHandler) {
 }
 
 // ── Form Fields ──
+const INVESTMENT_CATS = ['국내주식', '해외주식', '코인'];
+
 function updateFormFields(cat) {
   const isStock = ['국내주식', '해외주식'].includes(cat);
   const isCoin = cat === '코인';
   const isCash = cat === '현금';
+  const isInvestment = INVESTMENT_CATS.includes(cat);
   const stockF = $('#stockFields'), coinF = $('#coinField'), usdtF = $('#usdtField');
+  const txnSection = $('#txnSection'), valueField = $('#valueField');
+  const priceLabel = $('#editPriceLabel');
   if (stockF) { stockF.classList.toggle('hidden', !isStock); stockF.classList.toggle('form-row-visible', isStock); }
   if (coinF) coinF.classList.toggle('hidden', !isCoin);
   if (usdtF) usdtF.classList.toggle('hidden', !isCash);
+  if (txnSection) txnSection.classList.toggle('hidden', !isInvestment);
+  if (valueField) valueField.classList.toggle('hidden', isInvestment);
+  if (priceLabel) priceLabel.textContent = isInvestment ? '현재 단가' : '금액';
 }
 
 // ── Add Asset ──
@@ -219,9 +227,10 @@ function openAddAsset() {
     <div class="form-group hidden" id="coinField"><label for="coinSelect">코인 ID (CoinGecko)</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, id]) => `<option value="${escAttr(id)}">${escHtml(sym)} (${escHtml(id)})</option>`).join('')}</select></div>
     <div class="form-group hidden" id="usdtField"><label><input type="checkbox" id="isUsdt"> USDT (자동 환율 업데이트)</label></div>
     <div class="form-group"><label for="assetNote">메모</label><input type="text" id="assetNote" placeholder="선택사항" maxlength="500"></div>
-    <hr><h4>첫 거래 입력</h4>
+    <div class="form-group hidden" id="valueField"><label for="assetValue">금액</label><input type="number" id="assetValue" placeholder="예: 1000000" min="0" step="any"></div>
+    <div id="txnSection"><hr><h4>첫 거래 입력</h4>
     <div class="form-row"><div class="form-group"><label for="txPrice">단가</label><input type="number" id="txPrice" placeholder="0" min="0" step="any"></div><div class="form-group"><label for="txQty">수량</label><input type="number" id="txQty" placeholder="0" min="0" step="any"></div></div>
-    <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50"></div></div>
+    <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50"></div></div></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-add-asset">추가</button></div></div></div>`;
   openModal('modalMain');
   updateFormFields('국내주식');
@@ -232,20 +241,30 @@ function doAddAsset() {
   const name = $('#assetName')?.value.trim();
   if (!name) { showToast('자산명을 입력하세요', 'error'); return; }
   const cat = $('.modal.active .cat-btn.active')?.dataset?.cat || '기타';
-  const price = safeNum($('#txPrice')?.value), qty = safeNum($('#txQty')?.value);
-  const asset = addAsset({
-    name, category: cat, amount: price,
-    stockCode: $('#assetCode')?.value.trim() || '',
-    market: $('#assetMarket')?.value || '',
-    coinId: $('#coinSelect')?.value || '',
-    isUsdt: $('#isUsdt')?.checked || false,
-    note: $('#assetNote')?.value.trim() || null,
-    krxEtf: ETF_PREFIXES.some(p => name.toUpperCase().startsWith(p)),
-    txns: price > 0 && qty > 0 ? [{
+  const isInvestment = INVESTMENT_CATS.includes(cat);
+  let amount, txns;
+  if (isInvestment) {
+    const price = safeNum($('#txPrice')?.value), qty = safeNum($('#txQty')?.value);
+    amount = price;
+    txns = price > 0 && qty > 0 ? [{
       type: 'buy', price, qty,
       date: $('#txDate')?.value || today(),
       account: $('#txAccount')?.value.trim() || null, memo: null,
-    }] : [],
+    }] : [];
+  } else {
+    const val = safeNum($('#assetValue')?.value);
+    amount = val;
+    txns = val > 0 ? [{ type: 'buy', price: val, qty: 1, date: today(), account: null, memo: null }] : [];
+  }
+  const asset = addAsset({
+    name, category: cat, amount,
+    stockCode: isInvestment ? ($('#assetCode')?.value.trim() || '') : '',
+    market: isInvestment ? ($('#assetMarket')?.value || '') : '',
+    coinId: cat === '코인' ? ($('#coinSelect')?.value || '') : '',
+    isUsdt: cat === '현금' ? ($('#isUsdt')?.checked || false) : false,
+    note: $('#assetNote')?.value.trim() || null,
+    krxEtf: ETF_PREFIXES.some(p => name.toUpperCase().startsWith(p)),
+    txns,
   });
   if (asset) {
     closeModal('modalMain');
@@ -269,7 +288,7 @@ function openEditAsset(id) {
     <div class="form-row ${isStock ? '' : 'hidden'}" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" value="${escAttr(asset.stockCode)}" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${['KOSPI', 'KOSDAQ', 'NYSE', 'NASDAQ', ''].map(m => `<option value="${escAttr(m)}" ${asset.market === m ? 'selected' : ''}>${m || '기타'}</option>`).join('')}</select></div></div>
     <div class="form-group ${isCoin ? '' : 'hidden'}" id="coinField"><label for="coinSelect">코인 ID</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, cid]) => `<option value="${escAttr(cid)}" ${asset.coinId === cid ? 'selected' : ''}>${escHtml(sym)}</option>`).join('')}</select></div>
     <div class="form-group ${isCash ? '' : 'hidden'}" id="usdtField"><label><input type="checkbox" id="isUsdt" ${asset.isUsdt ? 'checked' : ''}> USDT</label></div>
-    <div class="form-group"><label for="editPrice">현재 단가</label><input type="number" id="editPrice" value="${safeNum(asset.amount)}" min="0" step="any"></div>
+    <div class="form-group"><label for="editPrice" id="editPriceLabel">${INVESTMENT_CATS.includes(asset.category) ? '현재 단가' : '금액'}</label><input type="number" id="editPrice" value="${safeNum(asset.amount)}" min="0" step="any"></div>
     <div class="form-group"><label for="editNote">메모</label><input type="text" id="editNote" value="${escAttr(asset.note || '')}" maxlength="500"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-edit-asset" data-id="${id}">저장</button></div></div></div>`;
   openModal('modalMain');

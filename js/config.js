@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v4.1.0 — Configuration
+   My Portfolio v4.2.0 — Configuration
    Planner-Creator-Evaluator Cycle 2
    ============================================= */
 
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.2.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
