@@ -187,6 +187,7 @@ function sanitizeAsset(a) {
     coinId: a.coinId ? stripHtml(a.coinId, 100) : '',
     krxEtf: !!a.krxEtf,
     isUsdt: !!a.isUsdt,
+    usdtQty: a.usdtQty != null ? safeNum(a.usdtQty) : undefined,
     walletCoinId: a.walletCoinId ? stripHtml(String(a.walletCoinId), 100) : undefined,
     lpu: (a.lpu && typeof a.lpu === 'string') ? stripHtml(a.lpu, 50) : null,
     txns: Array.isArray(a.txns) ? a.txns.slice(0, LIMITS.txns).map(sanitizeTxn) : [],

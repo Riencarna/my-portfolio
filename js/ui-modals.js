@@ -182,6 +182,9 @@ function _setupModalMainDelegation(container) {
     }
     else if (action === 'do-add-income') doAddIncome();
     else if (action === 'do-edit-income') doEditIncome(target.dataset.id);
+    else if (action === 'usdt-add-defi') _usdtAddDefiRow();
+    else if (action === 'usdt-remove-defi') target.closest('.usdt-row')?.remove();
+    else if (action === 'do-save-usdt') doSaveUsdtBatch();
   };
   _modalCleanup.add(container, 'click', handler);
 }
@@ -665,4 +668,199 @@ function _setupAddTxTotal() {
   const priceEl = $('#txPrice'), qtyEl = $('#txQty');
   if (priceEl) _modalCleanup.add(priceEl, 'input', calc);
   if (qtyEl) _modalCleanup.add(qtyEl, 'input', calc);
+}
+
+// ── USDT Batch Manager ──
+function _usdtLocationFromName(name) {
+  const m = name.match(/^USDT\s*\((.+)\)$/);
+  return m ? m[1] : null;
+}
+
+function _getExistingUsdtMap() {
+  const map = {};
+  for (const a of appState.assets) {
+    if (a.isUsdt && a.category === '현금') {
+      const loc = _usdtLocationFromName(a.name);
+      if (loc) map[loc] = a;
+    }
+  }
+  return map;
+}
+
+function _usdtRow(location, qty, isDefi) {
+  return `<div class="usdt-row" data-location="${escAttr(location)}">
+    <span class="usdt-loc">${isDefi ? `<input type="text" class="usdt-defi-name" value="${escAttr(location)}" placeholder="프로토콜명" maxlength="50">` : escHtml(location)}</span>
+    <div class="usdt-input-wrap">
+      <input type="number" class="usdt-qty-input" value="${qty || ''}" placeholder="0" min="0" step="any">
+      <span class="usdt-unit">USDT</span>
+    </div>
+    ${isDefi ? `<button class="btn-icon btn-danger usdt-del" data-action="usdt-remove-defi" aria-label="삭제">✕</button>` : ''}
+  </div>`;
+}
+
+function _usdtAddDefiRow() {
+  const section = $('#usdtDefiList');
+  if (!section) return;
+  const div = document.createElement('div');
+  div.innerHTML = _usdtRow('', 0, true);
+  section.appendChild(div.firstElementChild);
+  const newInput = section.lastElementChild.querySelector('.usdt-defi-name');
+  if (newInput) newInput.focus();
+  _usdtRecalcTotal();
+}
+
+function _usdtRecalcTotal() {
+  const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+  let total = 0;
+  // Section subtotals
+  for (const section of $$('#modalMain .usdt-section')) {
+    let secTotal = 0;
+    for (const input of section.querySelectorAll('.usdt-qty-input')) {
+      secTotal += safeNum(input.value);
+    }
+    const sub = section.querySelector('.usdt-subtotal');
+    if (sub) sub.textContent = `${fmtNum(secTotal, 2)} USDT`;
+    total += secTotal;
+  }
+  const totalEl = $('#usdtTotal');
+  const krwEl = $('#usdtTotalKrw');
+  if (totalEl) totalEl.textContent = fmtNum(total, 2);
+  if (krwEl) krwEl.textContent = fmtKRW(Math.round(total * rate));
+}
+
+function openUsdtManager() {
+  _modalCleanup.removeAll();
+  const existingMap = _getExistingUsdtMap();
+  const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+
+  const defiAssets = [];
+  const allPreset = [];
+  for (const sec of Object.values(USDT_LOCATIONS)) {
+    for (const item of sec.items) allPreset.push(item);
+  }
+  for (const [loc, asset] of Object.entries(existingMap)) {
+    if (!allPreset.includes(loc)) {
+      defiAssets.push({ name: loc, qty: asset.usdtQty || 0 });
+    }
+  }
+
+  const buildSection = (key) => {
+    const sec = USDT_LOCATIONS[key];
+    const subtotalHtml = `<span class="usdt-subtotal">0 USDT</span>`;
+    if (key === 'defi') {
+      return `<div class="usdt-section" data-section="${key}">
+        <div class="usdt-section-header">${sec.icon} ${sec.label} ${subtotalHtml}
+          <button class="btn-sm usdt-add-btn" data-action="usdt-add-defi">+ 추가</button>
+        </div>
+        <div id="usdtDefiList">
+          ${defiAssets.map(d => _usdtRow(d.name, d.qty, true)).join('')}
+        </div>
+      </div>`;
+    }
+    return `<div class="usdt-section" data-section="${key}">
+      <div class="usdt-section-header">${sec.icon} ${sec.label} ${subtotalHtml}</div>
+      ${sec.items.map(item => {
+        const existing = existingMap[item];
+        const qty = existing?.usdtQty || 0;
+        return _usdtRow(item, qty, false);
+      }).join('')}
+    </div>`;
+  };
+
+  const container = $('#modalMain');
+  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box modal-large"><div class="modal-header"><h3>USDT 일괄 관리</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body usdt-manager">
+    <div class="usdt-rate-bar">현재 USDT 환율: <strong>${escHtml(fmtNum(rate, 0))}원</strong><span class="usdt-rate-src">${cachedUsdt?.source || ''}</span></div>
+    ${buildSection('overseas')}
+    ${buildSection('wallet')}
+    ${buildSection('defi')}
+    ${buildSection('domestic')}
+    <div class="usdt-summary">
+      <div class="usdt-summary-row"><span>합계</span><span><strong id="usdtTotal">0</strong> USDT</span></div>
+      <div class="usdt-summary-row"><span>원화 환산</span><span id="usdtTotalKrw">${escHtml(fmtKRW(0))}</span></div>
+    </div>
+    <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-save-usdt">저장</button></div>
+  </div></div>`;
+
+  openModal('modalMain');
+  _setupModalMainDelegation(container);
+
+  const recalc = () => _usdtRecalcTotal();
+  _modalCleanup.add(container, 'input', (e) => {
+    if (e.target.classList.contains('usdt-qty-input')) recalc();
+  });
+  _usdtRecalcTotal();
+}
+
+function doSaveUsdtBatch() {
+  const existingMap = _getExistingUsdtMap();
+  const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+  const rows = $$('#modalMain .usdt-row');
+  const seen = new Set();
+  let addCount = 0, updateCount = 0;
+
+  // Validate: check for empty DeFi names
+  for (const row of rows) {
+    const defiInput = row.querySelector('.usdt-defi-name');
+    if (defiInput && !defiInput.value.trim()) {
+      const qty = safeNum(row.querySelector('.usdt-qty-input')?.value);
+      if (qty > 0) {
+        showToast('DeFi 프로토콜 이름을 입력하세요', 'error');
+        defiInput.focus();
+        return;
+      }
+    }
+  }
+
+  // Validate: check for duplicate DeFi names
+  for (const row of rows) {
+    let location = row.dataset.location;
+    const defiInput = row.querySelector('.usdt-defi-name');
+    if (defiInput) location = defiInput.value.trim();
+    if (!location) continue;
+    if (seen.has(location)) {
+      showToast(`"${location}" 중복 — 이름을 다르게 입력하세요`, 'error');
+      return;
+    }
+    seen.add(location);
+  }
+
+  // Save
+  for (const row of rows) {
+    let location = row.dataset.location;
+    const defiInput = row.querySelector('.usdt-defi-name');
+    if (defiInput) location = defiInput.value.trim();
+    if (!location) continue;
+
+    const qty = safeNum(row.querySelector('.usdt-qty-input')?.value);
+    const assetName = `USDT (${location})`;
+    const totalKRW = Math.round(qty * rate);
+
+    const existing = existingMap[location];
+    if (existing) {
+      updateAsset(existing.id, {
+        usdtQty: qty,
+        amount: totalKRW,
+        txns: totalKRW > 0 ? [{ id: uid(), type: 'buy', price: totalKRW, qty: 1, date: today(), account: null, memo: null }] : [],
+      });
+      updateCount++;
+    } else if (qty > 0) {
+      addAsset({
+        name: assetName,
+        category: '현금',
+        isUsdt: true,
+        usdtQty: qty,
+        amount: totalKRW,
+        note: null,
+        txns: [{ type: 'buy', price: totalKRW, qty: 1, date: today(), account: null, memo: null }],
+      });
+      addCount++;
+    }
+  }
+
+  closeModal('modalMain');
+  const msg = [];
+  if (addCount > 0) msg.push(`${addCount}개 추가`);
+  if (updateCount > 0) msg.push(`${updateCount}개 업데이트`);
+  showToast(msg.length > 0 ? `USDT: ${msg.join(', ')}` : 'USDT: 변경 없음', 'success');
+  render();
 }

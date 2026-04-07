@@ -284,8 +284,10 @@ async function _doAutoUpdate(onProgress) {
     try {
       const rate = await fetchUsdtRate();
       if (rate && isFinite(rate)) {
-        pendingUpdates.push({ id: item.asset.id, amount: rate, lpu: now });
-        log(item.asset.name, true, rate);
+        const qty = item.asset.usdtQty;
+        const amt = (qty != null && qty > 0) ? Math.round(rate * qty) : rate;
+        pendingUpdates.push({ id: item.asset.id, amount: amt, lpu: now });
+        log(item.asset.name, true, amt);
       } else {
         log(item.asset.name, false);
         failed.push(item);
@@ -348,8 +350,11 @@ async function _doAutoUpdate(onProgress) {
     for (const item of failed) {
       try {
         let price = null;
-        if (item.type === 'usdt') price = await fetchUsdtRate();
-        else if (item.type === 'coin') {
+        if (item.type === 'usdt') {
+          const rate = await fetchUsdtRate();
+          const qty = item.asset.usdtQty;
+          price = (qty != null && qty > 0) ? Math.round(rate * qty) : rate;
+        } else if (item.type === 'coin') {
           const prices = await fetchCoinPrices([item.asset.coinId]);
           price = prices[item.asset.coinId];
         } else {

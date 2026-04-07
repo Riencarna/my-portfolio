@@ -3,7 +3,7 @@
    Planner-Creator-Evaluator Cycle 2
    ============================================= */
 
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.4.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -87,6 +87,30 @@ const CATEGORIES = Object.freeze([
 const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c])));
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));
 const INVESTMENT_CATS = Object.freeze(['국내주식', '해외주식', '코인']);
+
+// USDT location presets (exchange/wallet/DeFi/domestic)
+const USDT_LOCATIONS = Object.freeze({
+  overseas: {
+    label: '해외 CEX',
+    icon: '🌐',
+    items: ['Binance', 'BYBIT', 'Bitget', 'Gate.io', 'Flipster', 'OKX'],
+  },
+  wallet: {
+    label: '지갑',
+    icon: '👛',
+    items: ['OKX wallet', 'Rabby wallet'],
+  },
+  defi: {
+    label: 'DeFi',
+    icon: '🔗',
+    items: [],
+  },
+  domestic: {
+    label: '국내 CEX',
+    icon: '🇰🇷',
+    items: ['빗썸', '업비트', '코빗', '코인원', '고팍스'],
+  },
+});
 
 // Income categories
 const INCOME_CATS = Object.freeze([
