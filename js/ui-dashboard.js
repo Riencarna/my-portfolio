@@ -1,7 +1,8 @@
 /* =============================================
-   My Portfolio v4.0.0 — Dashboard UI
-   Planner-Creator-Evaluator Cycle 1
-   Render-skip optimization: skip if nothing changed
+   My Portfolio v4.1.0 — Dashboard UI
+   Planner-Creator-Evaluator Cycle 2
+   Bento grid layout, stagger animations,
+   render-skip optimization
    ============================================= */
 
 let _dashRenderKey = '';
@@ -18,43 +19,45 @@ function renderDashboard() {
   const assetCount = appState.assets.length;
   const hasAssets = assetCount > 0;
 
-  // Skip render if nothing changed
   const key = `${assetCount}_${total}_${appState.saved}_${Object.values(UIState.dashboardCategoryOpen).join('')}`;
   if (_dashRenderKey === key && container.innerHTML !== '') return;
   _dashRenderKey = key;
 
   container.innerHTML = hasAssets ? `
-    <div class="dash-hero" role="region" aria-label="총 자산 현황">
-      <div class="dash-hero-label">총 자산</div>
-      <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
-      <div class="dash-hero-change ${profitClass(change)}" aria-label="일일 변동">
-        ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
+    <div class="bento-grid" role="region" aria-label="대시보드">
+      <div class="dash-hero bento-span-2 stagger-item" style="--i:0" role="region" aria-label="총 자산 현황">
+        <div class="dash-hero-label">총 자산</div>
+        <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
+        <div class="dash-hero-change ${profitClass(change)}" aria-label="일일 변동">
+          ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
+        </div>
+        ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
       </div>
-      ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
-    </div>
 
-    <div class="dash-stats" role="region" aria-label="요약 통계">
-      <div class="stat-card">
+      <div class="stat-card stagger-item" style="--i:1">
         <div class="stat-label">보유 자산</div>
         <div class="stat-value">${assetCount}개</div>
         <div class="stat-sub">${appState.categoryOrder.filter(c => catTotals[c] > 0).length}개 카테고리</div>
       </div>
+
       ${cachedRate ? `
-        <div class="stat-card">
+        <div class="stat-card stagger-item" style="--i:2">
           <div class="stat-label">USD/KRW 환율</div>
           <div class="stat-value">${escHtml(fmtNum(cachedRate.rate, 2))}</div>
           <div class="stat-sub">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</div>
         </div>
       ` : ''}
+
       ${cachedUsdt ? `
-        <div class="stat-card">
+        <div class="stat-card stagger-item" style="--i:${cachedRate ? 3 : 2}">
           <div class="stat-label">USDT</div>
           <div class="stat-value">${escHtml(fmtNum(cachedUsdt.rate, 0))}원</div>
           <div class="stat-sub">${escHtml(cachedUsdt.source)}</div>
         </div>
       ` : ''}
+
       ${appState.history.length >= 2 ? `
-        <div class="stat-card">
+        <div class="stat-card stagger-item" style="--i:${(cachedRate ? 1 : 0) + (cachedUsdt ? 1 : 0) + 2}">
           <div class="stat-label">기록 일수</div>
           <div class="stat-value">${appState.history.length}일</div>
           <div class="stat-sub">최초: ${escHtml(fmtDate(appState.history[0]?.date))}</div>
@@ -65,7 +68,7 @@ function renderDashboard() {
     ${renderBackupReminder()}
 
     <div class="dash-charts" role="region" aria-label="차트">
-      <div class="card">
+      <div class="card stagger-item" style="--i:3">
         <div class="card-title">자산 분포</div>
         <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 분포 차트">
           <canvas id="chartPie"></canvas>
@@ -73,7 +76,7 @@ function renderDashboard() {
         <div id="chartPieAlt"></div>
         ${renderPieLegend(catTotals, total)}
       </div>
-      <div class="card">
+      <div class="card stagger-item" style="--i:4">
         <div class="card-title">
           자산 추이
           <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
@@ -122,20 +125,11 @@ function _setupDashboardDelegation(container) {
 
 function _handleDashAction(target) {
   const action = target.dataset.action;
-  if (action === 'trend') {
-    _handleTrendClick(Number(target.dataset.days), target);
-  } else if (action === 'auto-update') {
-    startAutoUpdate();
-  } else if (action === 'toggle-dash-cat') {
-    const catId = target.dataset.cat;
-    if (catId) toggleDashCat(catId);
-  } else if (action === 'open-asset-detail') {
-    const id = target.dataset.id;
-    if (id) openAssetDetail(id);
-  } else if (action === 'go-tab') {
-    const tab = target.dataset.tab;
-    if (tab) goTab(tab);
-  }
+  if (action === 'trend') _handleTrendClick(Number(target.dataset.days), target);
+  else if (action === 'auto-update') startAutoUpdate();
+  else if (action === 'toggle-dash-cat') { const catId = target.dataset.cat; if (catId) toggleDashCat(catId); }
+  else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
+  else if (action === 'go-tab') { const tab = target.dataset.tab; if (tab) goTab(tab); }
 }
 
 function _handleTrendClick(days, btn) {
@@ -160,7 +154,7 @@ function renderBackupReminder() {
   const daysSince = Math.floor((Date.now() - new Date(appState.saved).getTime()) / 86400000);
   if (daysSince < 7) return '';
   return `
-    <div class="card card-warn" role="alert">
+    <div class="card card-warn stagger-item" style="--i:2" role="alert">
       <span>💾 마지막 백업이 ${daysSince}일 전입니다.</span>
       <button class="btn-sm btn-accent" data-action="go-tab" data-tab="pgHist" aria-label="백업 페이지로 이동">백업하기</button>
     </div>
@@ -169,7 +163,7 @@ function renderBackupReminder() {
 
 function renderAutoUpdateSection() {
   return `
-    <div class="card" role="region" aria-label="가격 업데이트">
+    <div class="card stagger-item" style="--i:5" role="region" aria-label="가격 업데이트">
       <div class="card-title">
         가격 업데이트
         <button class="btn-p" id="btnAutoUpdate" data-action="auto-update"
@@ -250,7 +244,7 @@ function renderCategoryBreakdown(catTotals, total) {
   const cats = appState.categoryOrder.filter(c => catTotals[c] > 0);
   if (cats.length === 0) return '';
   return `
-    <div class="card" role="region" aria-label="카테고리별 상세">
+    <div class="card stagger-item" style="--i:6" role="region" aria-label="카테고리별 상세">
       <div class="card-title">카테고리별 상세</div>
       ${cats.map(c => renderCategorySection(c, catTotals[c], total)).join('')}
     </div>
@@ -324,13 +318,13 @@ function toggleDashCat(catId) {
 function renderOnboarding() {
   if (appState.assets.length > 0) return '';
   return `
-    <div class="card onboarding" role="region" aria-label="시작 가이드">
+    <div class="card onboarding stagger-item" style="--i:0" role="region" aria-label="시작 가이드">
       <h3>👋 환영합니다!</h3>
       <p>자산을 추가하여 포트폴리오를 시작하세요.</p>
       <div class="onboard-steps">
-        <div class="step"><span class="step-num" aria-hidden="true">1</span><span>자산 탭에서 자산 추가</span></div>
-        <div class="step"><span class="step-num" aria-hidden="true">2</span><span>매수/매도 거래 기록</span></div>
-        <div class="step"><span class="step-num" aria-hidden="true">3</span><span>가격 업데이트로 실시간 관리</span></div>
+        <div class="step stagger-item" style="--i:1"><span class="step-num" aria-hidden="true">1</span><span>자산 탭에서 자산 추가</span></div>
+        <div class="step stagger-item" style="--i:2"><span class="step-num" aria-hidden="true">2</span><span>매수/매도 거래 기록</span></div>
+        <div class="step stagger-item" style="--i:3"><span class="step-num" aria-hidden="true">3</span><span>가격 업데이트로 실시간 관리</span></div>
       </div>
       <button class="btn-p" data-action="go-tab" data-tab="pgList" aria-label="자산 추가 페이지로 이동">자산 추가하러 가기 →</button>
     </div>

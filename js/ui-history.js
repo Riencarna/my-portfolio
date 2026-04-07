@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v4.0.0 — History & Export UI
-   Planner-Creator-Evaluator Cycle 1
+   My Portfolio v4.1.0 — History & Export UI
+   Planner-Creator-Evaluator Cycle 2
    Grid layout, wide charts, data management
    ============================================= */
 
@@ -14,7 +14,7 @@ function renderHistory() {
   const usageBarClass = usageNum > 80 ? 'progress-fill-danger' : 'progress-fill';
 
   container.innerHTML = `
-    <div class="card" role="region" aria-label="데이터 관리">
+    <div class="card stagger-item" style="--i:0" role="region" aria-label="데이터 관리">
       <div class="card-title">데이터 관리</div>
       <div class="storage-info">
         <div class="progress-bar" role="progressbar" aria-valuenow="${usagePct}" aria-valuemin="0" aria-valuemax="100"
@@ -45,7 +45,7 @@ function renderHistory() {
       </div>
     </div>
 
-    <div class="card" role="region" aria-label="자산 기록">
+    <div class="card stagger-item" style="--i:1" role="region" aria-label="자산 기록">
       <div class="card-title">
         자산 기록
         <div class="btn-group" role="group" aria-label="기록 기간 필터">
@@ -58,7 +58,7 @@ function renderHistory() {
       ${renderHistoryList()}
     </div>
 
-    <div class="card" role="region" aria-label="자산 성장 그래프">
+    <div class="card stagger-item" style="--i:2" role="region" aria-label="자산 성장 그래프">
       <div class="card-title">자산 성장 그래프</div>
       <div class="btn-group btn-group-mb" role="group" aria-label="성장 그래프 필터">
         <button class="btn-sm active" data-action="growth-view" data-days="0" data-by-cat="false" aria-pressed="true">전체</button>

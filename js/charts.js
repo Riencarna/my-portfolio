@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v4.0.0 — Charts (Chart.js)
-   Planner-Creator-Evaluator Cycle 1
+   My Portfolio v4.1.0 — Charts (Chart.js)
+   Planner-Creator-Evaluator Cycle 2
    ============================================= */
 
 const charts = { pie: null, catPie: null, catPies: {}, trend: null, incBar: null, incPie: null, growth: null };

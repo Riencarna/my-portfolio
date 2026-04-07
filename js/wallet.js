@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v4.0.0 — EVM Wallet Integration
-   Planner-Creator-Evaluator Cycle 1
+   My Portfolio v4.1.0 — EVM Wallet Integration
+   Planner-Creator-Evaluator Cycle 2
    ============================================= */
 
 let isWalletScanning = false;

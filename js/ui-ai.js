@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v4.0.0 — Analysis UI
-   Planner-Creator-Evaluator Cycle 1
-   Grid layout, wide cards
+   My Portfolio v4.1.0 — Analysis UI
+   Planner-Creator-Evaluator Cycle 2
+   Glassmorphism cards, stagger animations
    ============================================= */
 
 function renderAnalysis() {
@@ -11,14 +11,19 @@ function renderAnalysis() {
   const total = calcTotal(appState.assets);
   const catTotals = calcCategoryTotals(appState.assets);
 
-  container.innerHTML = `
-    ${renderGoalSection(total)}
-    ${renderDiversificationSection(catTotals, total)}
-    ${renderRiskSection(catTotals, total)}
-    ${renderPeriodReturnsSection()}
-    ${renderBenchmarkSection()}
-    ${renderStrategySection(catTotals, total)}
-  `;
+  const sections = [
+    renderGoalSection(total),
+    renderDiversificationSection(catTotals, total),
+    renderRiskSection(catTotals, total),
+    renderPeriodReturnsSection(),
+    renderBenchmarkSection(),
+    renderStrategySection(catTotals, total),
+  ].filter(Boolean);
+
+  let staggerIdx = 0;
+  container.innerHTML = sections.map(html =>
+    html.replace('<div class="card"', `<div class="card stagger-item" style="--i:${staggerIdx++}"`)
+  ).join('');
 
   _setupAnalysisDelegation(container);
 }

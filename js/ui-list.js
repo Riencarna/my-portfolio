@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v4.0.0 — Asset List UI
-   Planner-Creator-Evaluator Cycle 1
+   My Portfolio v4.1.0 — Asset List UI
+   Planner-Creator-Evaluator Cycle 2
    Scoped Cleanup for drag listeners
    ID-safe: all IDs are strings via sanitizeAsset
    ============================================= */

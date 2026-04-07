@@ -1,15 +1,23 @@
 /* =============================================
-   My Portfolio v4.0.0 — App Entry Point
-   Planner-Creator-Evaluator Cycle 1
-   SW update banner, page-transition focus management
+   My Portfolio v4.1.0 — App Entry Point
+   Planner-Creator-Evaluator Cycle 2
+   FAB, directional page transitions, bento glass UI
    ============================================= */
 
 let currentTab = 'pgDash';
+let _prevTabIdx = 0;
 let _swipeStartX = 0;
 let _swipeStartY = 0;
 const TAB_ORDER = ['pgDash', 'pgList', 'pgInc', 'pgHist', 'pgAi'];
 const TAB_ICONS = ['📊', '📋', '💰', '📁', '🔍'];
 const TAB_LABELS = ['대시보드', '자산', '수입', '기록', '분석'];
+
+// FAB menu items
+const FAB_ITEMS = [
+  { icon: '📋', label: '자산 추가', action: 'fab-add-asset' },
+  { icon: '💰', label: '수입 추가', action: 'fab-add-income' },
+  { icon: '🔗', label: '지갑 스캔', action: 'fab-wallet-scan' },
+];
 
 // ── Initialization ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -119,19 +127,23 @@ function updateSidebarThemeBtn(theme) {
 
 function updateThemeMeta(theme) {
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0a0a0f' : '#f5f7fa';
+  if (meta) meta.content = theme === 'dark' ? '#0d1117' : '#f8fafc';
 }
 
-// ── Tab Routing ──
+// ── Tab Routing (Directional Transitions) ──
 function goTab(tabId) {
   if (!TAB_ORDER.includes(tabId)) return;
+  const newIdx = TAB_ORDER.indexOf(tabId);
+  const oldIdx = TAB_ORDER.indexOf(currentTab);
+
   currentTab = tabId;
+  _prevTabIdx = oldIdx;
   localStorage.setItem(TAB_KEY, tabId);
   destroyAllCharts();
-  renderTabContent();
+  renderTabContent(newIdx > oldIdx ? 'forward' : 'backward');
   syncNav();
   renderPageHeader();
-  // Focus management: move focus to main content on tab switch
+
   requestAnimationFrame(() => {
     const page = $(`#${currentTab}`);
     if (page) page.focus({ preventScroll: true });
@@ -141,6 +153,7 @@ function goTab(tabId) {
 function restoreLastTab() {
   const saved = localStorage.getItem(TAB_KEY);
   if (saved && TAB_ORDER.includes(saved)) currentTab = saved;
+  _prevTabIdx = TAB_ORDER.indexOf(currentTab);
 }
 
 function render() {
@@ -148,6 +161,7 @@ function render() {
   renderPageHeader();
   renderTabContent();
   renderBottomNav();
+  renderFAB();
   syncNav();
 }
 
@@ -264,23 +278,30 @@ function renderPageHeader() {
   };
 }
 
-function renderTabContent() {
+// ── Tab Content (Directional Slide) ──
+function renderTabContent(direction) {
   TAB_ORDER.forEach(id => {
     const page = $(`#${id}`);
     if (page) {
       page.classList.add('hidden');
-      page.classList.remove('visible');
+      page.classList.remove('visible', 'page-enter', 'page-enter-reverse');
       page.setAttribute('aria-hidden', 'true');
     }
   });
+
   const page = $(`#${currentTab}`);
   if (page) {
     page.classList.remove('hidden');
-    page.classList.add('visible', 'page-enter');
+    page.classList.add('visible');
     page.removeAttribute('aria-hidden');
-    requestAnimationFrame(() => {
-      setTimeout(() => page.classList.remove('page-enter'), PAGE_ENTER_MS);
-    });
+
+    if (direction) {
+      const animClass = direction === 'forward' ? 'page-enter' : 'page-enter-reverse';
+      page.classList.add(animClass);
+      requestAnimationFrame(() => {
+        setTimeout(() => page.classList.remove(animClass), PAGE_ENTER_MS);
+      });
+    }
   }
 
   switch (currentTab) {
@@ -294,7 +315,7 @@ function renderTabContent() {
   setTimeout(applyDynamicColors, DYNAMIC_COLOR_DELAY_MS);
 }
 
-// ── Bottom Nav (mobile fallback) ──
+// ── Bottom Nav (mobile) ──
 function renderBottomNav() {
   const nav = $('#bottomNav');
   if (!nav) return;
@@ -330,6 +351,36 @@ function renderBottomNav() {
       if (newBtn) newBtn.focus();
     });
   };
+}
+
+// ── FAB (Floating Action Button) ──
+function renderFAB() {
+  const menu = $('#fabMenu');
+  if (!menu) return;
+  menu.innerHTML = FAB_ITEMS.map(item => `
+    <button class="fab-menu-item" data-action="${item.action}" role="menuitem" aria-label="${item.label}">
+      <span aria-hidden="true">${item.icon}</span>
+      ${item.label}
+    </button>
+  `).join('');
+}
+
+function toggleFAB() {
+  const container = $('#fabContainer');
+  const btn = $('#fabBtn');
+  if (!container || !btn) return;
+  const isOpen = container.classList.toggle('open');
+  btn.classList.toggle('open', isOpen);
+  btn.setAttribute('aria-expanded', String(isOpen));
+}
+
+function closeFAB() {
+  const container = $('#fabContainer');
+  const btn = $('#fabBtn');
+  if (!container || !btn) return;
+  container.classList.remove('open');
+  btn.classList.remove('open');
+  btn.setAttribute('aria-expanded', 'false');
 }
 
 function syncNav() {
@@ -400,12 +451,25 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     toggleTheme();
   }
+
+  if (e.key === 'Escape') {
+    closeFAB();
+  }
 });
 
-// ── Update Banner Delegation ──
+// ── Global Event Delegation ──
 document.addEventListener('click', e => {
   const target = e.target.closest('[data-action]');
   if (!target) return;
-  if (target.dataset.action === 'apply-update') applyUpdate();
-  else if (target.dataset.action === 'dismiss-update') dismissUpdateBanner();
+  const action = target.dataset.action;
+
+  switch (action) {
+    case 'apply-update': applyUpdate(); break;
+    case 'dismiss-update': dismissUpdateBanner(); break;
+    case 'toggle-fab': toggleFAB(); break;
+    case 'close-fab': closeFAB(); break;
+    case 'fab-add-asset': closeFAB(); openAddAsset(); break;
+    case 'fab-add-income': closeFAB(); openAddIncome(); break;
+    case 'fab-wallet-scan': closeFAB(); openWalletScan(); break;
+  }
 });

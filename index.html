@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- My Portfolio v4.0.0 | Planner-Creator-Evaluator Cycle 1 | 자산 관리 대시보드 -->
+<!-- My Portfolio v4.1.0 | Planner-Creator-Evaluator Cycle 2 | Bento Glass UI -->
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#0d1117">
   <meta name="description" content="My Portfolio - 개인 자산 관리 대시보드">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self';
@@ -20,7 +20,7 @@
       https://api.avax.network;
     img-src 'self' data:;">
 
-  <title>My Portfolio v4.0.0</title>
+  <title>My Portfolio v4.1.0</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -59,9 +59,7 @@
   </div>
 
   <!-- Sidebar (desktop/tablet) -->
-  <aside id="sidebar" class="sidebar" aria-label="사이드바">
-    <!-- Rendered by app.js -->
-  </aside>
+  <aside id="sidebar" class="sidebar" aria-label="사이드바"></aside>
 
   <!-- App Shell -->
   <div id="app" class="app-layout">
@@ -78,6 +76,13 @@
 
   <!-- Bottom Nav (mobile only) -->
   <nav id="bottomNav" class="bottom-nav" role="tablist" aria-label="메인 탐색"></nav>
+
+  <!-- FAB (Floating Action Button) -->
+  <div id="fabContainer" class="fab-container" aria-label="빠른 작업">
+    <div class="fab-backdrop" data-action="close-fab"></div>
+    <div class="fab-menu" id="fabMenu" role="menu" aria-label="빠른 작업 메뉴"></div>
+    <button class="fab-btn" id="fabBtn" data-action="toggle-fab" aria-label="빠른 작업 열기" aria-expanded="false">+</button>
+  </div>
 
   <!-- Modals -->
   <div id="modalMain" class="modal" aria-hidden="true"></div>

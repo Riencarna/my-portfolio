@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v4.0.0 — Income UI
-   Planner-Creator-Evaluator Cycle 1
+   My Portfolio v4.1.0 — Income UI
+   Planner-Creator-Evaluator Cycle 2
    Grid layout, centered modals
    IDs from uid() are STRINGS — no Number() wrapping
    openAddIncome/openEditIncome use _setupModalMainDelegation
@@ -22,7 +22,7 @@ function renderIncome() {
   const growth = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0;
 
   container.innerHTML = `
-    <div class="card">
+    <div class="card stagger-item" style="--i:0">
       <div class="month-nav" role="navigation" aria-label="월 탐색">
         <button class="btn-icon" data-action="change-month" data-delta="-1" aria-label="이전 달">◀</button>
         <span class="month-label" aria-live="polite">${escHtml(monthStr)}</span>
@@ -38,7 +38,7 @@ function renderIncome() {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card stagger-item" style="--i:1">
       <div class="card-title">
         수입 내역
         <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 추가</button>
@@ -53,7 +53,7 @@ function renderIncome() {
     </div>
 
     <div class="dash-charts">
-      <div class="card">
+      <div class="card stagger-item" style="--i:2">
         <div class="card-title">카테고리별</div>
         <div class="chart-wrap chart-wrap-220" role="img" aria-label="수입 카테고리 차트">
           <canvas id="chartIncPie"></canvas>
@@ -61,7 +61,7 @@ function renderIncome() {
         <div id="chartIncPieAlt"></div>
         ${renderIncomeCatLegend(items)}
       </div>
-      <div class="card">
+      <div class="card stagger-item" style="--i:3">
         <div class="card-title">최근 6개월 추이</div>
         <div class="chart-wrap chart-wrap-220" role="img" aria-label="6개월 수입 추이 차트">
           <canvas id="chartIncBar"></canvas>
