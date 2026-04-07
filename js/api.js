@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v3.13.2 — API Integration
-   Desktop UI Overhaul: no empty catch blocks, console.warn on failures
+   My Portfolio v4.0.0 — API Integration
+   Planner-Creator-Evaluator Cycle 1
    ============================================= */
 
 // ── Cache ──
@@ -238,7 +238,7 @@ async function fetchBenchmarkReturns() {
   return result;
 }
 
-// ── Auto Update All (returns summary object) ──
+// ── Auto Update All ──
 let _updatePromise = null;
 
 async function autoUpdateAll(onProgress) {

@@ -1,6 +1,8 @@
 /* =============================================
-   My Portfolio v3.13.2 — Utilities
-   Desktop UI Overhaul: uid() uses crypto.randomUUID, Scoped Cleanup
+   My Portfolio v4.0.0 — Utilities
+   Planner-Creator-Evaluator Cycle 1
+   uid() returns crypto.randomUUID string
+   Scoped Cleanup for modular listener management
    ============================================= */
 
 // ── HTML Security ──
@@ -93,7 +95,7 @@ function clampDay(year, month, day) {
   return Math.min(day, maxDay);
 }
 
-// ── Calculations (NaN-safe with guards, cached per render cycle) ──
+// ── Calculations (NaN-safe, cached per render cycle) ──
 let _calcCache = null;
 let _calcCacheKey = 0;
 
@@ -129,7 +131,7 @@ function calcAssetValue(asset) {
 
 function _buildCalcCache(assets) {
   const key = _calcCacheKey;
-  if (_calcCache && _calcCache._key === key && _calcCache._src === assets) return _calcCache;
+  if (_calcCache && _calcCache._key === key) return _calcCache;
   const byAsset = new Map();
   const byCat = {};
   let total = 0;
@@ -140,7 +142,7 @@ function _buildCalcCache(assets) {
     byCat[a.category] = safeNum(byCat[a.category]) + safeNum(v.value);
     total += safeNum(v.value);
   }
-  _calcCache = { _key: key, _src: assets, byAsset, byCat, total: safeNum(total) };
+  _calcCache = { _key: key, byAsset, byCat, total: safeNum(total) };
   return _calcCache;
 }
 
@@ -162,9 +164,10 @@ function isValidAsset(a) {
     CAT_IDS.includes(a.category) && Array.isArray(a.txns);
 }
 
+// sanitizeAsset: coerces ID to String for backward compatibility with v2.x numeric IDs
 function sanitizeAsset(a) {
   return {
-    id: a.id || uid(),
+    id: a.id != null ? String(a.id) : uid(),
     name: stripHtml(a.name, 100) || '이름 없음',
     category: CAT_IDS.includes(a.category) ? a.category : '기타',
     amount: safeNum(a.amount),
@@ -180,15 +183,29 @@ function sanitizeAsset(a) {
   };
 }
 
+// sanitizeTxn: coerces ID to String
 function sanitizeTxn(t) {
   return {
-    id: t.id || uid(),
+    id: t.id != null ? String(t.id) : uid(),
     type: t.type === 'sell' ? 'sell' : 'buy',
     price: safeNum(t.price),
     qty: Math.max(0, safeNum(t.qty)),
     account: t.account ? stripHtml(t.account, 50) : null,
     date: isValidDate(t.date) ? t.date : today(),
     memo: t.memo ? stripHtml(t.memo, 200) : null,
+  };
+}
+
+// sanitizeIncome: coerces ID to String, validates category
+function sanitizeIncome(i) {
+  return {
+    id: i.id != null ? String(i.id) : uid(),
+    date: isValidDate(i.date) ? i.date : today(),
+    amount: safeNum(i.amount),
+    cat: INCOME_MAP[i.cat] ? i.cat : 'other',
+    source: i.source ? stripHtml(i.source, 100) : '',
+    memo: i.memo ? stripHtml(i.memo, 200) : '',
+    recurring: !!i.recurring,
   };
 }
 
@@ -203,7 +220,7 @@ function el(tag, attrs = {}, children = []) {
     if (k === 'class') e.className = v;
     else if (k === 'text') e.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
-    else if (k.startsWith('on')) continue; // Block string on* (XSS defense)
+    else if (k.startsWith('on')) continue;
     else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
     else if (k === 'dataset') Object.assign(e.dataset, v);
     else e.setAttribute(k, v);
@@ -218,7 +235,7 @@ function el(tag, attrs = {}, children = []) {
 function showToast(msg, type = 'info') {
   const existing = $('.toast');
   if (existing) existing.remove();
-  const t = el('div', { class: `toast toast-${type}`, text: msg, role: 'alert' });
+  const t = el('div', { class: `toast toast-${type}`, text: msg, role: 'status' });
   const container = $('#toastContainer') || document.body;
   container.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
@@ -245,7 +262,6 @@ function uid() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  // Fallback: timestamp + random hex suffix
   return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
@@ -262,14 +278,11 @@ function groupBy(arr, key) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Scoped Cleanup Registry ──
-// Each module gets its own scope. Cleanup.scope('list').add() / Cleanup.scope('list').removeAll()
 const Cleanup = (() => {
   const _scopes = {};
 
   function _getScope(name) {
-    if (!_scopes[name]) {
-      _scopes[name] = [];
-    }
+    if (!_scopes[name]) _scopes[name] = [];
     return _scopes[name];
   }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- My Portfolio v3.13.2 | 2026-04-06 | 자산 관리 대시보드 — Desktop UI Overhaul -->
+<!-- My Portfolio v4.0.0 | Planner-Creator-Evaluator Cycle 1 | 자산 관리 대시보드 -->
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -20,7 +20,7 @@
       https://api.avax.network;
     img-src 'self' data:;">
 
-  <title>My Portfolio v3.13.2</title>
+  <title>My Portfolio v4.0.0</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -46,6 +46,15 @@
       <div class="splash-icon" aria-hidden="true">₩</div>
       <div class="splash-text">My Portfolio</div>
       <div class="spinner" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <!-- SW Update Banner -->
+  <div id="updateBanner" class="update-banner hidden" role="alert">
+    <span>새 버전이 있습니다.</span>
+    <div class="update-banner-actions">
+      <button class="btn-sm" data-action="apply-update">업데이트</button>
+      <button class="btn-sm" data-action="dismiss-update" aria-label="닫기">✕</button>
     </div>
   </div>
 

@@ -1,7 +1,8 @@
-/* Service Worker - My Portfolio v3.13.2
-   Offline fallback page for navigation requests */
+/* Service Worker - My Portfolio v4.0.0
+   Planner-Creator-Evaluator Cycle 1
+   Added: SKIP_WAITING message handler for click-to-refresh */
 
-var CACHE_NAME = "myportfolio-v3.13.2";
+var CACHE_NAME = "myportfolio-v4.0";
 
 var STATIC_ASSETS = [
   "./",
@@ -85,12 +86,18 @@ self.addEventListener("activate", function(e) {
   self.clients.claim();
 });
 
+// Message: handle SKIP_WAITING from client for click-to-refresh
+self.addEventListener("message", function(e) {
+  if (e.data && e.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 // Fetch: strategy based on request type
 self.addEventListener("fetch", function(e) {
   var url;
   try { url = new URL(e.request.url); } catch (_) { return; }
 
-  // Only handle GET requests
   if (e.request.method !== "GET") return;
 
   // API requests: network-first with cache fallback

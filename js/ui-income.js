@@ -1,6 +1,7 @@
 /* =============================================
-   My Portfolio v3.13.2 — Income UI
-   Desktop UI Overhaul: Grid layout, centered modals
+   My Portfolio v4.0.0 — Income UI
+   Planner-Creator-Evaluator Cycle 1
+   Grid layout, centered modals
    IDs from uid() are STRINGS — no Number() wrapping
    openAddIncome/openEditIncome use _setupModalMainDelegation
    ============================================= */
@@ -78,17 +79,11 @@ function renderIncome() {
 function _setupIncomeDelegation(container) {
   function handleAction(target) {
     const action = target.dataset.action;
-    if (action === 'change-month') {
-      changeMonth(Number(target.dataset.delta));
-    } else if (action === 'open-add-income') {
-      openAddIncome();
-    } else if (action === 'edit-income') {
-      openEditIncome(target.dataset.id);
-    } else if (action === 'delete-income') {
-      doDeleteIncome(target.dataset.id);
-    } else if (action === 'copy-recurring') {
-      copyRecurring(Number(target.dataset.year), Number(target.dataset.month));
-    }
+    if (action === 'change-month') changeMonth(Number(target.dataset.delta));
+    else if (action === 'open-add-income') openAddIncome();
+    else if (action === 'edit-income') openEditIncome(target.dataset.id);
+    else if (action === 'delete-income') doDeleteIncome(target.dataset.id);
+    else if (action === 'copy-recurring') copyRecurring(Number(target.dataset.year), Number(target.dataset.month));
   }
   container.onclick = (e) => {
     const target = e.target.closest('[data-action]');
@@ -102,7 +97,7 @@ function _setupIncomeDelegation(container) {
 }
 
 function getMonthIncome(year, month) {
-  const prefix = `${year}-${String(month).padStart(2,'0')}`;
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
   return appState.income.filter(i => i.date?.startsWith(prefix));
 }
 
@@ -141,7 +136,7 @@ function renderIncomeCatLegend(items) {
   if (total === 0) return '';
   return `
     <div class="pie-legend" role="list" aria-label="수입 카테고리 범례">
-      ${Object.entries(byCat).sort((a,b) => b[1] - a[1]).map(([catId, val]) => {
+      ${Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([catId, val]) => {
         const cat = INCOME_MAP[catId] || INCOME_MAP.other;
         const pct = ((val / total) * 100).toFixed(1);
         return `
@@ -165,18 +160,18 @@ function renderIncomeCharts(items, year, month) {
   destroyChart('incPie');
   const byCat = {};
   for (const i of items) byCat[i.cat] = (byCat[i.cat] || 0) + safeNum(i.amount);
-  const catEntries = Object.entries(byCat).filter(([,v]) => v > 0);
+  const catEntries = Object.entries(byCat).filter(([, v]) => v > 0);
   if (catEntries.length > 0) {
     charts.incPie = renderDoughnut('chartIncPie',
       catEntries.map(([id]) => (INCOME_MAP[id]?.label || id)),
-      catEntries.map(([,v]) => v),
+      catEntries.map(([, v]) => v),
       catEntries.map(([id]) => INCOME_COLORS[id] || '#6B7280'),
-      { centerText: { text: fmtKRW(items.reduce((s,i) => s + safeNum(i.amount), 0)), fontSize: 13 } }
+      { centerText: { text: fmtKRW(items.reduce((s, i) => s + safeNum(i.amount), 0)), fontSize: 13 } }
     );
 
     const altContainer = document.getElementById('chartIncPieAlt');
     if (altContainer) {
-      const totalInc = items.reduce((s,i) => s + safeNum(i.amount), 0);
+      const totalInc = items.reduce((s, i) => s + safeNum(i.amount), 0);
       const rows = catEntries.map(([id, v]) => {
         const pct = totalInc > 0 ? ((v / totalInc) * 100).toFixed(1) + '%' : '0%';
         return [(INCOME_MAP[id]?.label || id), fmtKRW(v), pct];
@@ -211,7 +206,7 @@ function changeMonth(delta) {
   m += delta;
   if (m > 12) { m = 1; y++; }
   if (m < 1) { m = 12; y--; }
-  UIState.incomeMonth = `${y}-${String(m).padStart(2,'0')}`;
+  UIState.incomeMonth = `${y}-${String(m).padStart(2, '0')}`;
   renderIncome();
 }
 
@@ -221,7 +216,7 @@ function openAddIncome() {
 
   const [year, month] = UIState.incomeMonth.split('-').map(Number);
   const day = Math.min(new Date().getDate(), new Date(year, month, 0).getDate());
-  const defaultDate = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  const defaultDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   const container = $('#modalMain');
   container.innerHTML = `
@@ -265,7 +260,6 @@ function openAddIncome() {
     </div>
   `;
   openModal('modalMain');
-
   _setupModalMainDelegation(container);
 }
 
@@ -345,7 +339,6 @@ function openEditIncome(id) {
     </div>
   `;
   openModal('modalMain');
-
   _setupModalMainDelegation(container);
 }
 
@@ -382,7 +375,7 @@ function copyRecurring(year, month) {
     if (!exists) {
       const origDay = Number((r.date || '').split('-')[2]) || 1;
       const safeDay = clampDay(year, month, origDay);
-      const newDate = `${year}-${String(month).padStart(2,'0')}-${String(safeDay).padStart(2,'0')}`;
+      const newDate = `${year}-${String(month).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
       addIncome({ ...r, date: newDate, id: undefined });
       count++;
     }

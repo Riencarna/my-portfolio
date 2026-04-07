@@ -1,8 +1,10 @@
 /* =============================================
-   My Portfolio v3.13.2 — Dashboard UI
-   Desktop UI Overhaul: Grid layout, stat cards, wide charts
-   Fix: empty state hides hero/charts, hero card bg, gradient value
+   My Portfolio v4.0.0 — Dashboard UI
+   Planner-Creator-Evaluator Cycle 1
+   Render-skip optimization: skip if nothing changed
    ============================================= */
+
+let _dashRenderKey = '';
 
 function renderDashboard() {
   const container = $('#pgDash');
@@ -15,6 +17,11 @@ function renderDashboard() {
   const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
   const assetCount = appState.assets.length;
   const hasAssets = assetCount > 0;
+
+  // Skip render if nothing changed
+  const key = `${assetCount}_${total}_${appState.saved}_${Object.values(UIState.dashboardCategoryOpen).join('')}`;
+  if (_dashRenderKey === key && container.innerHTML !== '') return;
+  _dashRenderKey = key;
 
   container.innerHTML = hasAssets ? `
     <div class="dash-hero" role="region" aria-label="총 자산 현황">
@@ -70,9 +77,9 @@ function renderDashboard() {
         <div class="card-title">
           자산 추이
           <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
-            <button class="btn-sm active" data-action="trend" data-days="30" aria-pressed="true">30일</button>
-            <button class="btn-sm" data-action="trend" data-days="90" aria-pressed="false">90일</button>
-            <button class="btn-sm" data-action="trend" data-days="0" aria-pressed="false">전체</button>
+            <button class="btn-sm ${UIState.dashboardTrendDays === 30 ? 'active' : ''}" data-action="trend" data-days="30" aria-pressed="${UIState.dashboardTrendDays === 30}">30일</button>
+            <button class="btn-sm ${UIState.dashboardTrendDays === 90 ? 'active' : ''}" data-action="trend" data-days="90" aria-pressed="${UIState.dashboardTrendDays === 90}">90일</button>
+            <button class="btn-sm ${UIState.dashboardTrendDays === 0 ? 'active' : ''}" data-action="trend" data-days="0" aria-pressed="${UIState.dashboardTrendDays === 0}">전체</button>
           </div>
         </div>
         <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 추이 차트">
@@ -91,7 +98,7 @@ function renderDashboard() {
       destroyChart('pie');
       destroyChart('trend');
       renderPortfolioPie();
-      renderTrendChart(30);
+      renderTrendChart(UIState.dashboardTrendDays);
     });
   }
 
@@ -132,6 +139,7 @@ function _handleDashAction(target) {
 }
 
 function _handleTrendClick(days, btn) {
+  UIState.dashboardTrendDays = days;
   $$('#trendBtns .btn-sm').forEach(b => {
     b.classList.remove('active');
     b.setAttribute('aria-pressed', 'false');
@@ -170,7 +178,8 @@ function renderAutoUpdateSection() {
         </button>
       </div>
       <div id="updateProgressWrap" class="${autoUpdateProgress.running ? 'visible' : 'hidden'}"
-        role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+        ${autoUpdateProgress.running ? 'aria-busy="true"' : ''}>
         <div class="progress-bar">
           <div class="progress-fill" id="updateProgressBar"></div>
         </div>
@@ -192,7 +201,7 @@ async function startAutoUpdate() {
   const btn = $('#btnAutoUpdate') || $('#btnAutoUpdateHeader');
   if (btn) btn.disabled = true;
   const wrap = $('#updateProgressWrap');
-  if (wrap) { wrap.classList.remove('hidden'); wrap.classList.add('visible'); }
+  if (wrap) { wrap.classList.remove('hidden'); wrap.classList.add('visible'); wrap.setAttribute('aria-busy', 'true'); }
 
   const summary = await autoUpdateAll(prog => {
     const pct = prog.total > 0 ? Math.round((prog.done / prog.total) * 100) : 0;
@@ -213,6 +222,7 @@ async function startAutoUpdate() {
     showToast('업데이트할 자산이 없습니다', 'info');
   }
 
+  _dashRenderKey = '';
   renderDashboard();
   renderPageHeader();
 }
@@ -287,7 +297,7 @@ function toggleDashCat(catId) {
   UIState.dashboardCategoryOpen[catId] = !UIState.dashboardCategoryOpen[catId];
   const isOpen = UIState.dashboardCategoryOpen[catId];
   const section = $(`#dashCat-${catId}`);
-  if (!section) { renderDashboard(); return; }
+  if (!section) { _dashRenderKey = ''; renderDashboard(); return; }
 
   const header = section.querySelector('.cat-header');
   if (header) {

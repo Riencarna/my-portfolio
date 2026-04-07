@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v3.13.2 — Stylesheet
-   Desktop-First UI/UX Overhaul
-   Fix: hero card, empty state, card contrast, layout shift, onboarding horizontal
+   My Portfolio v4.0.0 — Stylesheet
+   Planner-Creator-Evaluator Cycle 1
+   Desktop-First UI/UX, SW update banner
    ============================================= */
 
 /* ── Reset ── */
@@ -602,6 +602,23 @@ h4{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--t2)}
 .toast-success{border-color:var(--green);color:var(--green)}
 .toast-error{border-color:var(--red);color:var(--red)}
 .toast-info{border-color:var(--primary);color:var(--primary)}
+
+/* =============================================
+   SW UPDATE BANNER
+   ============================================= */
+.update-banner{
+  position:fixed;top:0;left:0;right:0;z-index:9998;
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  padding:10px 20px;
+  background:linear-gradient(90deg,var(--primary),var(--purple));
+  color:#fff;font-size:14px;font-weight:500;
+  transform:translateY(-100%);transition:transform .3s ease}
+.update-banner.visible{transform:translateY(0)}
+.update-banner.hidden{transform:translateY(-100%)}
+.update-banner-actions{display:flex;gap:8px}
+.update-banner .btn-sm{
+  background:rgba(255,255,255,0.2);color:#fff;border-color:rgba(255,255,255,0.3)}
+.update-banner .btn-sm:hover{background:rgba(255,255,255,0.3)}
 
 /* =============================================
    SPLASH

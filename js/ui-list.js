@@ -1,6 +1,8 @@
 /* =============================================
-   My Portfolio v3.13.2 — Asset List UI
-   Desktop UI Overhaul: Full rebuild from scratch
+   My Portfolio v4.0.0 — Asset List UI
+   Planner-Creator-Evaluator Cycle 1
+   Scoped Cleanup for drag listeners
+   ID-safe: all IDs are strings via sanitizeAsset
    ============================================= */
 
 let _dragAssetId = null;
@@ -135,7 +137,8 @@ function renderListCategory(catId, assets) {
   const hasMore = assets.length > shownCount;
 
   return `
-    <div class="list-cat" id="listCat-${escAttr(catId)}" data-cat="${escAttr(catId)}" ${UIState.isEditMode ? 'draggable="true"' : ''} role="listitem">
+    <div class="list-cat" id="listCat-${escAttr(catId)}" data-cat="${escAttr(catId)}"
+      ${UIState.isEditMode ? 'draggable="true"' : ''} role="listitem">
       <div class="list-cat-header" data-action="toggle-list-cat" data-cat="${escAttr(catId)}"
         role="button" tabindex="0" aria-expanded="${isOpen}">
         ${UIState.isEditMode ? '<span class="drag-handle cat-drag" aria-label="카테고리 드래그">⠿</span>' : ''}

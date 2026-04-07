@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v3.13.2 — Configuration
-   Desktop UI Overhaul: Full rebuild from scratch
+   My Portfolio v4.0.0 — Configuration
+   Planner-Creator-Evaluator Cycle 1
    ============================================= */
 
-const APP_VERSION = '3.13.2';
+const APP_VERSION = '4.0.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -218,6 +218,7 @@ const UIState = {
   listCategoryOpen: {},
   listCategoryShown: {},
   dashboardCategoryOpen: {},
+  dashboardTrendDays: 30,
   isEditMode: false,
   listSearchQuery: '',
   historyFilter: 30,
@@ -231,6 +232,7 @@ const UIState = {
     this.listCategoryOpen = {};
     this.listCategoryShown = {};
     this.dashboardCategoryOpen = {};
+    this.dashboardTrendDays = 30;
     this.isEditMode = false;
     this.listSearchQuery = '';
     this.historyFilter = 30;

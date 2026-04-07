@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v3.13.2 — App Entry Point
-   Desktop UI Overhaul: Sidebar navigation, centered modals
-   Fix: ARIA tablist structure, tab-switch animation
+   My Portfolio v4.0.0 — App Entry Point
+   Planner-Creator-Evaluator Cycle 1
+   SW update banner, page-transition focus management
    ============================================= */
 
 let currentTab = 'pgDash';
@@ -46,21 +46,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// ── Service Worker with Update Banner ──
+let _waitingSW = null;
+
 function registerSW() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-            showToast('새 버전이 있습니다. 새로고침하면 적용됩니다.', 'info');
-          }
-        });
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          _waitingSW = newWorker;
+          showUpdateBanner();
+        }
       });
-    }).catch(e => {
-      console.warn('Service worker registration failed:', e.message);
     });
+  }).catch(e => {
+    console.warn('Service worker registration failed:', e.message);
+  });
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    location.reload();
+  });
+}
+
+function showUpdateBanner() {
+  const banner = $('#updateBanner');
+  if (!banner) return;
+  banner.classList.remove('hidden');
+  banner.classList.add('visible');
+}
+
+function dismissUpdateBanner() {
+  const banner = $('#updateBanner');
+  if (banner) { banner.classList.add('hidden'); banner.classList.remove('visible'); }
+}
+
+function applyUpdate() {
+  if (_waitingSW) {
+    _waitingSW.postMessage({ type: 'SKIP_WAITING' });
   }
 }
 
@@ -106,6 +131,11 @@ function goTab(tabId) {
   renderTabContent();
   syncNav();
   renderPageHeader();
+  // Focus management: move focus to main content on tab switch
+  requestAnimationFrame(() => {
+    const page = $(`#${currentTab}`);
+    if (page) page.focus({ preventScroll: true });
+  });
 }
 
 function restoreLastTab() {
@@ -303,14 +333,12 @@ function renderBottomNav() {
 }
 
 function syncNav() {
-  // Sidebar nav items
   $$('.sidebar .nav-item').forEach(item => {
     const isActive = item.dataset.tab === currentTab;
     item.classList.toggle('active', isActive);
     item.setAttribute('aria-selected', String(isActive));
     item.setAttribute('tabindex', isActive ? '0' : '-1');
   });
-  // Bottom nav buttons (mobile)
   $$('.bottom-nav .nav-btn').forEach(btn => {
     const isActive = btn.dataset.tab === currentTab;
     btn.classList.toggle('active', isActive);
@@ -360,8 +388,8 @@ function removeSplash() {
 
 // ── Keyboard Shortcuts ──
 document.addEventListener('keydown', e => {
-  const el = document.activeElement;
-  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
 
   if (e.key >= '1' && e.key <= '5' && !e.ctrlKey && !e.altKey && !e.metaKey) {
     e.preventDefault();
@@ -372,4 +400,12 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     toggleTheme();
   }
+});
+
+// ── Update Banner Delegation ──
+document.addEventListener('click', e => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+  if (target.dataset.action === 'apply-update') applyUpdate();
+  else if (target.dataset.action === 'dismiss-update') dismissUpdateBanner();
 });

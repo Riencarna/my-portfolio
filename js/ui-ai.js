@@ -1,6 +1,7 @@
 /* =============================================
-   My Portfolio v3.13.2 — Analysis UI
-   Desktop UI Overhaul: Grid layout, wide cards
+   My Portfolio v4.0.0 — Analysis UI
+   Planner-Creator-Evaluator Cycle 1
+   Grid layout, wide cards
    ============================================= */
 
 function renderAnalysis() {
@@ -25,13 +26,9 @@ function renderAnalysis() {
 function _setupAnalysisDelegation(container) {
   function handleAction(target) {
     const action = target.dataset.action;
-    if (action === 'set-goal') {
-      doSetGoal();
-    } else if (action === 'clear-goal') {
-      doClearGoal();
-    } else if (action === 'load-benchmark') {
-      loadBenchmark();
-    }
+    if (action === 'set-goal') doSetGoal();
+    else if (action === 'clear-goal') doClearGoal();
+    else if (action === 'load-benchmark') loadBenchmark();
   }
   container.onclick = (e) => {
     const target = e.target.closest('[data-action]');
@@ -54,7 +51,7 @@ function renderGoalSection(total) {
         <p class="text-muted">자산 목표를 설정하면 진행률을 추적할 수 있습니다.</p>
         <div class="form-row">
           <input type="number" id="goalAmount" placeholder="목표 금액" min="0" aria-label="목표 금액">
-          <input type="date" id="goalDate" value="${(() => { const d = new Date(); d.setFullYear(d.getFullYear()+1); return d.toISOString().split('T')[0]; })()}" aria-label="목표 날짜">
+          <input type="date" id="goalDate" value="${(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]; })()}" aria-label="목표 날짜">
           <button class="btn-p" data-action="set-goal">설정</button>
         </div>
       </div>
@@ -142,7 +139,7 @@ function renderDiversificationSection(catTotals, total) {
           <div class="score-detail">활성 카테고리: <strong>${activeCats}개 / ${CATEGORIES.length}개</strong></div>
           <div class="score-detail">상위 3 자산 비중: <strong>${top3Pct.toFixed(1)}%</strong></div>
           ${top3.map(a => `
-            <div class="score-detail text-muted">${escHtml(a.name)}: ${escHtml(fmtKRW(a.value))} (${((a.value/total)*100).toFixed(1)}%)</div>
+            <div class="score-detail text-muted">${escHtml(a.name)}: ${escHtml(fmtKRW(a.value))} (${((a.value / total) * 100).toFixed(1)}%)</div>
           `).join('')}
         </div>
       </div>
@@ -159,24 +156,27 @@ function renderRiskSection(catTotals, total) {
   const domesticPct = (safeNum(catTotals['국내주식']) / total) * 100;
 
   if (safePct < ANALYSIS_THRESHOLDS.safeLow) {
-    risks.push({ level:'high', msg:`안전자산 비중이 ${safePct.toFixed(1)}%로 매우 낮습니다. (권장: ${ANALYSIS_THRESHOLDS.safeLow}% 이상)` });
+    risks.push({ level: 'high', msg: `안전자산 비중이 ${safePct.toFixed(1)}%로 매우 낮습니다. (권장: ${ANALYSIS_THRESHOLDS.safeLow}% 이상)` });
   }
   if (cryptoPct > ANALYSIS_THRESHOLDS.cryptoHigh) {
-    risks.push({ level:'high', msg:`코인 비중이 ${cryptoPct.toFixed(1)}%입니다. 변동성이 높은 자산이 과다합니다.` });
+    risks.push({ level: 'high', msg: `코인 비중이 ${cryptoPct.toFixed(1)}%입니다. 변동성이 높은 자산이 과다합니다.` });
   }
 
   const assetVals = appState.assets.map(a => ({ name: a.name, value: calcAssetValue(a).value }));
-  const maxAsset = assetVals.sort((a,b) => b.value - a.value)[0];
+  const maxAsset = assetVals.sort((a, b) => b.value - a.value)[0];
   if (maxAsset && (maxAsset.value / total) > (ANALYSIS_THRESHOLDS.singleAssetMax / 100)) {
-    risks.push({ level:'high', msg:`"${maxAsset.name}"이(가) 전체의 ${((maxAsset.value/total)*100).toFixed(1)}%를 차지합니다.` });
+    risks.push({ level: 'high', msg: `"${maxAsset.name}"이(가) 전체의 ${((maxAsset.value / total) * 100).toFixed(1)}%를 차지합니다.` });
   }
   if (domesticPct > ANALYSIS_THRESHOLDS.domesticRisk) {
-    risks.push({ level:'medium', msg:`국내주식 비중이 ${domesticPct.toFixed(1)}%입니다. 해외 분산 투자를 고려하세요.` });
+    risks.push({ level: 'medium', msg: `국내주식 비중이 ${domesticPct.toFixed(1)}%입니다. 해외 분산 투자를 고려하세요.` });
   }
 
-  const bigLoss = appState.assets.filter(a => { const v = calcAssetValue(a); return v.profitPct < ANALYSIS_THRESHOLDS.bigLoss && v.cost > 0; });
+  const bigLoss = appState.assets.filter(a => {
+    const v = calcAssetValue(a);
+    return v.profitPct < ANALYSIS_THRESHOLDS.bigLoss && v.cost > 0;
+  });
   if (bigLoss.length > 0) {
-    risks.push({ level:'medium', msg:`큰 손실 중인 자산 ${bigLoss.length}개: ${bigLoss.map(a => a.name).join(', ')}` });
+    risks.push({ level: 'medium', msg: `큰 손실 중인 자산 ${bigLoss.length}개: ${bigLoss.map(a => a.name).join(', ')}` });
   }
 
   if (risks.length === 0) {
@@ -270,12 +270,12 @@ function renderStrategySection(catTotals, total) {
   const foreignPct = safeNum(catTotals['해외주식']) / total * 100;
   const domesticPct = safeNum(catTotals['국내주식']) / total * 100;
 
-  if (safePct < ANALYSIS_THRESHOLDS.safeLow) strategies.push({ icon:'🛡️', text:`비상금 확보: 안전자산(현금/예적금) 비중을 ${ANALYSIS_THRESHOLDS.safeLow}~20%로 늘리는 것을 고려하세요.` });
-  if (foreignPct < ANALYSIS_THRESHOLDS.foreignLow && domesticPct > ANALYSIS_THRESHOLDS.domesticHigh) strategies.push({ icon:'🌍', text:`해외 분산: 해외주식/ETF 비중을 ${ANALYSIS_THRESHOLDS.foreignLow}% 이상으로 늘려 글로벌 분산 효과를 노려보세요.` });
-  if (cryptoPct > ANALYSIS_THRESHOLDS.cryptoHigh) strategies.push({ icon:'⚖️', text:'리밸런싱: 코인 비중이 높습니다. 일부를 안정적인 자산으로 재배분하세요.' });
-  if (appState.assets.length < 5) strategies.push({ icon:'📊', text:'자산 다양화: 보유 자산이 적습니다. 다양한 카테고리에 분산 투자하세요.' });
-  if (appState.history.length < 7) strategies.push({ icon:'📈', text:'기록 축적: 꾸준히 기록하면 자산 추이를 분석할 수 있습니다.' });
-  if (strategies.length === 0) strategies.push({ icon:'✨', text:'포트폴리오가 잘 분산되어 있습니다. 현재 전략을 유지하세요!' });
+  if (safePct < ANALYSIS_THRESHOLDS.safeLow) strategies.push({ icon: '🛡️', text: `비상금 확보: 안전자산(현금/예적금) 비중을 ${ANALYSIS_THRESHOLDS.safeLow}~20%로 늘리는 것을 고려하세요.` });
+  if (foreignPct < ANALYSIS_THRESHOLDS.foreignLow && domesticPct > ANALYSIS_THRESHOLDS.domesticHigh) strategies.push({ icon: '🌍', text: `해외 분산: 해외주식/ETF 비중을 ${ANALYSIS_THRESHOLDS.foreignLow}% 이상으로 늘려 글로벌 분산 효과를 노려보세요.` });
+  if (cryptoPct > ANALYSIS_THRESHOLDS.cryptoHigh) strategies.push({ icon: '⚖️', text: '리밸런싱: 코인 비중이 높습니다. 일부를 안정적인 자산으로 재배분하세요.' });
+  if (appState.assets.length < 5) strategies.push({ icon: '📊', text: '자산 다양화: 보유 자산이 적습니다. 다양한 카테고리에 분산 투자하세요.' });
+  if (appState.history.length < 7) strategies.push({ icon: '📈', text: '기록 축적: 꾸준히 기록하면 자산 추이를 분석할 수 있습니다.' });
+  if (strategies.length === 0) strategies.push({ icon: '✨', text: '포트폴리오가 잘 분산되어 있습니다. 현재 전략을 유지하세요!' });
 
   return `
     <div class="card" role="region" aria-label="성장 전략">

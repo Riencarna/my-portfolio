@@ -1,6 +1,7 @@
 /* =============================================
-   My Portfolio v3.13.2 — History & Export UI
-   Desktop UI Overhaul: Grid layout, wide charts
+   My Portfolio v4.0.0 — History & Export UI
+   Planner-Creator-Evaluator Cycle 1
+   Grid layout, wide charts, data management
    ============================================= */
 
 function renderHistory() {
@@ -48,7 +49,7 @@ function renderHistory() {
       <div class="card-title">
         자산 기록
         <div class="btn-group" role="group" aria-label="기록 기간 필터">
-          ${[7,30,90,0].map(d => `
+          ${[7, 30, 90, 0].map(d => `
             <button class="btn-sm ${UIState.historyFilter === d ? 'active' : ''}"
               data-action="history-filter" data-days="${d}" aria-pressed="${UIState.historyFilter === d}">${d === 0 ? '전체' : '최근 ' + d + '일'}</button>
           `).join('')}
@@ -79,22 +80,14 @@ function renderHistory() {
 function _setupHistoryDelegation(container) {
   function handleAction(target) {
     const action = target.dataset.action;
-
-    if (action === 'backup-json') {
-      doBackupJSON();
-    } else if (action === 'restore-json') {
-      doRestoreJSON();
-    } else if (action === 'export-csv') {
-      doExportCSV(target.dataset.type);
-    } else if (action === 'export-pdf') {
-      doExportPDF();
-    } else if (action === 'reset-all') {
-      doResetAll();
-    } else if (action === 'history-filter') {
-      setHistoryFilter(Number(target.dataset.days));
-    } else if (action === 'load-more-history') {
-      loadMoreHistory();
-    } else if (action === 'growth-view') {
+    if (action === 'backup-json') doBackupJSON();
+    else if (action === 'restore-json') doRestoreJSON();
+    else if (action === 'export-csv') doExportCSV(target.dataset.type);
+    else if (action === 'export-pdf') doExportPDF();
+    else if (action === 'reset-all') doResetAll();
+    else if (action === 'history-filter') setHistoryFilter(Number(target.dataset.days));
+    else if (action === 'load-more-history') loadMoreHistory();
+    else if (action === 'growth-view') {
       const days = Number(target.dataset.days);
       const byCat = target.dataset.byCat === 'true';
       _handleGrowthViewClick(days, byCat, target);
@@ -133,7 +126,7 @@ function renderHistoryList() {
   if (UIState.historyFilter > 0) {
     const d = new Date();
     d.setDate(d.getDate() - UIState.historyFilter);
-    const cutoffStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const cutoffStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     history = history.filter(h => h.date >= cutoffStr);
   }
 
@@ -179,6 +172,7 @@ function setHistoryFilter(days) {
   renderHistory();
 }
 
+// ── Backup & Restore ──
 function doBackupJSON() {
   try {
     saveDataNow();
@@ -186,7 +180,7 @@ function doBackupJSON() {
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const now = new Date();
-    const fname = `MyPortfolio_backup_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.json`;
+    const fname = `MyPortfolio_backup_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.json`;
     downloadBlob(blob, fname);
     showToast('백업 파일 다운로드 완료', 'success');
   } catch (e) {
@@ -228,6 +222,7 @@ function doRestoreJSON() {
   input.click();
 }
 
+// ── CSV Export ──
 function doExportCSV(type) {
   try {
     let csv, fname;
@@ -249,10 +244,10 @@ function doExportCSV(type) {
 }
 
 function generateAssetCSV() {
-  const headers = ['카테고리','자산명','종목코드','현재가','수량','평가금액','투자금액','손익','수익률'];
+  const headers = ['카테고리', '자산명', '종목코드', '현재가', '수량', '평가금액', '투자금액', '손익', '수익률'];
   const rows = appState.assets.map(a => {
     const v = calcAssetValue(a);
-    return [a.category, a.name, a.stockCode||'', v.price, v.qty, v.value, v.cost, v.profit, v.profitPct.toFixed(2)+'%']
+    return [a.category, a.name, a.stockCode || '', v.price, v.qty, v.value, v.cost, v.profit, v.profitPct.toFixed(2) + '%']
       .map(c => `"${String(c).replace(/"/g, '""')}"`)
       .join(',');
   });
@@ -260,12 +255,12 @@ function generateAssetCSV() {
 }
 
 function generateTxnCSV() {
-  const headers = ['자산명','카테고리','유형','단가','수량','금액','날짜','계좌','메모'];
+  const headers = ['자산명', '카테고리', '유형', '단가', '수량', '금액', '날짜', '계좌', '메모'];
   const rows = [];
   for (const a of appState.assets) {
     for (const t of a.txns) {
       rows.push([a.name, a.category, t.type === 'buy' ? '매수' : '매도',
-        t.price, t.qty, t.price * t.qty, t.date, t.account||'', t.memo||'']
+        t.price, t.qty, t.price * t.qty, t.date, t.account || '', t.memo || '']
         .map(c => `"${String(c).replace(/"/g, '""')}"`)
         .join(','));
     }
@@ -273,6 +268,7 @@ function generateTxnCSV() {
   return [headers.join(','), ...rows].join('\n');
 }
 
+// ── PDF Export ──
 function doExportPDF() {
   try {
     const total = calcTotal(appState.assets);
@@ -294,7 +290,7 @@ function doExportPDF() {
     <h2>자산 상세</h2><table><tr><th>자산명</th><th>카테고리</th><th>수량</th><th>현재가</th><th>평가금액</th><th>손익</th></tr>
     ${appState.assets.map(a => {
       const v = calcAssetValue(a);
-      return `<tr><td>${escHtml(a.name)}</td><td>${escHtml(a.category)}</td><td>${escHtml(fmtNum(v.qty,2))}</td>
+      return `<tr><td>${escHtml(a.name)}</td><td>${escHtml(a.category)}</td><td>${escHtml(fmtNum(v.qty, 2))}</td>
         <td>${escHtml(fmtPrice(v.price))}</td><td>${escHtml(fmtKRW(v.value))}</td>
         <td class="${v.profit >= 0 ? 'positive' : 'negative'}">${escHtml(fmtKRW(v.profit))} (${escHtml(fmtPct(v.profitPct))})</td></tr>`;
     }).join('')}</table>
@@ -311,16 +307,15 @@ function doExportPDF() {
   }
 }
 
+// ── Reset All ──
 function doResetAll() {
   openConfirmModal(
-    '⚠️ 모든 데이터가 영구 삭제됩니다. 백업을 먼저 하시는 것을 권장합니다. 정말 초기화하시겠습니까?',
+    '모든 데이터가 영구 삭제됩니다. 백업을 먼저 하시는 것을 권장합니다. 정말 초기화하시겠습니까?',
     () => {
       openConfirmModal('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', () => {
-        // 앱 데이터 삭제
         resetAllData();
         localStorage.clear();
         sessionStorage.clear();
-        // 서비스 워커 해제 + 캐시 삭제
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(regs => {
             regs.forEach(r => r.unregister());
@@ -331,7 +326,6 @@ function doResetAll() {
             names.forEach(name => caches.delete(name));
           });
         }
-        // 새로고침으로 완전 초기 상태
         setTimeout(() => location.reload(), 500);
       });
     }

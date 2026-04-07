@@ -1,7 +1,8 @@
 /* =============================================
-   My Portfolio v3.13.2 — State Management
-   Desktop UI Overhaul: debouncedSave, import recovery, income cat validation
-   NOTE: All IDs from uid() are STRINGS — never use Number() on them
+   My Portfolio v4.0.0 — State Management
+   Planner-Creator-Evaluator Cycle 1
+   All IDs from uid() are STRINGS — never use Number() on them
+   sanitizeAsset/sanitizeTxn/sanitizeIncome coerce IDs to String
    ============================================= */
 
 // ── Default State ──
@@ -157,7 +158,7 @@ function deletePortfolio(pid) {
   return true;
 }
 
-// ── Migration: v2.6.x short keys → v3.x full keys ──
+// ── Migration: v2.6.x short keys → v3.x+ full keys ──
 function _migrateOldFormat(d) {
   if (d.a && !d.assets) d.assets = d.a;
   if (d.h && !d.history) d.history = d.h;
@@ -183,8 +184,11 @@ function loadData() {
         if (!appState.categoryOrder.includes(cid)) appState.categoryOrder.push(cid);
       }
       appState.categoryOrder = appState.categoryOrder.filter(c => CAT_IDS.includes(c));
+      // sanitizeAsset coerces IDs to String (fixes v2.x numeric ID compatibility)
       appState.assets = appState.assets.slice(0, LIMITS.assets).map(sanitizeAsset);
       appState.history = appState.history.slice(-LIMITS.history);
+      // sanitizeIncome coerces IDs to String
+      appState.income = appState.income.map(sanitizeIncome);
     } else {
       appState = defaultState();
     }
@@ -212,7 +216,6 @@ function makeSnapshot() {
 }
 
 // ── Asset CRUD ──
-// All IDs are strings from uid() — compared with === as strings
 function addAsset(asset) {
   if (appState.assets.length >= LIMITS.assets) {
     showToast(`자산 최대 ${LIMITS.assets}개까지 추가 가능`, 'error');
@@ -308,7 +311,6 @@ function deleteTransaction(assetId, txnId) {
   const idx = appState.assets.findIndex(a => a.id === assetId);
   if (idx < 0) return;
   const asset = appState.assets[idx];
-  // txnId is a string from uid() — compare as string
   const newTxns = asset.txns.filter(t => t.id !== txnId);
   appState.assets[idx] = sanitizeAsset({ ...asset, txns: newTxns });
   invalidateCalcCache();
@@ -318,39 +320,21 @@ function deleteTransaction(assetId, txnId) {
 }
 
 // ── Income CRUD ──
-// Income IDs are strings from uid() — NEVER use Number() on them
 function addIncome(item) {
-  appState.income.push({
-    id: uid(),
-    date: isValidDate(item.date) ? item.date : today(),
-    amount: safeNum(item.amount),
-    cat: INCOME_MAP[item.cat] ? item.cat : 'other',
-    source: item.source ? stripHtml(item.source, 100) : '',
-    memo: item.memo ? stripHtml(item.memo, 200) : '',
-    recurring: !!item.recurring,
-  });
+  appState.income.push(sanitizeIncome(item));
   saveData();
   EventBus.emit('incomeChanged', { type: 'add' });
 }
 
 function updateIncome(id, updates) {
-  // id is a string — find by string comparison
   const idx = appState.income.findIndex(i => i.id === id);
   if (idx < 0) return;
-  const existing = appState.income[idx];
-  appState.income[idx] = {
-    ...existing,
-    ...updates,
-    cat: INCOME_MAP[updates.cat || existing.cat] ? (updates.cat || existing.cat) : 'other',
-    date: isValidDate(updates.date || existing.date) ? (updates.date || existing.date) : today(),
-    amount: safeNum(updates.amount ?? existing.amount),
-  };
+  appState.income[idx] = sanitizeIncome({ ...appState.income[idx], ...updates });
   saveData();
   EventBus.emit('incomeChanged', { type: 'update', id });
 }
 
 function deleteIncome(id) {
-  // id is a string — filter by string comparison
   appState.income = appState.income.filter(i => i.id !== id);
   saveData();
   EventBus.emit('incomeChanged', { type: 'delete', id });
@@ -434,12 +418,7 @@ function importData(json, merge = false) {
     }
     const newState = { ...defaultState(), ...data };
     newState.assets = (newState.assets || []).slice(0, LIMITS.assets).map(sanitizeAsset);
-    newState.income = (newState.income || []).map(i => ({
-      ...i,
-      amount: safeNum(i.amount),
-      cat: INCOME_MAP[i.cat] ? i.cat : 'other',
-      date: isValidDate(i.date) ? i.date : today(),
-    }));
+    newState.income = (newState.income || []).map(sanitizeIncome);
     if (Array.isArray(newState.categoryOrder)) {
       newState.categoryOrder = newState.categoryOrder.filter(c => CAT_IDS.includes(c));
       for (const cid of CAT_IDS) {
