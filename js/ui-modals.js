@@ -199,6 +199,15 @@ function _setupModalSubDelegation(container, extraHandler) {
 
 // ── Form Fields ──
 const INVESTMENT_CATS = ['국내주식', '해외주식', '코인'];
+const NAME_PLACEHOLDER = {
+  '국내주식': '예: 삼성전자, SK하이닉스',
+  '해외주식': '예: AAPL, QQQ, TSLA',
+  '코인': '예: BTC, ETH, SOL',
+  '현금': '예: 비상금, 달러, 용돈',
+  '예적금': '예: 정기예금, 적금',
+  '부동산': '예: 아파트, 오피스텔',
+  '기타': '예: 금, 자동차, 보험',
+};
 
 function updateFormFields(cat) {
   const isStock = ['국내주식', '해외주식'].includes(cat);
@@ -208,12 +217,14 @@ function updateFormFields(cat) {
   const stockF = $('#stockFields'), coinF = $('#coinField'), usdtF = $('#usdtField');
   const txnSection = $('#txnSection'), valueField = $('#valueField');
   const priceLabel = $('#editPriceLabel');
+  const nameInput = $('#assetName') || $('#editName');
   if (stockF) { stockF.classList.toggle('hidden', !isStock); stockF.classList.toggle('form-row-visible', isStock); }
   if (coinF) coinF.classList.toggle('hidden', !isCoin);
   if (usdtF) usdtF.classList.toggle('hidden', !isCash);
   if (txnSection) txnSection.classList.toggle('hidden', !isInvestment);
   if (valueField) valueField.classList.toggle('hidden', isInvestment);
   if (priceLabel) priceLabel.textContent = isInvestment ? '현재 단가' : '금액';
+  if (nameInput) nameInput.placeholder = NAME_PLACEHOLDER[cat] || '자산명';
 }
 
 // ── Add Asset ──
@@ -222,7 +233,7 @@ function openAddAsset() {
   const container = $('#modalMain');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 추가</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
     <div class="form-group"><label id="catSelectLabel">카테고리</label>${renderCategorySelector('국내주식', 'catSelect')}</div>
-    <div class="form-group"><label for="assetName">자산명 *</label><input type="text" id="assetName" placeholder="예: 삼성전자, QQQ, BTC" maxlength="100" required></div>
+    <div class="form-group"><label for="assetName">자산명 *</label><input type="text" id="assetName" placeholder="예: 삼성전자, SK하이닉스" maxlength="100" required></div>
     <div class="form-row" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" placeholder="예: 005930" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket"><option value="KOSPI">KOSPI</option><option value="KOSDAQ">KOSDAQ</option><option value="NYSE">NYSE</option><option value="NASDAQ">NASDAQ</option><option value="">기타</option></select></div></div>
     <div class="form-group hidden" id="coinField"><label for="coinSelect">코인 ID (CoinGecko)</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, id]) => `<option value="${escAttr(id)}">${escHtml(sym)} (${escHtml(id)})</option>`).join('')}</select></div>
     <div class="form-group hidden" id="usdtField"><label><input type="checkbox" id="isUsdt"> USDT (자동 환율 업데이트)</label></div>
