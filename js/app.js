@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — App Entry Point
-   Planner-Creator-Evaluator Cycle 2
-   FAB, directional page transitions, bento glass UI
+   My Portfolio v5.0.0 — App Entry Point
+   Soft Neutral: sidebar/header/FAB/theme-reactive charts
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let currentTab = 'pgDash';

@@ -28,12 +28,12 @@ function renderList() {
   container.innerHTML = `
     <div class="list-toolbar stagger-item" style="--i:0">
       <div class="search-box">
-        <input type="text" id="searchInput" class="input" placeholder="자산 검색..."
+        <input type="text" id="searchInput" placeholder="자산 검색..."
           value="${escAttr(UIState.listSearchQuery)}" aria-label="자산 검색">
         ${UIState.listSearchQuery ? '<button class="search-clear" data-action="clear-search" aria-label="검색 초기화">✕</button>' : ''}
       </div>
       <div class="list-actions">
-        <button class="btn-secondary btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
+        <button class="btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
           aria-pressed="${UIState.isEditMode}" aria-label="${UIState.isEditMode ? '편집 완료' : '편집 모드'}">
           ${UIState.isEditMode ? '✓ 완료' : '✎ 편집'}
         </button>
