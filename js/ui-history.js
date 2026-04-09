@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — History & Export UI
-   Planner-Creator-Evaluator Cycle 2
-   Grid layout, wide charts, data management
+   My Portfolio v5.0.0 — History & Export UI
+   Soft Neutral palette, PDF 라벤더 강조
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 function renderHistory() {
@@ -274,11 +274,12 @@ function doExportPDF() {
     const total = calcTotal(appState.assets);
     const catTotals = calcCategoryTotals(appState.assets);
     let html = `<html><head><meta charset="utf-8"><title>My Portfolio Report</title>
-    <style>body{font-family:sans-serif;padding:40px;color:#333}h1{color:#1E293B;border-bottom:2px solid #6366f1;padding-bottom:8px}
-    h2{color:#475569;margin-top:24px}table{width:100%;border-collapse:collapse;margin:12px 0}
-    th,td{border:1px solid #E2E8F0;padding:8px 12px;text-align:left}th{background:#F1F5F9;font-weight:600}
-    .total{font-size:24px;font-weight:700;color:#6366f1}.positive{color:#10B981}.negative{color:#EF4444}
-    .footer{margin-top:40px;color:#94A3B8;font-size:12px}</style></head><body>
+    <style>body{font-family:'Pretendard',sans-serif;padding:40px;color:#1A1A1A;background:#FAF9F7}
+    h1{color:#1A1A1A;border-bottom:2px solid #7C6FF0;padding-bottom:8px}
+    h2{color:#4A4A4A;margin-top:24px}table{width:100%;border-collapse:collapse;margin:12px 0}
+    th,td{border:1px solid #EFEEEA;padding:8px 12px;text-align:left}th{background:#F4F2EE;font-weight:600}
+    .total{font-size:24px;font-weight:700;color:#7C6FF0}.positive{color:#6BBF8A}.negative{color:#E8788A}
+    .footer{margin-top:40px;color:#A8A8A8;font-size:12px}</style></head><body>
     <h1>${escHtml(APP_NAME)} 리포트</h1>
     <p>생성일: ${escHtml(fmtDate(new Date()))} | 버전: v${escHtml(APP_VERSION)}</p>
     <p class="total">총 자산: ${escHtml(fmtKRW(total))}</p>

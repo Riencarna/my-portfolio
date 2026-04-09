@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — Analysis UI
-   Planner-Creator-Evaluator Cycle 2
-   Glassmorphism cards, stagger animations
+   My Portfolio v5.0.0 — Analysis UI
+   Soft Neutral palette, stagger animations
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 function renderAnalysis() {
@@ -127,9 +127,9 @@ function renderDiversificationSection(catTotals, total) {
   const top3Pct = total > 0 ? (top3.reduce((s, a) => s + a.value, 0) / total) * 100 : 0;
 
   let scoreLabel, scoreColor;
-  if (score >= 70) { scoreLabel = '우수'; scoreColor = '#10B981'; }
-  else if (score >= 40) { scoreLabel = '보통'; scoreColor = '#F59E0B'; }
-  else { scoreLabel = '집중'; scoreColor = '#EF4444'; }
+  if (score >= 70) { scoreLabel = '우수'; scoreColor = '#6BBF8A'; }
+  else if (score >= 40) { scoreLabel = '보통'; scoreColor = '#E8B474'; }
+  else { scoreLabel = '집중'; scoreColor = '#E8788A'; }
 
   return `
     <div class="card" role="region" aria-label="분산투자 진단">

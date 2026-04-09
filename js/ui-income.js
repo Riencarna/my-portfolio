@@ -1,9 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — Income UI
-   Planner-Creator-Evaluator Cycle 2
-   Grid layout, centered modals
-   IDs from uid() are STRINGS — no Number() wrapping
-   openAddIncome/openEditIncome use _setupModalMainDelegation
+   My Portfolio v5.0.0 — Income UI
+   Soft Neutral palette + dash-charts 재사용
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 function renderIncome() {
@@ -151,9 +149,10 @@ function renderIncomeCatLegend(items) {
   `;
 }
 
+// Soft Neutral palette (v5.0.0)
 const INCOME_COLORS = Object.freeze({
-  salary: '#6366f1', bonus: '#8b5cf6', side: '#f59e0b', invest: '#10B981',
-  rental: '#ec4899', interest: '#06b6d4', other: '#6b7280',
+  salary: '#7C6FF0', bonus: '#A395F5', side: '#E8B474', invest: '#6BBF8A',
+  rental: '#E8889E', interest: '#6B9DC7', other: '#B5ADA0',
 });
 
 function renderIncomeCharts(items, year, month) {
@@ -191,7 +190,8 @@ function renderIncomeCharts(items, year, month) {
     getMonthIncome(y, m).reduce((s, i) => s + safeNum(i.amount), 0)
   );
   if (barData.some(v => v > 0)) {
-    charts.incBar = renderBarChart('chartIncBar', months.map(m => m.label), barData, '#6366f1');
+    const primary = getThemeColor('--primary') || '#7C6FF0';
+    charts.incBar = renderBarChart('chartIncBar', months.map(m => m.label), barData, primary);
 
     const altContainer = document.getElementById('chartIncBarAlt');
     if (altContainer) {
