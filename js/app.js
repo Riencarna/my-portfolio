@@ -112,6 +112,8 @@ function toggleTheme() {
   localStorage.setItem(THEME_KEY, next);
   updateThemeMeta(next);
   destroyAllCharts();
+  // Force dashboard re-render so charts pick up new theme colors
+  if (typeof _dashRenderKey !== 'undefined') _dashRenderKey = '';
   updateSidebarThemeBtn(next);
   renderPageHeader();
   requestAnimationFrame(() => {
