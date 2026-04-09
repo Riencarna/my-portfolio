@@ -1,8 +1,8 @@
 /* =============================================
-   My Portfolio v4.1.0 — Asset List UI
-   Planner-Creator-Evaluator Cycle 2
-   Scoped Cleanup for drag listeners
-   ID-safe: all IDs are strings via sanitizeAsset
+   My Portfolio v5.0.0 — Asset List UI
+   Soft Neutral: cleaner toolbar, stagger animations
+   Drag&Drop logic preserved from v4.4.1 (lines 290~507)
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let _dragAssetId = null;
@@ -26,14 +26,14 @@ function renderList() {
   const order = appState.categoryOrder;
 
   container.innerHTML = `
-    <div class="list-toolbar">
+    <div class="list-toolbar stagger-item" style="--i:0">
       <div class="search-box">
-        <input type="text" id="searchInput" placeholder="자산 검색..."
+        <input type="text" id="searchInput" class="input" placeholder="자산 검색..."
           value="${escAttr(UIState.listSearchQuery)}" aria-label="자산 검색">
         ${UIState.listSearchQuery ? '<button class="search-clear" data-action="clear-search" aria-label="검색 초기화">✕</button>' : ''}
       </div>
       <div class="list-actions">
-        <button class="btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
+        <button class="btn-secondary btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
           aria-pressed="${UIState.isEditMode}" aria-label="${UIState.isEditMode ? '편집 완료' : '편집 모드'}">
           ${UIState.isEditMode ? '✓ 완료' : '✎ 편집'}
         </button>
@@ -41,16 +41,16 @@ function renderList() {
       </div>
     </div>
 
-    <div class="asset-summary" aria-label="자산 요약">
+    <div class="asset-summary stagger-item" style="--i:1" aria-label="자산 요약">
       <span>총 ${appState.assets.length}개 자산</span>
       <span>${escHtml(fmtKRW(calcTotal(appState.assets)))}</span>
     </div>
 
     <div id="assetListBody" role="list" aria-label="자산 목록">
-      ${order.map(catId => {
+      ${order.map((catId, idx) => {
         const catAssets = grouped[catId] || [];
         if (catAssets.length === 0 && !UIState.isEditMode) return '';
-        return renderListCategory(catId, catAssets);
+        return renderListCategory(catId, catAssets, idx + 2);
       }).join('')}
     </div>
   `;
@@ -130,7 +130,7 @@ function toggleEditMode() {
   renderList();
 }
 
-function renderListCategory(catId, assets) {
+function renderListCategory(catId, assets, staggerIdx = 2) {
   const cat = CAT_MAP[catId];
   const isOpen = UIState.listCategoryOpen[catId] !== false;
   const total = assets.reduce((s, a) => s + calcAssetValue(a).value, 0);
@@ -139,7 +139,7 @@ function renderListCategory(catId, assets) {
   const hasMore = assets.length > shownCount;
 
   return `
-    <div class="list-cat" id="listCat-${escAttr(catId)}" data-cat="${escAttr(catId)}"
+    <div class="list-cat stagger-item" style="--i:${staggerIdx}" id="listCat-${escAttr(catId)}" data-cat="${escAttr(catId)}"
       ${UIState.isEditMode ? 'draggable="true"' : ''} role="listitem">
       <div class="list-cat-header" data-action="toggle-list-cat" data-cat="${escAttr(catId)}"
         role="button" tabindex="0" aria-expanded="${isOpen}">
