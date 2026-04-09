@@ -7,8 +7,10 @@
 
 let _dragAssetId = null;
 let _dragCatName = null;
+let _dragInsertBefore = false;
 let _touchDragEl = null;
 let _touchClone = null;
+let _touchInsertBefore = false;
 
 const _listCleanup = Cleanup.scope('list');
 const _dragCleanup = Cleanup.scope('drag');
@@ -286,111 +288,195 @@ function toggleListCat(catId) {
 }
 
 // ── Drag & Drop ──
+// v4.4.1: 처음부터 재작성
+//  - 데스크톱: 행 어디서든 드래그 시작 (핸들 gate 제거, .edit-actions는 draggable=false로 차단됨)
+//  - 모바일: .drag-handle 터치만 드래그 시작 (히트영역 44px CSS로 확대)
+//  - 삽입선 피드백: 타겟 상/하반부 판정 → drag-over-top / drag-over-bottom
+//  - window.__dragInProgress 전역 플래그: app.js 스와이프 핸들러가 이를 보고 bail
+//  - 카테고리 dragstart도 stopPropagation
 function setupDragAndDrop() {
   _dragCleanup.removeAll();
 
+  // ── Asset rows ──
   $$('.list-asset[draggable]').forEach(el => {
     _dragCleanup.add(el, 'dragstart', e => {
-      if (!e.target.closest('.drag-handle')) { e.preventDefault(); return; }
       e.stopPropagation();
       _dragAssetId = el.dataset.id;
       _dragCatName = el.dataset.cat;
+      _dragInsertBefore = false;
       el.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
+      window.__dragInProgress = true;
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(_dragAssetId));
+      } catch (_) { /* Safari quirk */ }
     });
+
     _dragCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
-      $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
+      _clearDragOverClasses();
+      _dragAssetId = null;
+      _dragCatName = null;
+      _dragInsertBefore = false;
+      setTimeout(() => { window.__dragInProgress = false; }, 50);
     });
+
     _dragCleanup.add(el, 'dragover', e => {
+      if (!_dragAssetId || el.dataset.cat !== _dragCatName) return;
+      if (el.dataset.id === _dragAssetId) return;
       e.preventDefault();
-      if (el.dataset.cat === _dragCatName) el.classList.add('drag-over');
+      e.dataTransfer.dropEffect = 'move';
+      const rect = el.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      _dragInsertBefore = before;
+      _clearDragOverClasses();
+      el.classList.add(before ? 'drag-over-top' : 'drag-over-bottom');
     });
-    _dragCleanup.add(el, 'dragleave', () => el.classList.remove('drag-over'));
+
+    _dragCleanup.add(el, 'dragleave', e => {
+      if (e.currentTarget === el && !el.contains(e.relatedTarget)) {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+      }
+    });
+
     _dragCleanup.add(el, 'drop', e => {
       e.preventDefault();
-      el.classList.remove('drag-over');
+      e.stopPropagation();
+      _clearDragOverClasses();
       const targetId = el.dataset.id;
       if (_dragAssetId && _dragAssetId !== targetId && el.dataset.cat === _dragCatName) {
-        onReorderAsset(_dragAssetId, targetId);
+        onReorderAsset(_dragAssetId, targetId, _dragInsertBefore);
       }
     });
   });
 
+  // ── Category rows ──
   $$('.list-cat[draggable]').forEach(el => {
     _dragCleanup.add(el, 'dragstart', e => {
-      if (!e.target.closest('.cat-drag')) { e.preventDefault(); return; }
+      // 안전장치: 내부 asset에서 시작한 dragstart가 버블링된 경우 차단
+      if (e.target.closest('.list-asset')) { e.preventDefault(); return; }
+      e.stopPropagation();
       _dragAssetId = null;
       _dragCatName = el.dataset.cat;
+      _dragInsertBefore = false;
       el.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
+      window.__dragInProgress = true;
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(_dragCatName));
+      } catch (_) {}
     });
+
     _dragCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
-      $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
+      _clearDragOverClasses();
+      _dragCatName = null;
+      _dragInsertBefore = false;
+      setTimeout(() => { window.__dragInProgress = false; }, 50);
     });
+
     _dragCleanup.add(el, 'dragover', e => {
+      if (_dragAssetId) return; // asset 드래그 중엔 카테고리 하이라이트 금지
+      if (!_dragCatName || el.dataset.cat === _dragCatName) return;
       e.preventDefault();
-      if (_dragCatName && el.dataset.cat !== _dragCatName) el.classList.add('drag-over');
+      e.dataTransfer.dropEffect = 'move';
+      const rect = el.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      _dragInsertBefore = before;
+      _clearDragOverClasses();
+      el.classList.add(before ? 'drag-over-top' : 'drag-over-bottom');
     });
-    _dragCleanup.add(el, 'dragleave', () => el.classList.remove('drag-over'));
+
+    _dragCleanup.add(el, 'dragleave', e => {
+      if (e.currentTarget === el && !el.contains(e.relatedTarget)) {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+      }
+    });
+
     _dragCleanup.add(el, 'drop', e => {
       e.preventDefault();
-      el.classList.remove('drag-over');
+      e.stopPropagation();
+      _clearDragOverClasses();
       const targetCat = el.dataset.cat;
-      if (_dragCatName && !_dragAssetId && _dragCatName !== targetCat) onReorderCategory(_dragCatName, targetCat);
+      if (_dragCatName && !_dragAssetId && _dragCatName !== targetCat) {
+        onReorderCategory(_dragCatName, targetCat, _dragInsertBefore);
+      }
     });
   });
 
   setupTouchDrag();
 }
 
+function _clearDragOverClasses() {
+  $$('.drag-over-top, .drag-over-bottom, .drag-over').forEach(d => {
+    d.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-over');
+  });
+}
+
+// ── Touch Drag (mobile) ──
 function setupTouchDrag() {
   const touchMoveHandler = e => {
     if (!_touchClone) return;
     e.preventDefault();
-    positionGhost(e.touches[0]);
-    const elBelow = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+    const t = e.touches[0];
+    positionGhost(t);
+    const elBelow = document.elementFromPoint(t.clientX, t.clientY);
     const target = elBelow?.closest('.list-asset, .list-cat');
-    $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
-    if (target && target !== _touchDragEl) target.classList.add('drag-over');
+    _clearDragOverClasses();
+    if (!target || target === _touchDragEl) return;
+    if (_touchDragEl.classList.contains('list-asset')) {
+      if (!target.classList.contains('list-asset')) return;
+      if (target.dataset.cat !== _touchDragEl.dataset.cat) return;
+    } else if (_touchDragEl.classList.contains('list-cat')) {
+      if (!target.classList.contains('list-cat')) return;
+      if (target.dataset.cat === _touchDragEl.dataset.cat) return;
+    }
+    const rect = target.getBoundingClientRect();
+    const before = (t.clientY - rect.top) < rect.height / 2;
+    _touchInsertBefore = before;
+    target.classList.add(before ? 'drag-over-top' : 'drag-over-bottom');
   };
   _dragCleanup.add(document, 'touchmove', touchMoveHandler, { passive: false });
 
   const touchEndHandler = () => {
     if (!_touchClone) return;
-    const dropTarget = $('.drag-over');
+    const dropTarget = document.querySelector('.drag-over-top, .drag-over-bottom');
     if (dropTarget && _touchDragEl) {
+      const before = dropTarget.classList.contains('drag-over-top');
       if (_touchDragEl.classList.contains('list-asset') && dropTarget.classList.contains('list-asset')) {
         const fromId = _touchDragEl.dataset.id;
         const toId = dropTarget.dataset.id;
-        if (fromId && toId && _touchDragEl.dataset.cat === dropTarget.dataset.cat) {
-          onReorderAsset(fromId, toId);
+        if (fromId && toId && _touchDragEl.dataset.cat === dropTarget.dataset.cat && fromId !== toId) {
+          onReorderAsset(fromId, toId, before);
         }
       } else if (_touchDragEl.classList.contains('list-cat') && dropTarget.classList.contains('list-cat')) {
         const fromCat = _touchDragEl.dataset.cat;
         const toCat = dropTarget.dataset.cat;
-        if (fromCat && toCat && fromCat !== toCat) onReorderCategory(fromCat, toCat);
+        if (fromCat && toCat && fromCat !== toCat) {
+          onReorderCategory(fromCat, toCat, before);
+        }
       }
     }
     cleanupTouchDrag();
   };
   _dragCleanup.add(document, 'touchend', touchEndHandler);
+  _dragCleanup.add(document, 'touchcancel', cleanupTouchDrag);
 
   $$('.drag-handle').forEach(handle => {
     _dragCleanup.add(handle, 'touchstart', e => {
       e.preventDefault();
+      e.stopPropagation();
       const target = handle.closest('.list-asset') || handle.closest('.list-cat');
       if (!target) return;
       _touchDragEl = target;
+      _touchInsertBefore = false;
       _touchClone = target.cloneNode(true);
       _touchClone.classList.add('touch-ghost');
       _touchClone.style.width = target.offsetWidth + 'px';
       document.body.appendChild(_touchClone);
       positionGhost(e.touches[0]);
       target.classList.add('dragging');
+      window.__dragInProgress = true;
     }, { passive: false });
   });
 }
@@ -398,7 +484,9 @@ function setupTouchDrag() {
 function cleanupTouchDrag() {
   if (_touchClone) { _touchClone.remove(); _touchClone = null; }
   if (_touchDragEl) { _touchDragEl.classList.remove('dragging'); _touchDragEl = null; }
-  $$('.drag-over').forEach(d => d.classList.remove('drag-over'));
+  _touchInsertBefore = false;
+  _clearDragOverClasses();
+  setTimeout(() => { window.__dragInProgress = false; }, 50);
 }
 
 function positionGhost(touch) {
@@ -407,13 +495,13 @@ function positionGhost(touch) {
   _touchClone.style.top = (touch.clientY - TOUCH_GHOST_OFFSET.y) + 'px';
 }
 
-function onReorderAsset(fromId, toId) {
-  reorderAsset(fromId, toId);
+function onReorderAsset(fromId, toId, insertBefore) {
+  reorderAsset(fromId, toId, insertBefore);
   renderList();
 }
 
-function onReorderCategory(fromCat, toCat) {
-  reorderCategory(fromCat, toCat);
+function onReorderCategory(fromCat, toCat, insertBefore) {
+  reorderCategory(fromCat, toCat, insertBefore);
   renderList();
 }
 

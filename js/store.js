@@ -341,23 +341,29 @@ function deleteIncome(id) {
 }
 
 // ── Reorder ──
-function reorderAsset(fromId, toId) {
+// v4.4.1: 대칭 시맨틱 — "타겟 X에 드롭 → 이동 아이템이 X의 슬롯 차지,
+// X 및 이후가 한 칸씩 밀림". 앞→뒤 드래그의 off-by-one 수정.
+function reorderAsset(fromId, toId, insertBefore = false) {
   const arr = appState.assets;
   const fromIdx = arr.findIndex(a => a.id === fromId);
-  const toIdx = arr.findIndex(a => a.id === toId);
-  if (fromIdx < 0 || toIdx < 0) return;
+  if (fromIdx < 0) return;
   const [item] = arr.splice(fromIdx, 1);
+  let toIdx = arr.findIndex(a => a.id === toId);
+  if (toIdx < 0) { arr.splice(fromIdx, 0, item); return; }
+  if (!insertBefore) toIdx += 1;
   arr.splice(toIdx, 0, item);
   invalidateCalcCache();
   saveData();
 }
 
-function reorderCategory(fromCat, toCat) {
+function reorderCategory(fromCat, toCat, insertBefore = false) {
   const order = appState.categoryOrder;
   const fromIdx = order.indexOf(fromCat);
-  const toIdx = order.indexOf(toCat);
-  if (fromIdx < 0 || toIdx < 0) return;
+  if (fromIdx < 0) return;
   order.splice(fromIdx, 1);
+  let toIdx = order.indexOf(toCat);
+  if (toIdx < 0) { order.splice(fromIdx, 0, fromCat); return; }
+  if (!insertBefore) toIdx += 1;
   order.splice(toIdx, 0, fromCat);
   invalidateCalcCache();
   saveData();

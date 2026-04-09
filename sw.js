@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v4.4.0
+/* Service Worker - My Portfolio v4.4.1
    Planner-Creator-Evaluator Cycle 2
-   Added: SKIP_WAITING message handler for click-to-refresh */
+   Drag&Drop reorder 수정 (삽입선 피드백, 히트영역 44px, 스와이프 bail) */
 
-var CACHE_NAME = "myportfolio-v4.4";
+var CACHE_NAME = "myportfolio-v4.4.1";
 
 var STATIC_ASSETS = [
   "./",

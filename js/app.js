@@ -421,11 +421,15 @@ function setupSwipe() {
   }, { passive: true });
 
   document.addEventListener('touchend', e => {
+    // v4.4.1: 드래그-리오더 진행 중이면 탭 전환 무시
+    if (window.__dragInProgress) return;
     const dx = e.changedTouches[0].clientX - _swipeStartX;
     const dy = e.changedTouches[0].clientY - _swipeStartY;
     if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
     if (Math.abs(dy) > Math.abs(dx)) return;
     if (e.target.closest('input, select, textarea, .drag-handle, canvas, .modal.active')) return;
+    // Belt-and-suspenders: 목록 탭 편집 모드에선 가로 스와이프 무시
+    if (UIState.isEditMode && currentTab === 'pgList') return;
 
     const idx = TAB_ORDER.indexOf(currentTab);
     if (dx > 0 && idx > 0) goTab(TAB_ORDER[idx - 1]);
