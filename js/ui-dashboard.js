@@ -1,8 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — Dashboard UI
-   Planner-Creator-Evaluator Cycle 2
-   Bento grid layout, stagger animations,
-   render-skip optimization
+   My Portfolio v5.0.0 — Dashboard UI
+   Soft Neutral: hero + stats + charts + breakdown
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let _dashRenderKey = '';
@@ -24,22 +23,21 @@ function renderDashboard() {
   _dashRenderKey = key;
 
   container.innerHTML = hasAssets ? `
-    <div class="bento-grid" role="region" aria-label="대시보드">
-      <div class="dash-hero bento-span-2 stagger-item" style="--i:0" role="region" aria-label="총 자산 현황">
-        <div class="dash-hero-label">총 자산</div>
-        <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
-        <div class="dash-hero-change ${profitClass(change)}" aria-label="일일 변동">
-          ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
-        </div>
-        ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
+    <section class="dash-hero stagger-item" style="--i:0" role="region" aria-label="총 자산 현황">
+      <div class="dash-hero-label">총 자산</div>
+      <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
+      <div class="dash-hero-change ${profitClass(change)}" aria-label="일일 변동">
+        ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
       </div>
+      ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
+    </section>
 
+    <section class="dash-stats" role="region" aria-label="요약 지표">
       <div class="stat-card stagger-item" style="--i:1">
         <div class="stat-label">보유 자산</div>
         <div class="stat-value">${assetCount}개</div>
         <div class="stat-sub">${appState.categoryOrder.filter(c => catTotals[c] > 0).length}개 카테고리</div>
       </div>
-
       ${cachedRate ? `
         <div class="stat-card stagger-item" style="--i:2">
           <div class="stat-label">USD/KRW 환율</div>
@@ -47,7 +45,6 @@ function renderDashboard() {
           <div class="stat-sub">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</div>
         </div>
       ` : ''}
-
       ${cachedUsdt ? `
         <div class="stat-card stagger-item" style="--i:${cachedRate ? 3 : 2}">
           <div class="stat-label">USDT</div>
@@ -55,7 +52,6 @@ function renderDashboard() {
           <div class="stat-sub">${escHtml(cachedUsdt.source)}</div>
         </div>
       ` : ''}
-
       ${appState.history.length >= 2 ? `
         <div class="stat-card stagger-item" style="--i:${(cachedRate ? 1 : 0) + (cachedUsdt ? 1 : 0) + 2}">
           <div class="stat-label">기록 일수</div>
@@ -63,11 +59,11 @@ function renderDashboard() {
           <div class="stat-sub">최초: ${escHtml(fmtDate(appState.history[0]?.date))}</div>
         </div>
       ` : ''}
-    </div>
+    </section>
 
     ${renderBackupReminder()}
 
-    <div class="dash-charts" role="region" aria-label="차트">
+    <section class="dash-charts" role="region" aria-label="차트">
       <div class="card stagger-item" style="--i:3">
         <div class="card-title">자산 분포</div>
         <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 분포 차트">
@@ -78,7 +74,7 @@ function renderDashboard() {
       </div>
       <div class="card stagger-item" style="--i:4">
         <div class="card-title">
-          자산 추이
+          <span>자산 추이</span>
           <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
             <button class="btn-sm ${UIState.dashboardTrendDays === 30 ? 'active' : ''}" data-action="trend" data-days="30" aria-pressed="${UIState.dashboardTrendDays === 30}">30일</button>
             <button class="btn-sm ${UIState.dashboardTrendDays === 90 ? 'active' : ''}" data-action="trend" data-days="90" aria-pressed="${UIState.dashboardTrendDays === 90}">90일</button>
@@ -90,7 +86,7 @@ function renderDashboard() {
         </div>
         <div id="chartTrendAlt"></div>
       </div>
-    </div>
+    </section>
 
     ${renderAutoUpdateSection()}
     ${renderCategoryBreakdown(catTotals, total)}

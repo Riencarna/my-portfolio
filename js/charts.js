@@ -1,6 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — Charts (Chart.js)
-   Planner-Creator-Evaluator Cycle 2
+   My Portfolio v5.0.0 — Charts (Chart.js)
+   Soft Neutral: lavender/coral palette
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 const charts = { pie: null, catPie: null, catPies: {}, trend: null, incBar: null, incPie: null, growth: null };
@@ -186,9 +187,10 @@ function renderTrendChart(days = 30) {
   if (!canvas) return;
   const labels = history.map(h => fmtDate(h.date).slice(5));
   const data = history.map(h => h.total);
+  const primary = getThemeColor('--primary') || '#7C6FF0';
   charts.trend = renderLineChart('chartTrend', labels, [{
-    label: '총 자산', data, borderColor: '#3B82F6',
-    backgroundColor: makeGradient(canvas, '#3B82F6'), fill: true,
+    label: '총 자산', data, borderColor: primary,
+    backgroundColor: makeGradient(canvas, primary), fill: true,
   }], { pointRadius: data.length > CHART_POINT_THRESHOLD ? 0 : 2 });
 
   const altContainer = document.getElementById('chartTrendAlt');
@@ -220,9 +222,10 @@ function renderGrowthChart(days = 0, byCategory = false) {
     }
     charts.growth = renderLineChart('chartGrowth', labels, datasets, { legend: true, pointRadius: 0 });
   } else {
+    const primary = getThemeColor('--primary') || '#7C6FF0';
     charts.growth = renderLineChart('chartGrowth', labels, [{
-      label: '총 자산', data: history.map(h => h.total), borderColor: '#8B5CF6',
-      backgroundColor: makeGradient(canvas, '#8B5CF6'), fill: true,
+      label: '총 자산', data: history.map(h => h.total), borderColor: primary,
+      backgroundColor: makeGradient(canvas, primary), fill: true,
     }], { pointRadius: history.length > CHART_POINT_THRESHOLD ? 0 : 2 });
   }
 

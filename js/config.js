@@ -74,15 +74,15 @@ const LIMITS = Object.freeze({
 // Fallback values
 const FALLBACK_USD_KRW = 1350;
 
-// Asset categories
+// Asset categories — Soft Neutral palette (v5.0.0)
 const CATEGORIES = Object.freeze([
-  { id: '국내주식', icon: '🇰🇷', color: '#6366f1', label: '국내주식' },
-  { id: '해외주식', icon: '🌍', color: '#8b5cf6', label: '해외주식' },
-  { id: '코인',     icon: '₿',  color: '#f59e0b', label: '코인' },
-  { id: '현금',     icon: '💵', color: '#22c55e', label: '현금' },
-  { id: '예적금',   icon: '🏦', color: '#06b6d4', label: '예적금' },
-  { id: '부동산',   icon: '🏠', color: '#ec4899', label: '부동산' },
-  { id: '기타',     icon: '📦', color: '#6b7280', label: '기타' },
+  { id: '국내주식', icon: '🇰🇷', color: '#7C6FF0', label: '국내주식' },
+  { id: '해외주식', icon: '🌍', color: '#A395F5', label: '해외주식' },
+  { id: '코인',     icon: '₿',  color: '#E8B474', label: '코인' },
+  { id: '현금',     icon: '💵', color: '#6BBF8A', label: '현금' },
+  { id: '예적금',   icon: '🏦', color: '#6B9DC7', label: '예적금' },
+  { id: '부동산',   icon: '🏠', color: '#E8889E', label: '부동산' },
+  { id: '기타',     icon: '📦', color: '#B5ADA0', label: '기타' },
 ]);
 const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c])));
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));
