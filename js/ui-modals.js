@@ -1,8 +1,8 @@
 /* =============================================
-   My Portfolio v4.1.0 — Modals UI
-   Planner-Creator-Evaluator Cycle 2
-   Centered modals with scale animation
+   My Portfolio v5.0.0 — Modals UI
+   Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
+   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let _modalKeyHandler = null;
