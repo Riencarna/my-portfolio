@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v4.2.0 — Configuration
-   Planner-Creator-Evaluator Cycle 2
+   My Portfolio v5.0.0 — Configuration
+   Soft Neutral palette, Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
-const APP_VERSION = '4.4.1';
+const APP_VERSION = '5.0.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──

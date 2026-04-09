@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v4.4.1
-   Planner-Creator-Evaluator Cycle 2
-   Drag&Drop reorder 수정 (삽입선 피드백, 히트영역 44px, 스와이프 bail) */
+/* Service Worker - My Portfolio v5.0.0
+   Planner-Creator-Evaluator Cycle 3
+   Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v4.4.1";
+var CACHE_NAME = "myportfolio-v5.0.0";
 
 var STATIC_ASSETS = [
   "./",
