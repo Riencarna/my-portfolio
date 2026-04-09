@@ -100,19 +100,20 @@ function applyUpdate() {
 
 // ── Theme ──
 function loadTheme() {
-  const theme = localStorage.getItem(THEME_KEY) || 'dark';
+  const theme = localStorage.getItem(THEME_KEY) || 'light';
   document.body.dataset.theme = theme;
   updateThemeMeta(theme);
 }
 
 function toggleTheme() {
-  const current = document.body.dataset.theme || 'dark';
+  const current = document.body.dataset.theme || 'light';
   const next = current === 'dark' ? 'light' : 'dark';
   document.body.dataset.theme = next;
   localStorage.setItem(THEME_KEY, next);
   updateThemeMeta(next);
   destroyAllCharts();
   updateSidebarThemeBtn(next);
+  renderPageHeader();
   requestAnimationFrame(() => {
     renderTabContent();
   });
@@ -128,7 +129,7 @@ function updateSidebarThemeBtn(theme) {
 
 function updateThemeMeta(theme) {
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'dark' ? '#0d1117' : '#f8fafc';
+  if (meta) meta.content = theme === 'dark' ? '#151318' : '#FAF9F7';
 }
 
 // ── Tab Routing (Directional Transitions) ──
@@ -183,7 +184,7 @@ function renderSidebar() {
           role="button" tabindex="0" aria-label="포트폴리오 전환: ${escAttr(pf?.name || '기본')}">
           <span class="sidebar-pf-icon">📂</span>
           <span>${escHtml(pf?.name || '기본 포트폴리오')}</span>
-          ${meta.list.length > 1 ? '<span style="margin-left:auto;color:var(--t4)">▾</span>' : ''}
+          ${meta.list.length > 1 ? '<span class="sidebar-pf-arrow" aria-hidden="true">▾</span>' : ''}
         </div>
       ` : ''}
     </div>
@@ -248,8 +249,10 @@ function renderPageHeader() {
   const meta = loadPortfolioMeta();
   const pf = meta.list.find(p => p.id === activePortfolioId);
 
+  const isDark = document.body.dataset.theme === 'dark';
+
   header.innerHTML = `
-    <div style="display:flex;align-items:baseline;gap:10px">
+    <div class="page-header-title">
       <span class="page-title">${TAB_LABELS[idx] || '대시보드'}</span>
       <span class="page-subtitle">${escHtml(pf?.name || APP_NAME)}</span>
     </div>
@@ -266,6 +269,9 @@ function renderPageHeader() {
       ${currentTab === 'pgInc' ? `
         <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 수입 추가</button>
       ` : ''}
+      <button class="btn-icon" data-action="toggle-theme"
+        aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}"
+        title="${isDark ? '라이트 모드' : '다크 모드'}">${isDark ? '☀️' : '🌙'}</button>
     </div>
   `;
 
@@ -276,6 +282,7 @@ function renderPageHeader() {
     if (action === 'auto-update') startAutoUpdate();
     else if (action === 'open-add-asset') openAddAsset();
     else if (action === 'open-add-income') openAddIncome();
+    else if (action === 'toggle-theme') toggleTheme();
   };
 }
 
