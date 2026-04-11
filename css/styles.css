@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.3.2 — Stylesheet
+   My Portfolio v5.4.0 — Stylesheet
    Soft Neutral UI: lavender + cream + coral
    Planner-Creator-Evaluator Cycle 3
    Design tokens + base components
@@ -741,7 +741,8 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .txn-total{font-weight:700;color:var(--t1)}
 .txn-acct{color:var(--t4);font-size:11px}
 .txn-memo{width:100%;font-size:11px;color:var(--t4);padding-left:8px}
-.txn-del{position:absolute;right:6px;top:6px;width:28px;height:28px;font-size:10px}
+.txn-actions{position:absolute;right:6px;top:6px;display:flex;gap:4px}
+.txn-edit,.txn-del{width:28px;height:28px;font-size:10px}
 .tx-total{font-size:16px;font-weight:700;text-align:right;padding:10px 0;color:var(--primary)}
 .amount-hint{font-size:12px;color:var(--primary);margin-top:3px;min-height:16px;font-variant-numeric:tabular-nums;font-weight:500}
 

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.3.2 — State Management
+   My Portfolio v5.4.0 — State Management
    Planner-Creator-Evaluator Cycle 2
    All IDs from uid() are STRINGS — never use Number() on them
    sanitizeAsset/sanitizeTxn/sanitizeIncome coerce IDs to String
@@ -304,6 +304,22 @@ function addTransactionWithPrice(assetId, txn, price) {
   makeSnapshot();
   saveData();
   EventBus.emit('assetChanged', { type: 'update', asset: appState.assets[idx] });
+  return true;
+}
+
+function updateTransaction(assetId, txnId, updates) {
+  const idx = appState.assets.findIndex(a => a.id === assetId);
+  if (idx < 0) return false;
+  const asset = appState.assets[idx];
+  const txnIdx = asset.txns.findIndex(t => t.id === txnId);
+  if (txnIdx < 0) return false;
+  const newTxns = [...asset.txns];
+  newTxns[txnIdx] = sanitizeTxn({ ...newTxns[txnIdx], ...updates, id: txnId });
+  appState.assets[idx] = sanitizeAsset({ ...asset, txns: newTxns });
+  invalidateCalcCache();
+  makeSnapshot();
+  saveData();
+  EventBus.emit('assetChanged', { type: 'updateTxn', assetId, txnId });
   return true;
 }
 

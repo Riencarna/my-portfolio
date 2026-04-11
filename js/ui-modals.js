@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.3.2 — Modals UI
+   My Portfolio v5.4.0 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3
@@ -172,6 +172,7 @@ function _setupModalMainDelegation(container) {
     else if (action === 'do-edit-asset') doEditAsset(target.dataset.id);
     else if (action === 'open-transaction') openTransaction(target.dataset.id, target.dataset.type || 'buy');
     else if (action === 'edit-asset-from-detail') openEditAsset(target.dataset.id);
+    else if (action === 'edit-txn') { e.stopPropagation(); openEditTransaction(target.dataset.assetId, target.dataset.txnId); }
     else if (action === 'delete-txn') { e.stopPropagation(); doDeleteTxn(target.dataset.assetId, target.dataset.txnId); }
     else if (action === 'create-portfolio') doCreatePortfolio();
     else if (action === 'wallet-scan') doWalletScan();
@@ -440,8 +441,12 @@ function openAssetDetail(id) {
               <span class="txn-total">${escHtml(fmtKRW(t.price * t.qty))}</span>
             </div>
             ${t.memo ? `<div class="txn-memo">${escHtml(t.memo)}</div>` : ''}
-            <button class="btn-icon btn-danger txn-del" aria-label="거래 삭제"
-              data-action="delete-txn" data-asset-id="${id}" data-txn-id="${t.id}">✕</button>
+            <div class="txn-actions">
+              <button class="btn-icon txn-edit" aria-label="거래 수정"
+                data-action="edit-txn" data-asset-id="${id}" data-txn-id="${t.id}">✎</button>
+              <button class="btn-icon btn-danger txn-del" aria-label="거래 삭제"
+                data-action="delete-txn" data-asset-id="${id}" data-txn-id="${t.id}">✕</button>
+            </div>
           </div>`).join('')
         : '<div class="empty-state">거래 내역이 없습니다</div>'}
     </div></div>
@@ -538,6 +543,65 @@ function doDeleteTxn(assetId, txnId) {
     openAssetDetail(assetId);
     showToast('거래 삭제됨');
   });
+}
+
+// ── Edit Transaction ──
+function openEditTransaction(assetId, txnId) {
+  const asset = getAsset(assetId);
+  if (!asset) return;
+  const txn = asset.txns.find(t => t.id === txnId);
+  if (!txn) return;
+  const container = $('#modalSub');
+  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>거래 수정</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body">
+    <div class="form-group"><label>유형</label><div class="btn-group" role="radiogroup" aria-label="거래 유형"><button type="button" class="btn-sm ${txn.type === 'buy' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="buy" role="radio" aria-checked="${txn.type === 'buy'}">매수</button><button type="button" class="btn-sm ${txn.type === 'sell' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="sell" role="radio" aria-checked="${txn.type === 'sell'}">매도</button></div><input type="hidden" id="editTxnType" value="${txn.type}"></div>
+    <div class="form-row"><div class="form-group"><label for="editTxnPrice">단가</label><input type="number" id="editTxnPrice" value="${safeNum(txn.price)}" min="0" step="any"><div class="amount-hint" id="editTxnPriceHint"></div></div><div class="form-group"><label for="editTxnQty">수량</label><input type="number" id="editTxnQty" value="${safeNum(txn.qty)}" min="0" step="any"></div></div>
+    <div class="tx-total" aria-live="polite">총액: <span id="editTxnTotal">${escHtml(fmtKRW(txn.price * txn.qty))}</span></div>
+    <div class="form-row"><div class="form-group"><label for="editTxnDate">날짜</label><input type="date" id="editTxnDate" value="${txn.date || today()}"></div><div class="form-group"><label for="editTxnAccount">계좌</label><input type="text" id="editTxnAccount" value="${escAttr(txn.account || '')}" placeholder="선택사항" maxlength="50"></div></div>
+    <div class="form-group"><label for="editTxnMemo">메모</label><input type="text" id="editTxnMemo" value="${escAttr(txn.memo || '')}" placeholder="선택사항" maxlength="200"></div>
+    <div class="modal-actions"><button class="btn-s" data-action="close-sub-modal">취소</button><button class="btn-p" data-action="do-edit-txn" data-asset-id="${assetId}" data-txn-id="${txnId}">저장</button></div></div></div>`;
+  openModal('modalSub');
+  _setupModalSubDelegation(container, (action, target) => {
+    if (action === 'set-edit-txn-type') _setEditTxnType(target, target.dataset.type);
+    else if (action === 'do-edit-txn') doEditTxn(target.dataset.assetId, target.dataset.txnId);
+  });
+  const calcTotal = () => {
+    const p = safeNum($('#editTxnPrice')?.value), q = safeNum($('#editTxnQty')?.value);
+    const el = $('#editTxnTotal');
+    if (el) el.textContent = fmtKRW(p * q);
+  };
+  const priceEl = $('#editTxnPrice'), qtyEl = $('#editTxnQty');
+  if (priceEl) _modalCleanup.add(priceEl, 'input', calcTotal);
+  if (qtyEl) _modalCleanup.add(qtyEl, 'input', calcTotal);
+  _setupAmountHints(['editTxnPrice:editTxnPriceHint']);
+}
+
+function _setEditTxnType(btn, type) {
+  $$('#modalSub .btn-group [role="radio"]').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-checked', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-checked', 'true');
+  const input = $('#editTxnType');
+  if (input) input.value = type;
+}
+
+function doEditTxn(assetId, txnId) {
+  const price = safeNum($('#editTxnPrice')?.value);
+  const qty = safeNum($('#editTxnQty')?.value);
+  if (!price || !qty) { showToast('단가와 수량을 입력하세요', 'error'); return; }
+  const ok = updateTransaction(assetId, txnId, {
+    type: $('#editTxnType')?.value || 'buy',
+    price, qty,
+    date: $('#editTxnDate')?.value || today(),
+    account: $('#editTxnAccount')?.value.trim() || null,
+    memo: $('#editTxnMemo')?.value.trim() || null,
+  });
+  if (ok) {
+    closeModal('modalSub');
+    showToast('거래 수정됨', 'success');
+    openAssetDetail(assetId);
+  }
 }
 
 // ── Portfolio Manager ──
