@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.0 — State Management
+   My Portfolio v5.4.1 — State Management
    Planner-Creator-Evaluator Cycle 2
    All IDs from uid() are STRINGS — never use Number() on them
    sanitizeAsset/sanitizeTxn/sanitizeIncome coerce IDs to String
@@ -198,6 +198,8 @@ function loadData() {
     showToast('데이터 로드 실패. 기본값으로 초기화됩니다.', 'error');
   }
   invalidateCalcCache();
+  // Ensure today has a snapshot on load — prevents stale getPreviousTotal() after first mutation
+  makeSnapshot();
   EventBus.emit('dataLoaded');
 }
 
@@ -299,7 +301,10 @@ function addTransactionWithPrice(assetId, txn, price) {
     return false;
   }
   const newTxns = [...asset.txns, sanitizeTxn({ ...txn, id: uid() })];
-  appState.assets[idx] = sanitizeAsset({ ...asset, amount: safeNum(price), txns: newTxns });
+  // Preserve market price from auto-update; only overwrite for non-updatable assets
+  const hasAutoUpdate = asset.stockCode || asset.coinId || asset.isUsdt;
+  const newAmount = (hasAutoUpdate && asset.amount > 0) ? asset.amount : safeNum(price);
+  appState.assets[idx] = sanitizeAsset({ ...asset, amount: newAmount, txns: newTxns });
   invalidateCalcCache();
   makeSnapshot();
   saveData();

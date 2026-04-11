@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.0 — Modals UI
+   My Portfolio v5.4.1 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3
@@ -325,6 +325,27 @@ function doAddAsset() {
     closeModal('modalMain');
     showToast(`"${name}" 추가됨`, 'success');
     render();
+    // Auto-fetch current market price for investment assets
+    if (isInvestment) _autoFetchNewAssetPrice(asset);
+  }
+}
+
+async function _autoFetchNewAssetPrice(asset) {
+  try {
+    let price = null;
+    if (asset.coinId) {
+      const prices = await fetchCoinPrices([asset.coinId]);
+      price = prices[asset.coinId];
+    } else if (asset.stockCode) {
+      price = await fetchStockPrice(asset);
+    }
+    if (price != null && isFinite(price) && price > 0) {
+      updateAsset(asset.id, { amount: price, lpu: new Date().toLocaleString('ko-KR') });
+      invalidateCalcCache();
+      render();
+    }
+  } catch (e) {
+    console.warn('_autoFetchNewAssetPrice: failed for', asset.name, e.message);
   }
 }
 

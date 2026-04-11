@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.0 — Asset List UI
+   My Portfolio v5.4.1 — Asset List UI
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1 (lines 290~507)
    Planner-Creator-Evaluator Cycle 3

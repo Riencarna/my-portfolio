@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.0 — Income UI
+   My Portfolio v5.4.1 — Income UI
    Soft Neutral palette + dash-charts 재사용
    Planner-Creator-Evaluator Cycle 3
    ============================================= */
