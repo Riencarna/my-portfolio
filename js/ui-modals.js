@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.2.0 — Modals UI
+   My Portfolio v5.3.0 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3
@@ -187,6 +187,7 @@ function _setupModalMainDelegation(container) {
     else if (action === 'do-save-usdt') doSaveUsdtBatch();
     else if (action === 'add-usdt-row') { const rows = $('#usdtRows'); if (rows) { rows.insertAdjacentHTML('beforeend', _buildUsdtDefaultRows(1)); } }
     else if (action === 'remove-usdt-row') { target.closest('.usdt-add-row')?.remove(); _recalcUsdtAddTotal(); }
+    else if (action === 'set-add-tx-currency') _setAddTxCurrency(target, target.dataset.currency);
   };
   _modalCleanup.add(container, 'click', handler);
 }
@@ -231,6 +232,14 @@ function updateFormFields(cat) {
   if (valueField) valueField.classList.toggle('hidden', isInvestment || (isCash && $('#isUsdt')?.checked));
   if (priceLabel) priceLabel.textContent = isInvestment ? '현재 단가' : '금액';
   if (nameInput) nameInput.placeholder = NAME_PLACEHOLDER[cat] || '자산명';
+  const coinCurrField = $('#coinCurrencyField');
+  if (coinCurrField) coinCurrField.classList.toggle('hidden', !isCoin);
+  if (!isCoin) {
+    const addCurr = $('#addTxCurrency');
+    if (addCurr) addCurr.value = 'KRW';
+    const addLabel = $('#addTxPriceLabel');
+    if (addLabel) addLabel.textContent = '단가';
+  }
 }
 
 // ── Add Asset ──
@@ -252,7 +261,8 @@ function openAddAsset() {
     <div class="form-group"><label for="assetNote">메모</label><input type="text" id="assetNote" placeholder="선택사항" maxlength="500"></div>
     <div class="form-group hidden" id="valueField"><label for="assetValue">금액</label><input type="number" id="assetValue" placeholder="예: 1000000" min="0" step="any"><div class="amount-hint" id="valueHint"></div></div>
     <div id="txnSection"><hr><h4>첫 거래 입력</h4>
-    <div class="form-row"><div class="form-group"><label for="txPrice">단가</label><input type="number" id="txPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txPriceHint"></div></div><div class="form-group"><label for="txQty">수량</label><input type="number" id="txQty" placeholder="0" min="0" step="any"></div></div>
+    <div class="form-group hidden" id="coinCurrencyField"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button type="button" class="btn-sm active" data-action="set-add-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button type="button" class="btn-sm" data-action="set-add-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="addTxCurrency" value="KRW"></div>
+    <div class="form-row"><div class="form-group"><label for="txPrice" id="addTxPriceLabel">단가</label><input type="number" id="txPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txPriceHint"></div></div><div class="form-group"><label for="txQty">수량</label><input type="number" id="txQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총 투자금: <span id="addTxTotal">₩0</span></div>
     <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50"></div></div></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-add-asset">추가</button></div></div></div>`;
@@ -272,7 +282,13 @@ function doAddAsset() {
   const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
   let amount, txns, usdtQty, usdtDetails;
   if (isInvestment) {
-    const price = safeNum($('#txPrice')?.value), qty = safeNum($('#txQty')?.value);
+    let price = safeNum($('#txPrice')?.value);
+    const qty = safeNum($('#txQty')?.value);
+    const addCurrency = $('#addTxCurrency')?.value;
+    if (cat === '코인' && addCurrency === 'USD' && price > 0) {
+      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      price = Math.round(price * rate);
+    }
     amount = price;
     txns = price > 0 && qty > 0 ? [{
       type: 'buy', price, qty,
@@ -438,10 +454,12 @@ function openTransaction(assetId, type = 'buy') {
   const asset = getAsset(assetId);
   if (!asset) return;
   const isForeign = asset.market && !['KOSPI', 'KOSDAQ', ''].includes(asset.market);
+  const isCoin = asset.category === '코인';
+  const showCurrency = isForeign || isCoin;
   const container = $('#modalSub');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>${escHtml(asset.name)} — ${type === 'buy' ? '매수' : '매도'}</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body">
-    ${isForeign ? `<div class="form-group"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button class="btn-sm active" data-action="set-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW</button><button class="btn-sm" data-action="set-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD</button></div><input type="hidden" id="txCurrency" value="KRW"></div>` : ''}
-    <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${isForeign ? '(<span id="txCurrLabel">KRW</span>)' : ''}</label><input type="number" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" id="txnQty" placeholder="0" min="0" step="any"></div></div>
+    ${showCurrency ? `<div class="form-group"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button class="btn-sm active" data-action="set-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button class="btn-sm" data-action="set-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="txCurrency" value="KRW"></div>` : ''}
+    <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${showCurrency ? '(<span id="txCurrLabel">KRW</span>)' : ''}</label><input type="number" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" id="txnQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총액: <span id="txnTotal">₩0</span></div>
     <div class="form-row"><div class="form-group"><label for="txnDate">날짜</label><input type="date" id="txnDate" value="${today()}"></div><div class="form-group"><label for="txnAccount">계좌</label><input type="text" id="txnAccount" placeholder="선택사항" maxlength="50"></div></div>
     <div class="form-group"><label for="txnMemo">메모</label><input type="text" id="txnMemo" placeholder="선택사항" maxlength="200"></div>
@@ -776,11 +794,42 @@ function _setupAddTxTotal() {
   const calc = () => {
     const p = safeNum($('#txPrice')?.value), q = safeNum($('#txQty')?.value);
     const el = $('#addTxTotal');
-    if (el) el.textContent = fmtKRW(p * q);
+    if (!el) return;
+    const curr = $('#addTxCurrency')?.value;
+    if (curr === 'USD') {
+      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      el.textContent = `$${fmtNum(p * q, 2)} (≈ ${fmtKRW(Math.round(p * q * rate))})`;
+    } else {
+      el.textContent = fmtKRW(p * q);
+    }
   };
   const priceEl = $('#txPrice'), qtyEl = $('#txQty');
   if (priceEl) _modalCleanup.add(priceEl, 'input', calc);
   if (qtyEl) _modalCleanup.add(qtyEl, 'input', calc);
+}
+
+function _setAddTxCurrency(btn, currency) {
+  $('#coinCurrencyField')?.querySelectorAll('[role="radio"]').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-checked', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-checked', 'true');
+  const input = $('#addTxCurrency');
+  if (input) input.value = currency;
+  const label = $('#addTxPriceLabel');
+  if (label) label.textContent = currency === 'USD' ? '단가 (USD)' : '단가';
+  // recalc total display
+  const p = safeNum($('#txPrice')?.value), q = safeNum($('#txQty')?.value);
+  const el = $('#addTxTotal');
+  if (el) {
+    if (currency === 'USD') {
+      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      el.textContent = `$${fmtNum(p * q, 2)} (≈ ${fmtKRW(Math.round(p * q * rate))})`;
+    } else {
+      el.textContent = fmtKRW(p * q);
+    }
+  }
 }
 
 // ── USDT Batch Manager ──

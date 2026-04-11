@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.2.0
+/* Service Worker - My Portfolio v5.3.0
    Planner-Creator-Evaluator Cycle 3
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.2.0";
+var CACHE_NAME = "myportfolio-v5.3.0";
 
 var STATIC_ASSETS = [
   "./",

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.2.0 — Asset List UI
+   My Portfolio v5.3.0 — Asset List UI
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1 (lines 290~507)
    Planner-Creator-Evaluator Cycle 3
@@ -37,7 +37,6 @@ function renderList() {
           aria-pressed="${UIState.isEditMode}" aria-label="${UIState.isEditMode ? '편집 완료' : '편집 모드'}">
           ${UIState.isEditMode ? '✓ 완료' : '✎ 편집'}
         </button>
-        <button class="btn-p" data-action="open-add-asset" aria-label="자산 추가">+ 자산 추가</button>
       </div>
     </div>
 
@@ -224,7 +223,7 @@ function renderListAsset(asset) {
           ${asset.stockCode ? `<span class="asset-code">${escHtml(asset.stockCode)}</span>` : ''}
         </div>
         <div class="asset-sub">
-          ${isInv && v.qty > 0 ? `${escHtml(fmtNum(v.qty, v.qty % 1 !== 0 ? 4 : 0))}주` : ''}
+          ${isInv && v.qty > 0 ? `${escHtml(fmtNum(v.qty, v.qty % 1 !== 0 ? 4 : 0))}${asset.category === '코인' ? '개' : '주'}` : ''}
           ${asset.lpu ? `${isInv && v.qty > 0 ? '· ' : ''}${escHtml(fmtRelTime(asset.lpu))}` : ''}
         </div>
       </div>

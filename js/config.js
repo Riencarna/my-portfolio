@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.2.0 — Configuration
+   My Portfolio v5.3.0 — Configuration
    Soft Neutral palette, Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
-const APP_VERSION = '5.2.0';
+const APP_VERSION = '5.3.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -128,6 +128,7 @@ const INCOME_MAP = Object.freeze(Object.fromEntries(INCOME_CATS.map(c => [c.id, 
 // CoinGecko ID mapping
 const COIN_IDS = Object.freeze({
   BTC:'bitcoin', ETH:'ethereum', SOL:'solana', XRP:'ripple',
+  BNB:'binancecoin', HYPE:'hyperliquid',
   DOGE:'dogecoin', ADA:'cardano', AVAX:'avalanche-2', DOT:'polkadot',
   MATIC:'matic-network', LINK:'chainlink', UNI:'uniswap', ATOM:'cosmos',
   FIL:'filecoin', APT:'aptos', ARB:'arbitrum', OP:'optimism',

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.2.0 — API Integration
+   My Portfolio v5.3.0 — API Integration
    Planner-Creator-Evaluator Cycle 3
    Naver world stock, Promise.any parallel CORS
    ============================================= */

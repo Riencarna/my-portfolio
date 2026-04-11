@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.2.0 — App Entry Point
+   My Portfolio v5.3.0 — App Entry Point
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    Planner-Creator-Evaluator Cycle 3
    ============================================= */
@@ -15,7 +15,6 @@ const TAB_LABELS = ['대시보드', '자산', '수입', '기록', '분석'];
 // FAB menu items
 const FAB_ITEMS = [
   { icon: '📋', label: '자산 추가', action: 'fab-add-asset' },
-  { icon: '💲', label: 'USDT 관리', action: 'fab-usdt-manager' },
   { icon: '💰', label: '수입 추가', action: 'fab-add-income' },
   { icon: '🔗', label: '지갑 스캔', action: 'fab-wallet-scan' },
 ];
@@ -487,7 +486,6 @@ document.addEventListener('click', e => {
     case 'toggle-fab': toggleFAB(); break;
     case 'close-fab': closeFAB(); break;
     case 'fab-add-asset': closeFAB(); openAddAsset(); break;
-    case 'fab-usdt-manager': closeFAB(); openUsdtManager(); break;
     case 'fab-add-income': closeFAB(); openAddIncome(); break;
     case 'fab-wallet-scan': closeFAB(); openWalletScan(); break;
   }
