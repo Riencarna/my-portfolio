@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.0 — Configuration
+   My Portfolio v5.0.1 — Configuration
    Soft Neutral palette, Planner-Creator-Evaluator Cycle 3
    ============================================= */
 

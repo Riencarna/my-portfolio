@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.0 — App Entry Point
+   My Portfolio v5.0.1 — App Entry Point
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    Planner-Creator-Evaluator Cycle 3
    ============================================= */

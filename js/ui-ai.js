@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.0 — Analysis UI
+   My Portfolio v5.0.1 — Analysis UI
    Soft Neutral palette, stagger animations
    Planner-Creator-Evaluator Cycle 3
    ============================================= */
