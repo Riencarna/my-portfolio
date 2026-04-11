@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.3.1 — Utilities
+   My Portfolio v5.3.2 — Utilities
    Planner-Creator-Evaluator Cycle 2
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -37,6 +37,16 @@ function fmtAmountHint(n) {
   if (abs >= 1e8) return '= ' + (n / 1e8).toFixed(2) + '억원';
   if (abs >= 1e4) return '= ' + (n / 1e4).toFixed(0) + '만원';
   return '= ' + Math.round(n).toLocaleString('ko-KR') + '원';
+}
+
+function fmtAmountHintUSD(n) {
+  n = safeNum(n);
+  if (n <= 0) return '';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return '= $' + (n / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return '= $' + (n / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return '= $' + (n / 1e3).toFixed(1) + 'K';
+  return '= $' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtNum(n, dec = 0) {
