@@ -3,7 +3,7 @@
    Soft Neutral palette, Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
-const APP_VERSION = '5.0.0';
+const APP_VERSION = '5.0.1';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──

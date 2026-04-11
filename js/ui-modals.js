@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.0 — Modals UI
+   My Portfolio v5.0.1 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3
@@ -225,7 +225,12 @@ function updateFormFields(cat) {
   if (usdtF) usdtF.classList.toggle('hidden', !isCash);
   if (txnSection) txnSection.classList.toggle('hidden', !isInvestment);
   if (valueField) valueField.classList.toggle('hidden', isInvestment);
-  if (priceLabel) priceLabel.textContent = isInvestment ? '현재 단가' : '금액';
+  if (priceLabel) {
+    if (isInvestment) priceLabel.textContent = '현재 단가';
+    else priceLabel.textContent = (isCash && $('#isUsdt')?.checked) ? '금액 (USDT)' : '금액';
+  }
+  const _addValLabel = $('#valueField label');
+  if (_addValLabel) _addValLabel.textContent = (isCash && $('#isUsdt')?.checked) ? '금액 (USDT)' : '금액';
   if (nameInput) nameInput.placeholder = NAME_PLACEHOLDER[cat] || '자산명';
 }
 
@@ -250,6 +255,7 @@ function openAddAsset() {
   updateFormFields('국내주식');
   _setupModalMainDelegation(container);
   _setupAmountHints(['assetValue:valueHint', 'txPrice:txPriceHint']);
+  _setupUsdtCheckbox();
   _setupAddTxTotal();
 }
 
@@ -258,6 +264,7 @@ function doAddAsset() {
   if (!name) { showToast('자산명을 입력하세요', 'error'); return; }
   const cat = $('.modal.active .cat-btn.active')?.dataset?.cat || '기타';
   const isInvestment = INVESTMENT_CATS.includes(cat);
+  const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
   let amount, txns;
   if (isInvestment) {
     const price = safeNum($('#txPrice')?.value), qty = safeNum($('#txQty')?.value);
@@ -269,15 +276,21 @@ function doAddAsset() {
     }] : [];
   } else {
     const val = safeNum($('#assetValue')?.value);
-    amount = val;
-    txns = val > 0 ? [{ type: 'buy', price: val, qty: 1, date: today(), account: null, memo: null }] : [];
+    if (isUsdtChecked && val > 0) {
+      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      amount = Math.round(val * rate);
+    } else {
+      amount = val;
+    }
+    txns = amount > 0 ? [{ type: 'buy', price: amount, qty: 1, date: today(), account: null, memo: null }] : [];
   }
   const asset = addAsset({
     name, category: cat, amount,
     stockCode: isInvestment ? ($('#assetCode')?.value.trim() || '') : '',
     market: isInvestment ? ($('#assetMarket')?.value || '') : '',
     coinId: cat === '코인' ? ($('#coinSelect')?.value || '') : '',
-    isUsdt: cat === '현금' ? ($('#isUsdt')?.checked || false) : false,
+    isUsdt: isUsdtChecked,
+    usdtQty: isUsdtChecked ? safeNum($('#assetValue')?.value) : undefined,
     note: $('#assetNote')?.value.trim() || null,
     krxEtf: ETF_PREFIXES.some(p => name.toUpperCase().startsWith(p)),
     txns,
@@ -304,24 +317,34 @@ function openEditAsset(id) {
     <div class="form-row ${isStock ? '' : 'hidden'}" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" value="${escAttr(asset.stockCode)}" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${['KOSPI', 'KOSDAQ', 'NYSE', 'NASDAQ', ''].map(m => `<option value="${escAttr(m)}" ${asset.market === m ? 'selected' : ''}>${m || '기타'}</option>`).join('')}</select></div></div>
     <div class="form-group ${isCoin ? '' : 'hidden'}" id="coinField"><label for="coinSelect">코인 ID</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, cid]) => `<option value="${escAttr(cid)}" ${asset.coinId === cid ? 'selected' : ''}>${escHtml(sym)}</option>`).join('')}</select></div>
     <div class="form-group ${isCash ? '' : 'hidden'}" id="usdtField"><label><input type="checkbox" id="isUsdt" ${asset.isUsdt ? 'checked' : ''}> USDT</label></div>
-    <div class="form-group"><label for="editPrice" id="editPriceLabel">${INVESTMENT_CATS.includes(asset.category) ? '현재 단가' : '금액'}</label><input type="number" id="editPrice" value="${safeNum(asset.amount)}" min="0" step="any"><div class="amount-hint" id="editPriceHint"></div></div>
+    <div class="form-group"><label for="editPrice" id="editPriceLabel">${INVESTMENT_CATS.includes(asset.category) ? '현재 단가' : (asset.isUsdt ? '금액 (USDT)' : '금액')}</label><input type="number" id="editPrice" value="${asset.isUsdt && asset.usdtQty != null ? asset.usdtQty : safeNum(asset.amount)}" min="0" step="any"><div class="amount-hint" id="editPriceHint"></div></div>
     <div class="form-group"><label for="editNote">메모</label><input type="text" id="editNote" value="${escAttr(asset.note || '')}" maxlength="500"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-edit-asset" data-id="${id}">저장</button></div></div></div>`;
   openModal('modalMain');
   _setupModalMainDelegation(container);
   _setupAmountHints(['editPrice:editPriceHint']);
+  _setupUsdtCheckbox();
 }
 
 function doEditAsset(id) {
   const cat = $$('#modalMain .cat-btn.active')[0]?.dataset?.cat || '기타';
-  const newAmount = safeNum($('#editPrice')?.value);
+  const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
+  const rawVal = safeNum($('#editPrice')?.value);
+  let newAmount;
+  if (isUsdtChecked && rawVal > 0) {
+    const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+    newAmount = Math.round(rawVal * rate);
+  } else {
+    newAmount = rawVal;
+  }
   const updates = {
     name: $('#editName')?.value.trim() || '이름 없음',
     category: cat,
     stockCode: $('#assetCode')?.value.trim() || '',
     market: $('#assetMarket')?.value || '',
     coinId: $('#coinSelect')?.value || '',
-    isUsdt: $('#isUsdt')?.checked || false,
+    isUsdt: isUsdtChecked,
+    usdtQty: isUsdtChecked ? rawVal : undefined,
     amount: newAmount,
     note: $('#editNote')?.value.trim() || null,
   };
@@ -647,13 +670,33 @@ function doImportWallet() {
 }
 
 // ── Amount Hints ──
+function _setupUsdtCheckbox() {
+  const cb = $('#isUsdt');
+  if (!cb) return;
+  _modalCleanup.add(cb, 'change', () => {
+    const label = $('#editPriceLabel') || $('#valueField label');
+    if (label) label.textContent = cb.checked ? '금액 (USDT)' : '금액';
+    const input = $('#assetValue') || $('#editPrice');
+    if (input) input.dispatchEvent(new Event('input'));
+  });
+}
+
 function _setupAmountHints(pairs) {
   for (const pair of pairs) {
     const [inputId, hintId] = pair.split(':');
     const input = $(`#${inputId}`);
     const hint = $(`#${hintId}`);
     if (!input || !hint) continue;
-    const update = () => { hint.textContent = fmtAmountHint(input.value); };
+    const update = () => {
+      const usdtCb = $('#isUsdt');
+      if (usdtCb?.checked && (inputId === 'assetValue' || inputId === 'editPrice')) {
+        const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+        const val = safeNum(input.value);
+        hint.textContent = val > 0 ? `≈ ${fmtKRW(Math.round(val * rate))}` : '';
+      } else {
+        hint.textContent = fmtAmountHint(input.value);
+      }
+    };
     _modalCleanup.add(input, 'input', update);
     update();
   }
