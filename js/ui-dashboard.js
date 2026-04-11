@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.1 — Dashboard UI
+   My Portfolio v5.1.0 — Dashboard UI
    Soft Neutral: hero + stats + charts + breakdown
    Planner-Creator-Evaluator Cycle 3
    ============================================= */

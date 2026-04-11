@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.1 — History & Export UI
+   My Portfolio v5.1.0 — History & Export UI
    Soft Neutral palette, PDF 라벤더 강조
    Planner-Creator-Evaluator Cycle 3
    ============================================= */

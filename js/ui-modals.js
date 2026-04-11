@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.0.1 — Modals UI
+   My Portfolio v5.1.0 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3
@@ -223,6 +223,8 @@ function updateFormFields(cat) {
   if (stockF) { stockF.classList.toggle('hidden', !isStock); stockF.classList.toggle('form-row-visible', isStock); }
   if (coinF) coinF.classList.toggle('hidden', !isCoin);
   if (usdtF) usdtF.classList.toggle('hidden', !isCash);
+  const usdtLocF = $('#usdtLocField');
+  if (usdtLocF) usdtLocF.classList.toggle('hidden', !(isCash && $('#isUsdt')?.checked));
   if (txnSection) txnSection.classList.toggle('hidden', !isInvestment);
   if (valueField) valueField.classList.toggle('hidden', isInvestment);
   if (priceLabel) {
@@ -244,6 +246,7 @@ function openAddAsset() {
     <div class="form-row" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" placeholder="예: 005930" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket"><option value="KOSPI">KOSPI</option><option value="KOSDAQ">KOSDAQ</option><option value="NYSE">NYSE</option><option value="NASDAQ">NASDAQ</option><option value="">기타</option></select></div></div>
     <div class="form-group hidden" id="coinField"><label for="coinSelect">코인 ID (CoinGecko)</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, id]) => `<option value="${escAttr(id)}">${escHtml(sym)} (${escHtml(id)})</option>`).join('')}</select></div>
     <div class="form-group hidden" id="usdtField"><label><input type="checkbox" id="isUsdt"> USDT (자동 환율 업데이트)</label></div>
+    <div class="form-group hidden" id="usdtLocField"><label for="usdtLocation">보관 위치</label><select id="usdtLocation"><option value="">선택하세요</option>${_buildUsdtLocOptions()}<option value="__custom__">직접 입력</option></select></div>
     <div class="form-group"><label for="assetNote">메모</label><input type="text" id="assetNote" placeholder="선택사항" maxlength="500"></div>
     <div class="form-group hidden" id="valueField"><label for="assetValue">금액</label><input type="number" id="assetValue" placeholder="예: 1000000" min="0" step="any"><div class="amount-hint" id="valueHint"></div></div>
     <div id="txnSection"><hr><h4>첫 거래 입력</h4>
@@ -317,6 +320,7 @@ function openEditAsset(id) {
     <div class="form-row ${isStock ? '' : 'hidden'}" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" value="${escAttr(asset.stockCode)}" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${['KOSPI', 'KOSDAQ', 'NYSE', 'NASDAQ', ''].map(m => `<option value="${escAttr(m)}" ${asset.market === m ? 'selected' : ''}>${m || '기타'}</option>`).join('')}</select></div></div>
     <div class="form-group ${isCoin ? '' : 'hidden'}" id="coinField"><label for="coinSelect">코인 ID</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, cid]) => `<option value="${escAttr(cid)}" ${asset.coinId === cid ? 'selected' : ''}>${escHtml(sym)}</option>`).join('')}</select></div>
     <div class="form-group ${isCash ? '' : 'hidden'}" id="usdtField"><label><input type="checkbox" id="isUsdt" ${asset.isUsdt ? 'checked' : ''}> USDT</label></div>
+    <div class="form-group ${asset.isUsdt ? '' : 'hidden'}" id="usdtLocField"><label for="usdtLocation">보관 위치</label><select id="usdtLocation"><option value="">선택하세요</option>${_buildUsdtLocOptions(_usdtLocationFromName(asset.name))}<option value="__custom__" ${asset.isUsdt && !_usdtLocationFromName(asset.name) ? 'selected' : ''}>직접 입력</option></select></div>
     <div class="form-group"><label for="editPrice" id="editPriceLabel">${INVESTMENT_CATS.includes(asset.category) ? '현재 단가' : (asset.isUsdt ? '금액 (USDT)' : '금액')}</label><input type="number" id="editPrice" value="${asset.isUsdt && asset.usdtQty != null ? asset.usdtQty : safeNum(asset.amount)}" min="0" step="any"><div class="amount-hint" id="editPriceHint"></div></div>
     <div class="form-group"><label for="editNote">메모</label><input type="text" id="editNote" value="${escAttr(asset.note || '')}" maxlength="500"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-edit-asset" data-id="${id}">저장</button></div></div></div>`;
@@ -670,14 +674,38 @@ function doImportWallet() {
 }
 
 // ── Amount Hints ──
+function _buildUsdtLocOptions(selected) {
+  return Object.entries(USDT_LOCATIONS).map(([key, sec]) => {
+    if (sec.items.length === 0) return '';
+    return `<optgroup label="${escHtml(sec.icon + ' ' + sec.label)}">${sec.items.map(item =>
+      `<option value="${escAttr(item)}" ${selected === item ? 'selected' : ''}>${escHtml(item)}</option>`
+    ).join('')}</optgroup>`;
+  }).join('');
+}
+
 function _setupUsdtCheckbox() {
   const cb = $('#isUsdt');
   if (!cb) return;
   _modalCleanup.add(cb, 'change', () => {
     const label = $('#editPriceLabel') || $('#valueField label');
     if (label) label.textContent = cb.checked ? '금액 (USDT)' : '금액';
+    const locField = $('#usdtLocField');
+    if (locField) locField.classList.toggle('hidden', !cb.checked);
     const input = $('#assetValue') || $('#editPrice');
     if (input) input.dispatchEvent(new Event('input'));
+  });
+  const locSelect = $('#usdtLocation');
+  if (!locSelect) return;
+  _modalCleanup.add(locSelect, 'change', () => {
+    const nameInput = $('#assetName') || $('#editName');
+    if (!nameInput) return;
+    const loc = locSelect.value;
+    if (loc && loc !== '__custom__') {
+      nameInput.value = `USDT (${loc})`;
+    } else if (loc === '__custom__') {
+      nameInput.value = '';
+      nameInput.focus();
+    }
   });
 }
 
