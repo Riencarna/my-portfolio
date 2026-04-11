@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.3.0 — App Entry Point
+   My Portfolio v5.3.1 — App Entry Point
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    Planner-Creator-Evaluator Cycle 3
    ============================================= */
@@ -178,8 +178,13 @@ function renderSidebar() {
 
   sidebar.innerHTML = `
     <div class="sidebar-brand">
-      <div class="sidebar-logo">${escHtml(APP_NAME)}</div>
-      <div class="sidebar-version">v${APP_VERSION}</div>
+      <div class="sidebar-brand-row">
+        <img class="sidebar-icon" src="icon.svg" alt="" width="36" height="36">
+        <div class="sidebar-brand-text">
+          <div class="sidebar-logo">${escHtml(APP_NAME)}</div>
+          <div class="sidebar-version">v${APP_VERSION}</div>
+        </div>
+      </div>
       ${meta.list.length > 0 ? `
         <div class="sidebar-pf" data-action="open-portfolio-manager"
           role="button" tabindex="0" aria-label="포트폴리오 전환: ${escAttr(pf?.name || '기본')}">

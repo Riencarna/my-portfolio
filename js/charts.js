@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.3.0 — Charts (Chart.js)
+   My Portfolio v5.3.1 — Charts (Chart.js)
    Soft Neutral: lavender/coral palette
    Planner-Creator-Evaluator Cycle 3
    ============================================= */
