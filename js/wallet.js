@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v4.1.0 — EVM Wallet Integration
+   My Portfolio v5.2.0 — EVM Wallet Integration
    Planner-Creator-Evaluator Cycle 2
    ============================================= */
 

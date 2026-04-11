@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.1.0 — Modals UI
+   My Portfolio v5.2.0 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3

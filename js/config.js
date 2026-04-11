@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.1.0 — Configuration
+   My Portfolio v5.2.0 — Configuration
    Soft Neutral palette, Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.2.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -59,6 +59,7 @@ const THEME_KEY = 'mp_theme';
 const TAB_KEY = 'mp_last_tab';
 const RATE_KEY = 'mp_ex_rate';
 const WALLET_KEY = 'wl_addr';
+const CUSTOM_PROXY_KEY = 'mp_custom_proxy';
 
 // Limits
 const LIMITS = Object.freeze({
@@ -204,14 +205,15 @@ const CORS_PROXIES = [
 
 // API endpoints
 const API = Object.freeze({
-  coingecko:  'https://api.coingecko.com/api/v3',
-  yahoo:      'https://query1.finance.yahoo.com',
-  naver:      'https://m.stock.naver.com/api/stock',
-  stooq:      'https://stooq.com/q/l/',
-  openER:     'https://open.er-api.com/v6/latest/USD',
-  floatRates: 'https://www.floatrates.com/daily/usd.json',
-  upbit:      'https://api.upbit.com/v1/ticker',
-  bithumb:    'https://api.bithumb.com/public/ticker',
+  coingecko:   'https://api.coingecko.com/api/v3',
+  yahoo:       'https://query1.finance.yahoo.com',
+  naver:       'https://m.stock.naver.com/api/stock',
+  naverWorld:  'https://api.stock.naver.com/stock',
+  stooq:       'https://stooq.com/q/l/',
+  openER:      'https://open.er-api.com/v6/latest/USD',
+  floatRates:  'https://www.floatrates.com/daily/usd.json',
+  upbit:       'https://api.upbit.com/v1/ticker',
+  bithumb:     'https://api.bithumb.com/public/ticker',
 });
 
 // Benchmark indices

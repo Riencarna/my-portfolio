@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v4.1.0 — State Management
+   My Portfolio v5.2.0 — State Management
    Planner-Creator-Evaluator Cycle 2
    All IDs from uid() are STRINGS — never use Number() on them
    sanitizeAsset/sanitizeTxn/sanitizeIncome coerce IDs to String

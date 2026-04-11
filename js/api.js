@@ -1,6 +1,7 @@
 /* =============================================
-   My Portfolio v4.1.0 — API Integration
-   Planner-Creator-Evaluator Cycle 2
+   My Portfolio v5.2.0 — API Integration
+   Planner-Creator-Evaluator Cycle 3
+   Naver world stock, Promise.any parallel CORS
    ============================================= */
 
 // ── Cache ──
@@ -17,28 +18,41 @@ function fetchWithTimeout(url, ms = API_TIMEOUT, options = {}) {
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
-// ── CORS Proxy Fetch ──
+// ── CORS Proxy Fetch (Promise.any parallel race) ──
 async function corsFetch(url, timeout = API_TIMEOUT) {
+  // 1. Direct fetch
   try {
     const r = await fetchWithTimeout(url, timeout);
     if (r.ok) return r;
   } catch (e) {
     console.warn('corsFetch direct failed:', url.split('?')[0], e.message);
   }
-  const proxies = [...CORS_PROXIES];
-  for (let i = proxies.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [proxies[i], proxies[j]] = [proxies[j], proxies[i]];
-  }
-  for (const proxy of proxies) {
-    try {
-      const r = await fetchWithTimeout(proxy(url), timeout);
+
+  // 2. Custom proxy (power-user setting)
+  try {
+    const customProxy = localStorage.getItem(CUSTOM_PROXY_KEY);
+    if (customProxy) {
+      const base = customProxy.endsWith('/') ? customProxy : customProxy + '/';
+      const r = await fetchWithTimeout(base + encodeURIComponent(url), timeout);
       if (r.ok) return r;
-    } catch (e) {
-      console.warn('corsFetch proxy failed:', e.message);
     }
+  } catch (e) {
+    console.warn('corsFetch custom proxy failed:', e.message);
   }
-  throw new Error(`네트워크 요청 실패: ${url.split('?')[0]}`);
+
+  // 3. Public proxies — parallel race (fastest wins)
+  try {
+    return await Promise.any(
+      CORS_PROXIES.map(proxy =>
+        fetchWithTimeout(proxy(url), timeout).then(r => {
+          if (r.ok) return r;
+          throw new Error('not ok: ' + r.status);
+        })
+      )
+    );
+  } catch (e) {
+    throw new Error(`네트워크 요청 실패: ${url.split('?')[0]}`);
+  }
 }
 
 // ── Exchange Rate (USD -> KRW) ──
@@ -150,7 +164,7 @@ async function fetchStockPrice(asset) {
     return null;
   }
   if (stockCode && !['KOSPI', 'KOSDAQ'].includes(market)) {
-    return fetchForeignStockPrice(stockCode);
+    return fetchForeignStockPrice(stockCode, market);
   }
   if (stockCode) {
     return fetchKoreanStockPrice(stockCode);
@@ -180,7 +194,31 @@ async function fetchKoreanStockPrice(code) {
   return null;
 }
 
-async function fetchForeignStockPrice(symbol) {
+async function fetchForeignStockPrice(symbol, market) {
+  // 1. Naver world stock API (api.stock.naver.com)
+  //    NASDAQ → symbol.O, NYSE → symbol (no suffix), unknown → try both
+  const suffixes = market === 'NASDAQ' ? ['.O']
+                 : market === 'NYSE'   ? ['']
+                 : ['', '.O'];
+  for (const suffix of suffixes) {
+    try {
+      const r = await corsFetch(`${API.naverWorld}/${symbol}${suffix}/basic`, API_TIMEOUT);
+      const d = await r.json();
+      if (d.code) continue;
+      const price = d.closePrice || d.currentPrice;
+      if (price) {
+        const usdPrice = safeNum(String(price).replace(/,/g, ''));
+        if (usdPrice > 0) {
+          const rate = await fetchExchangeRate();
+          return Math.round(usdPrice * rate);
+        }
+      }
+    } catch (e) {
+      console.warn(`fetchForeignStockPrice naver (${symbol}${suffix}) failed:`, e.message);
+    }
+  }
+
+  // 2. Yahoo Finance fallback
   try {
     const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${symbol}?interval=1d&range=1d`, API_TIMEOUT);
     const d = await r.json();
@@ -194,6 +232,8 @@ async function fetchForeignStockPrice(symbol) {
   } catch (e) {
     console.warn('fetchForeignStockPrice yahoo failed:', symbol, e.message);
   }
+
+  // 3. Stooq fallback
   try {
     const r = await corsFetch(`${API.stooq}?s=${symbol.toLowerCase()}&f=sd2t2ohlcvn&h&e=csv`, API_TIMEOUT);
     const text = await r.text();
