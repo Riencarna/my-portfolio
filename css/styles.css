@@ -763,9 +763,20 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .usdt-summary-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--t2)}
 .usdt-summary-row:last-child{font-size:17px;color:var(--primary);font-weight:700}
 
+/* USDT Multi-Row Input (Add/Edit form) */
+.usdt-add-row{display:flex;align-items:center;gap:6px;padding:4px 0}
+.usdt-add-row .usdt-loc-input{flex:1;min-width:0;padding:9px 12px;border-radius:var(--radius-sm);border:1px solid var(--bd);background:var(--surface-sunken);color:var(--t1);font-size:13px}
+.usdt-add-row .usdt-loc-input:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px var(--primary-soft)}
+.usdt-add-row .usdt-qty-input{width:110px;flex-shrink:0}
+.usdt-add-row .usdt-row-del{padding:4px 8px;font-size:12px;flex-shrink:0}
+.usdt-add-total{margin-top:10px;padding:10px 14px;background:var(--primary-soft);border-radius:var(--radius-md);font-size:14px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.usdt-add-total .amount-hint{font-size:12px;color:var(--primary);font-weight:500}
+
 @media(max-width:480px){
   .usdt-loc{min-width:80px;font-size:12px}
   .usdt-qty-input{font-size:13px;padding:8px 10px}
+  .usdt-add-row .usdt-loc-input{font-size:12px;padding:7px 10px}
+  .usdt-add-row .usdt-qty-input{width:90px}
 }
 
 /* Portfolio Manager */
