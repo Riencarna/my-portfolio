@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — Analysis UI
-   Cycle B: goal amount hint
+   My Portfolio v5.6.0 — Analysis UI
+   Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
 

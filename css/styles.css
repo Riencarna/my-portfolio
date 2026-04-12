@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.5.0 — Stylesheet
+   My Portfolio v5.6.0 — Stylesheet
    Cycle B: history tabs, dashboard customize, input presets
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -1133,15 +1133,34 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .dash-cards:not(.dash-edit-mode) .dash-edit-controls{display:none}
 .dash-cards:not(.dash-edit-mode) .dash-card-wrap.dash-hidden{display:none}
 
-/* ── Mobile adjustments for v5.5.0 ── */
+/* ── Asset list tabs (Cycle C, C-15) ── */
+.list-tabs{display:flex;gap:4px;margin-bottom:12px;padding:4px;background:var(--bg-2);border-radius:var(--radius-lg);border:1px solid var(--border)}
+.list-tab{flex:1;padding:9px 12px;background:transparent;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;transition:all .18s ease;font-variant-numeric:tabular-nums}
+.list-tab:hover{color:var(--t1);background:var(--bg-1)}
+.list-tab[aria-selected="true"]{background:var(--card-bg);color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.list-tab:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ── Asset detail txn stats (Cycle C, C-16) ── */
+.txn-stats{margin-top:18px;padding:14px;background:var(--surface-alt);border:1px solid var(--bd);border-radius:var(--radius-lg)}
+.txn-stats h4{margin:0 0 10px;font-size:14px;color:var(--t1);font-weight:700}
+.txn-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.txn-stat-item{display:flex;flex-direction:column;gap:3px;padding:10px 12px;background:var(--card-bg);border:1px solid var(--bd);border-radius:var(--radius-md)}
+.txn-stat-label{font-size:11px;color:var(--t4);font-weight:600}
+.txn-stat-value{font-size:14px;font-weight:700;color:var(--t1);font-variant-numeric:tabular-nums}
+.txn-stat-value.text-muted{color:var(--t4);font-weight:500}
+.txn-stat-sub{font-size:11px;color:var(--t4);font-weight:500;margin-left:4px}
+
+/* ── Mobile adjustments for v5.6.0 ── */
 @media(max-width:640px){
   .hist-tab{padding:9px 8px;font-size:13px}
+  .list-tab{padding:8px 6px;font-size:12px}
   .txn-filter-row{flex-direction:column;align-items:stretch}
   .txn-filter-row select{width:100%}
   .txn-period-group{justify-content:space-between}
   .txn-period-btn{flex:1;padding:7px 6px;font-size:11px}
   .txn-flat-item{padding:10px 12px;gap:10px}
   .txn-cat-icon{width:28px;height:28px;font-size:17px}
+  .txn-stats-grid{grid-template-columns:1fr}
   .dash-toolbar{flex-direction:column;align-items:stretch;gap:8px}
   .dash-toolbar-actions{justify-content:flex-end}
   .dash-edit-controls{flex-wrap:wrap}

@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — Modals UI
-   Cycle B: DeFi removed, input presets (datalist)
+   My Portfolio v5.6.0 — Modals UI
+   Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    ============================================= */
@@ -454,6 +454,7 @@ function openAssetDetail(id) {
       ` : ''}
       <button class="btn-sm" data-action="edit-asset-from-detail" data-id="${id}">수정</button>
     </div>
+    ${isInv && asset.txns.length > 0 ? _renderTxnStats(v) : ''}
     ${isInv ? `
     <div class="txn-section" role="region" aria-label="거래 내역"><h4>거래 내역 (${asset.txns.length}건)</h4><div class="txn-list" role="list">
       ${asset.txns.length > 0
@@ -867,6 +868,39 @@ function _setupUsdtCheckbox() {
   }
   // 초기 합계 계산
   if (cb.checked) _recalcUsdtAddTotal();
+}
+
+// ── Asset Detail Stats (Cycle C, C-16) ──
+function _renderTxnStats(v) {
+  const hasRealized = v.totalSell > 0;
+  const hasFirstBuy = v.firstBuyDate && isValidDate(v.firstBuyDate);
+  let holdingDays = null;
+  if (hasFirstBuy) {
+    const start = new Date(v.firstBuyDate).getTime();
+    const end = (v.qty < 1e-9 && v.lastTxnDate) ? new Date(v.lastTxnDate).getTime() : Date.now();
+    if (isFinite(start) && isFinite(end) && end >= start) {
+      holdingDays = Math.floor((end - start) / 86400000);
+    }
+  }
+  const periodLabel = (v.qty < 1e-9) ? '보유 기간' : '보유일';
+  return `
+    <div class="txn-stats" role="region" aria-label="거래 통계">
+      <h4>거래 통계</h4>
+      <div class="txn-stats-grid">
+        <div class="txn-stat-item"><span class="txn-stat-label">총 매수액</span><span class="txn-stat-value">${escHtml(fmtKRW(v.totalBuy))}</span></div>
+        <div class="txn-stat-item"><span class="txn-stat-label">총 매도액</span><span class="txn-stat-value">${escHtml(fmtKRW(v.totalSell))}</span></div>
+        ${hasRealized ? `
+          <div class="txn-stat-item"><span class="txn-stat-label">실현 손익</span>
+            <span class="txn-stat-value ${profitClass(v.realizedProfit)}">${escHtml(fmtKRW(v.realizedProfit))} (${escHtml(fmtPct(v.realizedPct))})</span></div>
+        ` : `
+          <div class="txn-stat-item"><span class="txn-stat-label">실현 손익</span><span class="txn-stat-value text-muted">매도 기록 없음</span></div>
+        `}
+        ${hasFirstBuy ? `
+          <div class="txn-stat-item"><span class="txn-stat-label">첫 매수일</span><span class="txn-stat-value">${escHtml(fmtDate(v.firstBuyDate))}${holdingDays != null ? ` <span class="txn-stat-sub">· ${periodLabel} ${holdingDays}일</span>` : ''}</span></div>
+        ` : ''}
+      </div>
+    </div>
+  `;
 }
 
 function _setupAmountHints(pairs) {

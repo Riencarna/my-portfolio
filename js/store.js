@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — State Management
-   Cycle B: dashboard prefs, input presets, history tabs
+   My Portfolio v5.6.0 — State Management
+   Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
 

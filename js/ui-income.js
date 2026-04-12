@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — Income UI
-   Cycle B: amount hints + source presets (datalist)
+   My Portfolio v5.6.0 — Income UI
+   Cycle C compatible
    Soft Neutral palette + dash-charts 재사용
    ============================================= */
 

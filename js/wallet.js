@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — EVM Wallet Integration
-   Cycle B compatible
+   My Portfolio v5.6.0 — EVM Wallet Integration
+   Cycle C compatible
    ============================================= */
 
 let isWalletScanning = false;

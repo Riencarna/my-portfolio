@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — App Entry Point
-   Cycle B compatible
+   My Portfolio v5.6.0 — App Entry Point
+   Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
 

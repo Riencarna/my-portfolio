@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — Dashboard UI
-   Cycle B: card registry, edit mode, show/hide + reorder
+   My Portfolio v5.6.0 — Dashboard UI
+   Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
 

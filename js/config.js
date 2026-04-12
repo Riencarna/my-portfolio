@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.5.0 — Configuration
+   My Portfolio v5.6.0 — Configuration
    Soft Neutral palette, Cycle B (pgHist tabs, dash customize, presets)
    ============================================= */
 
-const APP_VERSION = '5.5.0';
+const APP_VERSION = '5.6.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -251,6 +251,7 @@ const UIState = {
   dashboardEditMode: false,
   isEditMode: false,
   listSearchQuery: '',
+  listFilter: 'all',
   historyTab: 'records',
   historyFilter: 30,
   historyShown: HISTORY_PAGE_SIZE,
@@ -273,6 +274,7 @@ const UIState = {
     this.dashboardEditMode = false;
     this.isEditMode = false;
     this.listSearchQuery = '';
+    this.listFilter = 'all';
     this.historyTab = 'records';
     this.historyFilter = 30;
     this.historyShown = HISTORY_PAGE_SIZE;

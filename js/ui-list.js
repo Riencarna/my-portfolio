@@ -1,8 +1,8 @@
 /* =============================================
-   My Portfolio v5.5.0 — Asset List UI
-   Cycle B compatible
+   My Portfolio v5.6.0 — Asset List UI
+   Cycle C: 보유중/매도완료 탭 (C-15)
    Soft Neutral: cleaner toolbar, stagger animations
-   Drag&Drop logic preserved from v4.4.1 (lines 290~507)
+   Drag&Drop logic preserved from v4.4.1
    ============================================= */
 
 let _dragAssetId = null;
@@ -21,9 +21,15 @@ function renderList() {
 
   _listCleanup.removeAll();
 
-  const assets = filterAssets(appState.assets, UIState.listSearchQuery);
+  const assets = _getVisibleAssets();
   const grouped = groupBy(assets, 'category');
   const order = appState.categoryOrder;
+
+  const allCount = appState.assets.length;
+  const heldCount = filterAssetsByListTab(appState.assets, 'held').length;
+  const soldCount = filterAssetsByListTab(appState.assets, 'sold').length;
+
+  const summaryTotal = calcTotal(assets);
 
   container.innerHTML = `
     <div class="list-toolbar stagger-item" style="--i:0">
@@ -33,24 +39,39 @@ function renderList() {
         ${UIState.listSearchQuery ? '<button class="search-clear" data-action="clear-search" aria-label="검색 초기화">✕</button>' : ''}
       </div>
       <div class="list-actions">
-        <button class="btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
-          aria-pressed="${UIState.isEditMode}" aria-label="${UIState.isEditMode ? '편집 완료' : '편집 모드'}">
-          ${UIState.isEditMode ? '✓ 완료' : '✎ 편집'}
-        </button>
+        ${UIState.listFilter !== 'sold' ? `
+          <button class="btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
+            aria-pressed="${UIState.isEditMode}" aria-label="${UIState.isEditMode ? '편집 완료' : '편집 모드'}">
+            ${UIState.isEditMode ? '✓ 완료' : '✎ 편집'}
+          </button>
+        ` : ''}
       </div>
     </div>
 
-    <div class="asset-summary stagger-item" style="--i:1" aria-label="자산 요약">
-      <span>총 ${appState.assets.length}개 자산</span>
-      <span>${escHtml(fmtKRW(calcTotal(appState.assets)))}</span>
+    <div class="list-tabs stagger-item" style="--i:1" role="tablist" aria-label="자산 필터">
+      <button class="list-tab ${UIState.listFilter === 'all' ? 'active' : ''}" role="tab"
+        aria-selected="${UIState.listFilter === 'all' ? 'true' : 'false'}"
+        data-action="set-list-filter" data-filter="all">전체 (${allCount})</button>
+      <button class="list-tab ${UIState.listFilter === 'held' ? 'active' : ''}" role="tab"
+        aria-selected="${UIState.listFilter === 'held' ? 'true' : 'false'}"
+        data-action="set-list-filter" data-filter="held">보유중 (${heldCount})</button>
+      <button class="list-tab ${UIState.listFilter === 'sold' ? 'active' : ''}" role="tab"
+        aria-selected="${UIState.listFilter === 'sold' ? 'true' : 'false'}"
+        data-action="set-list-filter" data-filter="sold">매도완료 (${soldCount})</button>
+    </div>
+
+    <div class="asset-summary stagger-item" style="--i:2" aria-label="자산 요약">
+      <span>${assets.length}개 표시 중</span>
+      <span>${escHtml(fmtKRW(summaryTotal))}</span>
     </div>
 
     <div id="assetListBody" role="list" aria-label="자산 목록">
       ${order.map((catId, idx) => {
         const catAssets = grouped[catId] || [];
         if (catAssets.length === 0 && !UIState.isEditMode) return '';
-        return renderListCategory(catId, catAssets, idx + 2);
+        return renderListCategory(catId, catAssets, idx + 3);
       }).join('')}
+      ${assets.length === 0 ? `<div class="empty-state">${_emptyStateText()}</div>` : ''}
     </div>
   `;
 
@@ -88,7 +109,10 @@ function _handleListAction(target, e) {
   if (action === 'clear-search') clearSearch();
   else if (action === 'toggle-edit') toggleEditMode();
   else if (action === 'open-add-asset') openAddAsset();
-  else if (action === 'toggle-list-cat') {
+  else if (action === 'set-list-filter') {
+    const f = target.dataset.filter;
+    if (f) setListFilter(f);
+  } else if (action === 'toggle-list-cat') {
     const catId = target.dataset.cat;
     if (catId) toggleListCat(catId);
   } else if (action === 'show-more') {
@@ -117,6 +141,43 @@ function filterAssets(assets, query) {
     (a.stockCode && a.stockCode.toLowerCase().includes(q)) ||
     (a.note && a.note.toLowerCase().includes(q))
   );
+}
+
+// Cycle C (C-15): 보유중/매도완료 분류
+// 매도완료 = 투자형 카테고리 + 거래 있음 + 현재 수량 사실상 0 + USDT 아님
+function _isSoldOut(asset) {
+  if (!INVESTMENT_CATS.includes(asset.category)) return false;
+  if (asset.isUsdt) return false;
+  if (!Array.isArray(asset.txns) || asset.txns.length === 0) return false;
+  const v = calcAssetValue(asset);
+  return v.qty < 1e-9;
+}
+
+function filterAssetsByListTab(assets, filter) {
+  if (filter === 'all') return assets;
+  if (filter === 'sold') return assets.filter(a => _isSoldOut(a));
+  // 'held' = 매도완료가 아닌 모든 자산 (비투자형 자산은 항상 보유중에 포함)
+  return assets.filter(a => !_isSoldOut(a));
+}
+
+function _getVisibleAssets() {
+  const tabFiltered = filterAssetsByListTab(appState.assets, UIState.listFilter);
+  return filterAssets(tabFiltered, UIState.listSearchQuery);
+}
+
+function _emptyStateText() {
+  if (UIState.listSearchQuery) return '검색 결과가 없습니다';
+  if (UIState.listFilter === 'sold') return '매도완료된 자산이 없습니다';
+  if (UIState.listFilter === 'held') return '보유 중인 자산이 없습니다';
+  return '자산이 없습니다';
+}
+
+function setListFilter(filter) {
+  if (UIState.listFilter === filter) return;
+  UIState.listFilter = filter;
+  // 매도완료 탭으로 전환 시 편집 모드 자동 해제
+  if (filter === 'sold' && UIState.isEditMode) UIState.isEditMode = false;
+  renderList();
 }
 
 function clearSearch() {
@@ -175,7 +236,7 @@ function showMoreAssets(catId) {
   const body = section.querySelector('.list-cat-body');
   if (!body) { renderList(); return; }
 
-  const assets = filterAssets(appState.assets, UIState.listSearchQuery).filter(a => a.category === catId);
+  const assets = _getVisibleAssets().filter(a => a.category === catId);
   const newItems = assets.slice(oldShown, newShown);
   const hasMore = assets.length > newShown;
   const cat = CAT_MAP[catId];
@@ -258,7 +319,7 @@ function toggleListCat(catId) {
   const existingBody = section.querySelector('.list-cat-body');
   if (newOpen) {
     if (!existingBody) {
-      const assets = filterAssets(appState.assets, UIState.listSearchQuery).filter(a => a.category === catId);
+      const assets = _getVisibleAssets().filter(a => a.category === catId);
       const shownCount = UIState.listCategoryShown[catId] || LAZY_RENDER_THRESHOLD;
       const visibleAssets = assets.slice(0, shownCount);
       const hasMore = assets.length > shownCount;

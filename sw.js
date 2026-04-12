@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.5.0
-   Cycle B: history tabs, dashboard customize, input presets, DeFi removed
+/* Service Worker - My Portfolio v5.6.0
+   Cycle C: list tabs (held/sold), asset detail txn stats
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.5.0";
+var CACHE_NAME = "myportfolio-v5.6.0";
 
 var STATIC_ASSETS = [
   "./",

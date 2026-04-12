@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.5.0 — Utilities
-   Cycle B compatible
+   My Portfolio v5.6.0 — Utilities
+   Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
    ============================================= */
@@ -122,16 +122,27 @@ function invalidateCalcCache() { _calcCacheKey++; _calcCache = null; }
 function calcAssetValue(asset) {
   const txns = asset.txns || [];
   let qty = 0, cost = 0;
+  let realizedProfit = 0;
+  let totalBuy = 0, totalSell = 0;
+  let firstBuyDate = null, lastTxnDate = null;
   for (const t of txns) {
     const tPrice = safeNum(t.price);
     const tQty = safeNum(t.qty);
+    const tDate = (t.date && typeof t.date === 'string') ? t.date : null;
+    if (tDate) {
+      if (!lastTxnDate || tDate > lastTxnDate) lastTxnDate = tDate;
+    }
     if (t.type === 'buy') {
       qty += tQty;
       cost += tPrice * tQty;
+      totalBuy += tPrice * tQty;
+      if (tDate && (!firstBuyDate || tDate < firstBuyDate)) firstBuyDate = tDate;
     } else {
+      totalSell += tPrice * tQty;
       if (qty > 0) {
         const sellQty = Math.min(tQty, qty);
         const avgCost = cost / qty;
+        realizedProfit += (tPrice - avgCost) * sellQty;
         cost -= avgCost * sellQty;
         qty -= sellQty;
       }
@@ -144,7 +155,16 @@ function calcAssetValue(asset) {
   const profit = safeNum(value - cost);
   const profitPct = cost > 0 ? safeNum((profit / cost) * 100) : 0;
   const avgPrice = qty > 0 ? safeNum(cost / qty) : 0;
-  return { qty, cost, value, profit, profitPct, avgPrice, price };
+  const realizedPct = totalBuy > 0 ? safeNum((realizedProfit / totalBuy) * 100) : 0;
+  return {
+    qty, cost, value, profit, profitPct, avgPrice, price,
+    realizedProfit: safeNum(realizedProfit),
+    realizedPct,
+    totalBuy: safeNum(totalBuy),
+    totalSell: safeNum(totalSell),
+    firstBuyDate,
+    lastTxnDate,
+  };
 }
 
 function _buildCalcCache(assets) {
