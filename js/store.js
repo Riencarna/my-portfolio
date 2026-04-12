@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.1 — State Management
+   My Portfolio v5.4.2 — State Management
    Planner-Creator-Evaluator Cycle 2
    All IDs from uid() are STRINGS — never use Number() on them
    sanitizeAsset/sanitizeTxn/sanitizeIncome coerce IDs to String
@@ -12,7 +12,6 @@ function defaultState() {
     history: [],
     saved: null,
     categoryOrder: [...CAT_IDS],
-    coinShowProfitLoss: true,
     goal: null,
     income: [],
   };
@@ -164,7 +163,6 @@ function _migrateOldFormat(d) {
   if (d.h && !d.history) d.history = d.h;
   if (d.s && !d.saved) d.saved = d.s;
   if (d.co && !d.categoryOrder) d.categoryOrder = d.co;
-  if (d.cpl !== undefined && d.coinShowProfitLoss === undefined) d.coinShowProfitLoss = d.cpl;
   if (d.inc && !d.income) d.income = d.inc;
   return d;
 }
@@ -434,7 +432,7 @@ function exportData() {
   };
 }
 
-function importData(json, merge = false) {
+function importData(json) {
   const backup = JSON.stringify(appState);
   try {
     const imported = typeof json === 'string' ? JSON.parse(json) : json;
@@ -454,22 +452,7 @@ function importData(json, merge = false) {
     } else {
       newState.categoryOrder = [...CAT_IDS];
     }
-
-    if (merge) {
-      const existingIds = new Set(appState.assets.map(a => a.id));
-      for (const a of newState.assets) {
-        if (!existingIds.has(a.id)) appState.assets.push(a);
-      }
-      const existingIncIds = new Set(appState.income.map(i => i.id));
-      for (const i of newState.income) {
-        if (!existingIncIds.has(i.id)) appState.income.push(i);
-      }
-      const histMap = new Map(appState.history.map(h => [h.date, h]));
-      for (const h of (newState.history || [])) histMap.set(h.date, h);
-      appState.history = [...histMap.values()].sort((a, b) => a.date.localeCompare(b.date));
-    } else {
-      appState = newState;
-    }
+    appState = newState;
     invalidateCalcCache();
     makeSnapshot();
     saveDataNow();

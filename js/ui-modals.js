@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.1 — Modals UI
+   My Portfolio v5.4.2 — Modals UI
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
    Planner-Creator-Evaluator Cycle 3
@@ -318,7 +318,6 @@ function doAddAsset() {
     usdtQty: isUsdtChecked ? usdtQty : undefined,
     usdtDetails: isUsdtChecked ? usdtDetails : undefined,
     note: $('#assetNote')?.value.trim() || null,
-    krxEtf: ETF_PREFIXES.some(p => name.toUpperCase().startsWith(p)),
     txns,
   });
   if (asset) {

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.4.1 — Utilities
+   My Portfolio v5.4.2 — Utilities
    Planner-Creator-Evaluator Cycle 2
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -193,7 +193,6 @@ function sanitizeAsset(a) {
     stockCode: a.stockCode ? stripHtml(a.stockCode, 20) : '',
     market: ['KOSPI','KOSDAQ','NYSE','NASDAQ',''].includes(a.market) ? a.market : '',
     coinId: a.coinId ? stripHtml(a.coinId, 100) : '',
-    krxEtf: !!a.krxEtf,
     isUsdt: !!a.isUsdt,
     usdtQty: a.usdtQty != null ? safeNum(a.usdtQty) : undefined,
     usdtDetails: Array.isArray(a.usdtDetails) ? a.usdtDetails.slice(0, 50).map(d => ({ name: stripHtml(d.name, 50), qty: safeNum(d.qty) })) : undefined,
