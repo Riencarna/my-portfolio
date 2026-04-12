@@ -1,131 +1,253 @@
 /* =============================================
-   My Portfolio v5.4.2 — Dashboard UI
+   My Portfolio v5.5.0 — Dashboard UI
+   Cycle B: card registry, edit mode, show/hide + reorder
    Soft Neutral: hero + stats + charts + breakdown
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
-let _dashRenderKey = '';
+// ── Card Registry ──
+const DASH_CARD_REGISTRY = Object.freeze([
+  { id: 'hero',        label: '총 자산 헤더' },
+  { id: 'stats',       label: '요약 지표' },
+  { id: 'pie',         label: '자산 분포' },
+  { id: 'trend',       label: '자산 추이' },
+  { id: 'auto-update', label: '가격 업데이트' },
+  { id: 'breakdown',   label: '카테고리별 상세' },
+]);
+
+let _dashDragId = null;
+const _dashDragCleanup = Cleanup.scope('dash-drag');
 
 function renderDashboard() {
   const container = $('#pgDash');
   if (!container) return;
 
+  const hasAssets = appState.assets.length > 0;
+  if (!hasAssets) {
+    container.innerHTML = renderOnboarding();
+    _setupDashboardDelegation(container);
+    return;
+  }
+
+  const ctx = _buildDashContext();
+  const prefs = loadDashPrefs();
+  const order = _getDashOrder(prefs);
+  const hiddenSet = new Set(prefs.hidden || []);
+  const editMode = UIState.dashboardEditMode;
+
+  let staggerIdx = 0;
+  const cardsHtml = order.map((id) => {
+    const meta = DASH_CARD_REGISTRY.find(c => c.id === id);
+    if (!meta) return '';
+    const isHidden = hiddenSet.has(id);
+    if (!editMode && isHidden) return '';
+    const inner = _renderDashCardInner(id, ctx);
+    if (!inner) return '';
+    return _wrapDashCard(id, meta.label, inner, isHidden, editMode, staggerIdx++);
+  }).filter(Boolean).join('');
+
+  container.innerHTML = `
+    ${_renderDashToolbar(editMode)}
+    ${renderBackupReminder()}
+    <div class="dash-cards ${editMode ? 'dash-edit-mode' : ''}">${cardsHtml}</div>
+  `;
+
+  requestAnimationFrame(() => {
+    destroyChart('pie');
+    destroyChart('trend');
+    if (!hiddenSet.has('pie') || editMode) renderPortfolioPie();
+    if (!hiddenSet.has('trend') || editMode) renderTrendChart(UIState.dashboardTrendDays);
+  });
+
+  _setupDashboardDelegation(container);
+  if (editMode) _setupDashDragAndDrop(container);
+  else _dashDragCleanup.removeAll();
+}
+
+function _buildDashContext() {
   const total = calcTotal(appState.assets);
   const catTotals = calcCategoryTotals(appState.assets);
   const prevTotal = getPreviousTotal();
   const change = total - prevTotal;
   const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
-  const assetCount = appState.assets.length;
-  const hasAssets = assetCount > 0;
+  return { total, catTotals, prevTotal, change, changePct };
+}
 
-  const key = `${assetCount}_${total}_${appState.saved}_${Object.values(UIState.dashboardCategoryOpen).join('')}`;
-  if (_dashRenderKey === key && container.innerHTML !== '') return;
-  _dashRenderKey = key;
+function _getDashOrder(prefs) {
+  const defaults = DASH_CARD_REGISTRY.map(c => c.id);
+  if (!prefs.order || prefs.order.length === 0) return defaults;
+  const seen = new Set();
+  const out = [];
+  for (const id of prefs.order) {
+    if (defaults.includes(id) && !seen.has(id)) {
+      out.push(id);
+      seen.add(id);
+    }
+  }
+  for (const id of defaults) {
+    if (!seen.has(id)) out.push(id);
+  }
+  return out;
+}
 
-  container.innerHTML = hasAssets ? `
-    <section class="dash-hero stagger-item" style="--i:0" role="region" aria-label="총 자산 현황">
+function _renderDashCardInner(id, ctx) {
+  switch (id) {
+    case 'hero':        return _renderHeroCard(ctx);
+    case 'stats':       return _renderStatsCard(ctx);
+    case 'pie':         return _renderPieCard(ctx);
+    case 'trend':       return _renderTrendCard(ctx);
+    case 'auto-update': return renderAutoUpdateSection();
+    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total);
+    default: return '';
+  }
+}
+
+function _wrapDashCard(id, label, innerHtml, isHidden, editMode, staggerIdx) {
+  if (!editMode) {
+    return `<div class="dash-card-wrap stagger-item" style="--i:${staggerIdx}" data-card="${escAttr(id)}">${innerHtml}</div>`;
+  }
+  return `
+    <div class="dash-card-wrap dash-edit-card ${isHidden ? 'dash-hidden' : ''} stagger-item"
+      style="--i:${staggerIdx}" data-card="${escAttr(id)}" draggable="true" aria-label="${escAttr(label)}">
+      <div class="dash-edit-controls" role="group" aria-label="${escAttr(label)} 편집">
+        <span class="dash-drag-handle" aria-hidden="true">⋮⋮</span>
+        <span class="dash-edit-label">${escHtml(label)}</span>
+        <button class="dash-move-btn" data-action="dash-move-up" data-card="${escAttr(id)}" aria-label="${escAttr(label)} 위로 이동">▲</button>
+        <button class="dash-move-btn" data-action="dash-move-down" data-card="${escAttr(id)}" aria-label="${escAttr(label)} 아래로 이동">▼</button>
+        <button class="dash-vis-btn" data-action="toggle-dash-card" data-card="${escAttr(id)}" aria-label="${escAttr(label)} ${isHidden ? '표시' : '숨김'}" aria-pressed="${isHidden ? 'false' : 'true'}">${isHidden ? '🙈' : '👁'}</button>
+      </div>
+      <div class="dash-card-inner">${innerHtml}</div>
+    </div>
+  `;
+}
+
+function _renderDashToolbar(editMode) {
+  if (editMode) {
+    return `
+      <div class="dash-toolbar" role="toolbar" aria-label="대시보드 편집 도구">
+        <span class="dash-toolbar-hint">💡 카드를 드래그하거나 ▲▼로 순서 변경, 👁로 표시/숨김 전환</span>
+        <div class="dash-toolbar-actions">
+          <button class="btn-sm" data-action="reset-dash-prefs" aria-label="대시보드 초기화">초기화</button>
+          <button class="btn-p" data-action="toggle-dash-edit" aria-label="편집 완료">✓ 완료</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="dash-toolbar" role="toolbar" aria-label="대시보드 도구">
+      <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
+    </div>
+  `;
+}
+
+// ── Card Renderers ──
+function _renderHeroCard(ctx) {
+  return `
+    <section class="dash-hero" role="region" aria-label="총 자산 현황">
       <div class="dash-hero-label">총 자산</div>
-      <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(total))}</div>
-      <div class="dash-hero-change ${profitClass(change)}" aria-label="일일 변동">
-        ${change !== 0 ? `${change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(change)))} (${escHtml(fmtPct(changePct))})` : '변동 없음'}
+      <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(ctx.total))}</div>
+      <div class="dash-hero-change ${profitClass(ctx.change)}" aria-label="일일 변동">
+        ${ctx.change !== 0 ? `${ctx.change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(ctx.change)))} (${escHtml(fmtPct(ctx.changePct))})` : '변동 없음'}
       </div>
       ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
     </section>
+  `;
+}
 
+function _renderStatsCard(ctx) {
+  const { catTotals } = ctx;
+  const assetCount = appState.assets.length;
+  return `
     <section class="dash-stats" role="region" aria-label="요약 지표">
-      <div class="stat-card stagger-item" style="--i:1">
+      <div class="stat-card">
         <div class="stat-label">보유 자산</div>
         <div class="stat-value">${assetCount}개</div>
         <div class="stat-sub">${appState.categoryOrder.filter(c => catTotals[c] > 0).length}개 카테고리</div>
       </div>
       ${cachedRate ? `
-        <div class="stat-card stagger-item" style="--i:2">
+        <div class="stat-card">
           <div class="stat-label">USD/KRW 환율</div>
           <div class="stat-value">${escHtml(fmtNum(cachedRate.rate, 2))}</div>
           <div class="stat-sub">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</div>
         </div>
       ` : ''}
       ${cachedUsdt ? `
-        <div class="stat-card stagger-item" style="--i:${cachedRate ? 3 : 2}">
+        <div class="stat-card">
           <div class="stat-label">USDT</div>
           <div class="stat-value">${escHtml(fmtNum(cachedUsdt.rate, 0))}원</div>
           <div class="stat-sub">${escHtml(cachedUsdt.source)}</div>
         </div>
       ` : ''}
       ${appState.history.length >= 2 ? `
-        <div class="stat-card stagger-item" style="--i:${(cachedRate ? 1 : 0) + (cachedUsdt ? 1 : 0) + 2}">
+        <div class="stat-card">
           <div class="stat-label">기록 일수</div>
           <div class="stat-value">${appState.history.length}일</div>
           <div class="stat-sub">최초: ${escHtml(fmtDate(appState.history[0]?.date))}</div>
         </div>
       ` : ''}
     </section>
-
-    ${renderBackupReminder()}
-
-    <section class="dash-charts" role="region" aria-label="차트">
-      <div class="card stagger-item" style="--i:3">
-        <div class="card-title">자산 분포</div>
-        <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 분포 차트">
-          <canvas id="chartPie"></canvas>
-        </div>
-        <div id="chartPieAlt"></div>
-        ${renderPieLegend(catTotals, total)}
-      </div>
-      <div class="card stagger-item" style="--i:4">
-        <div class="card-title">
-          <span>자산 추이</span>
-          <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
-            <button class="btn-sm ${UIState.dashboardTrendDays === 30 ? 'active' : ''}" data-action="trend" data-days="30" aria-pressed="${UIState.dashboardTrendDays === 30}">30일</button>
-            <button class="btn-sm ${UIState.dashboardTrendDays === 90 ? 'active' : ''}" data-action="trend" data-days="90" aria-pressed="${UIState.dashboardTrendDays === 90}">90일</button>
-            <button class="btn-sm ${UIState.dashboardTrendDays === 0 ? 'active' : ''}" data-action="trend" data-days="0" aria-pressed="${UIState.dashboardTrendDays === 0}">전체</button>
-          </div>
-        </div>
-        <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 추이 차트">
-          <canvas id="chartTrend"></canvas>
-        </div>
-        <div id="chartTrendAlt"></div>
-      </div>
-    </section>
-
-    ${renderAutoUpdateSection()}
-    ${renderCategoryBreakdown(catTotals, total)}
-  ` : `${renderOnboarding()}`;
-
-  if (hasAssets) {
-    requestAnimationFrame(() => {
-      destroyChart('pie');
-      destroyChart('trend');
-      renderPortfolioPie();
-      renderTrendChart(UIState.dashboardTrendDays);
-    });
-  }
-
-  _setupDashboardDelegation(container);
+  `;
 }
 
+function _renderPieCard(ctx) {
+  return `
+    <div class="card" role="region" aria-label="자산 분포 차트">
+      <div class="card-title">자산 분포</div>
+      <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 분포 차트">
+        <canvas id="chartPie"></canvas>
+      </div>
+      <div id="chartPieAlt"></div>
+      ${renderPieLegend(ctx.catTotals, ctx.total)}
+    </div>
+  `;
+}
+
+function _renderTrendCard() {
+  return `
+    <div class="card" role="region" aria-label="자산 추이 차트">
+      <div class="card-title">
+        <span>자산 추이</span>
+        <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
+          <button class="btn-sm ${UIState.dashboardTrendDays === 30 ? 'active' : ''}" data-action="trend" data-days="30" aria-pressed="${UIState.dashboardTrendDays === 30}">30일</button>
+          <button class="btn-sm ${UIState.dashboardTrendDays === 90 ? 'active' : ''}" data-action="trend" data-days="90" aria-pressed="${UIState.dashboardTrendDays === 90}">90일</button>
+          <button class="btn-sm ${UIState.dashboardTrendDays === 0 ? 'active' : ''}" data-action="trend" data-days="0" aria-pressed="${UIState.dashboardTrendDays === 0}">전체</button>
+        </div>
+      </div>
+      <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 추이 차트">
+        <canvas id="chartTrend"></canvas>
+      </div>
+      <div id="chartTrendAlt"></div>
+    </div>
+  `;
+}
+
+// ── Delegation ──
 function _setupDashboardDelegation(container) {
   container.onclick = (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
-    _handleDashAction(target);
+    _handleDashAction(target, e);
   };
   container.onkeydown = (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target.closest('[data-action]');
     if (!target) return;
     e.preventDefault();
-    _handleDashAction(target);
+    _handleDashAction(target, e);
   };
 }
 
-function _handleDashAction(target) {
+function _handleDashAction(target, e) {
   const action = target.dataset.action;
   if (action === 'trend') _handleTrendClick(Number(target.dataset.days), target);
   else if (action === 'auto-update') startAutoUpdate();
   else if (action === 'toggle-dash-cat') { const catId = target.dataset.cat; if (catId) toggleDashCat(catId); }
   else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   else if (action === 'go-tab') { const tab = target.dataset.tab; if (tab) goTab(tab); }
+  else if (action === 'toggle-dash-edit') toggleDashEditMode();
+  else if (action === 'toggle-dash-card') { if (e) e.stopPropagation(); toggleDashCardHidden(target.dataset.card); }
+  else if (action === 'dash-move-up') { if (e) e.stopPropagation(); moveDashCard(target.dataset.card, -1); }
+  else if (action === 'dash-move-down') { if (e) e.stopPropagation(); moveDashCard(target.dataset.card, 1); }
+  else if (action === 'reset-dash-prefs') doResetDashPrefs();
 }
 
 function _handleTrendClick(days, btn) {
@@ -139,6 +261,108 @@ function _handleTrendClick(days, btn) {
   renderTrendChart(days);
 }
 
+// ── Edit Mode Actions ──
+function toggleDashEditMode() {
+  UIState.dashboardEditMode = !UIState.dashboardEditMode;
+  renderDashboard();
+}
+
+function toggleDashCardHidden(cardId) {
+  if (!cardId) return;
+  const prefs = loadDashPrefs();
+  const hidden = new Set(prefs.hidden || []);
+  if (hidden.has(cardId)) hidden.delete(cardId);
+  else hidden.add(cardId);
+  saveDashPrefs({ order: _getDashOrder(prefs), hidden: [...hidden] });
+  renderDashboard();
+}
+
+function moveDashCard(cardId, delta) {
+  if (!cardId) return;
+  const prefs = loadDashPrefs();
+  const order = _getDashOrder(prefs);
+  const idx = order.indexOf(cardId);
+  if (idx < 0) return;
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= order.length) return;
+  order.splice(idx, 1);
+  order.splice(newIdx, 0, cardId);
+  saveDashPrefs({ order, hidden: prefs.hidden || [] });
+  renderDashboard();
+}
+
+function doResetDashPrefs() {
+  openConfirmModal('대시보드 레이아웃을 기본값으로 초기화하시겠습니까?', () => {
+    resetDashPrefs();
+    showToast('대시보드가 초기화되었습니다', 'success');
+    renderDashboard();
+  });
+}
+
+// ── Drag & Drop ──
+function _setupDashDragAndDrop(container) {
+  _dashDragCleanup.removeAll();
+  const cards = container.querySelectorAll('.dash-card-wrap[draggable="true"]');
+
+  cards.forEach(card => {
+    _dashDragCleanup.add(card, 'dragstart', (e) => {
+      _dashDragId = card.dataset.card;
+      card.classList.add('dragging');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', card.dataset.card); } catch (_) {} }
+    });
+    _dashDragCleanup.add(card, 'dragend', () => {
+      card.classList.remove('dragging');
+      _clearDashDragOver();
+      _dashDragId = null;
+    });
+    _dashDragCleanup.add(card, 'dragover', (e) => {
+      if (!_dashDragId || _dashDragId === card.dataset.card) return;
+      e.preventDefault();
+      const rect = card.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const isTop = e.clientY < midY;
+      _clearDashDragOver();
+      card.classList.add(isTop ? 'drag-over-top' : 'drag-over-bottom');
+    });
+    _dashDragCleanup.add(card, 'dragleave', (e) => {
+      if (!card.contains(e.relatedTarget)) {
+        card.classList.remove('drag-over-top', 'drag-over-bottom');
+      }
+    });
+    _dashDragCleanup.add(card, 'drop', (e) => {
+      if (!_dashDragId) return;
+      e.preventDefault();
+      const targetId = card.dataset.card;
+      if (targetId === _dashDragId) return;
+      const rect = card.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const insertBefore = e.clientY < midY;
+      _reorderDashCardDnD(_dashDragId, targetId, insertBefore);
+    });
+  });
+}
+
+function _clearDashDragOver() {
+  $$('.dash-card-wrap.drag-over-top, .dash-card-wrap.drag-over-bottom').forEach(c => {
+    c.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+}
+
+function _reorderDashCardDnD(fromId, toId, insertBefore) {
+  const prefs = loadDashPrefs();
+  const order = _getDashOrder(prefs);
+  const fromIdx = order.indexOf(fromId);
+  if (fromIdx < 0) return;
+  order.splice(fromIdx, 1);
+  let toIdx = order.indexOf(toId);
+  if (toIdx < 0) return;
+  if (!insertBefore) toIdx += 1;
+  order.splice(toIdx, 0, fromId);
+  saveDashPrefs({ order, hidden: prefs.hidden || [] });
+  renderDashboard();
+}
+
+// ── Auto Update ──
 function getPreviousTotal() {
   const hist = appState.history;
   if (hist.length < 2) return calcTotal(appState.assets);
@@ -150,7 +374,7 @@ function renderBackupReminder() {
   const daysSince = Math.floor((Date.now() - new Date(appState.saved).getTime()) / 86400000);
   if (daysSince < 7) return '';
   return `
-    <div class="card card-warn stagger-item" style="--i:2" role="alert">
+    <div class="card card-warn" role="alert">
       <span>💾 마지막 백업이 ${daysSince}일 전입니다.</span>
       <button class="btn-sm btn-accent" data-action="go-tab" data-tab="pgHist" aria-label="백업 페이지로 이동">백업하기</button>
     </div>
@@ -159,7 +383,7 @@ function renderBackupReminder() {
 
 function renderAutoUpdateSection() {
   return `
-    <div class="card stagger-item" style="--i:5" role="region" aria-label="가격 업데이트">
+    <div class="card" role="region" aria-label="가격 업데이트">
       <div class="card-title">
         가격 업데이트
         <button class="btn-p" id="btnAutoUpdate" data-action="auto-update"
@@ -212,7 +436,6 @@ async function startAutoUpdate() {
     showToast('업데이트할 자산이 없습니다', 'info');
   }
 
-  _dashRenderKey = '';
   renderDashboard();
   renderPageHeader();
 }
@@ -240,7 +463,7 @@ function renderCategoryBreakdown(catTotals, total) {
   const cats = appState.categoryOrder.filter(c => catTotals[c] > 0);
   if (cats.length === 0) return '';
   return `
-    <div class="card stagger-item" style="--i:6" role="region" aria-label="카테고리별 상세">
+    <div class="card" role="region" aria-label="카테고리별 상세">
       <div class="card-title">카테고리별 상세</div>
       ${cats.map(c => renderCategorySection(c, catTotals[c], total)).join('')}
     </div>
@@ -288,7 +511,7 @@ function toggleDashCat(catId) {
   UIState.dashboardCategoryOpen[catId] = !UIState.dashboardCategoryOpen[catId];
   const isOpen = UIState.dashboardCategoryOpen[catId];
   const section = $(`#dashCat-${catId}`);
-  if (!section) { _dashRenderKey = ''; renderDashboard(); return; }
+  if (!section) { renderDashboard(); return; }
 
   const header = section.querySelector('.cat-header');
   if (header) {

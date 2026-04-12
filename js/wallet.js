@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.4.2 — EVM Wallet Integration
-   Planner-Creator-Evaluator Cycle 2
+   My Portfolio v5.5.0 — EVM Wallet Integration
+   Cycle B compatible
    ============================================= */
 
 let isWalletScanning = false;

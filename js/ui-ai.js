@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v5.4.2 — Analysis UI
+   My Portfolio v5.5.0 — Analysis UI
+   Cycle B: goal amount hint
    Soft Neutral palette, stagger animations
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 function renderAnalysis() {
@@ -26,6 +26,16 @@ function renderAnalysis() {
   ).join('');
 
   _setupAnalysisDelegation(container);
+  _setupGoalAmountHint();
+}
+
+function _setupGoalAmountHint() {
+  const input = document.getElementById('goalAmount');
+  const hint = document.getElementById('goalAmountHint');
+  if (!input || !hint) return;
+  const update = () => { hint.textContent = fmtAmountHint(input.value); };
+  input.addEventListener('input', update);
+  update();
 }
 
 function _setupAnalysisDelegation(container) {
@@ -55,7 +65,10 @@ function renderGoalSection(total) {
         <div class="card-title">목표 설정</div>
         <p class="text-muted">자산 목표를 설정하면 진행률을 추적할 수 있습니다.</p>
         <div class="form-row">
-          <input type="number" id="goalAmount" placeholder="목표 금액" min="0" aria-label="목표 금액">
+          <div class="form-col-grow">
+            <input type="number" id="goalAmount" placeholder="목표 금액" min="0" aria-label="목표 금액">
+            <div class="amount-hint" id="goalAmountHint"></div>
+          </div>
           <input type="date" id="goalDate" value="${(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]; })()}" aria-label="목표 날짜">
           <button class="btn-p" data-action="set-goal">설정</button>
         </div>

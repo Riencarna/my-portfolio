@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.4.2 — Utilities
-   Planner-Creator-Evaluator Cycle 2
+   My Portfolio v5.5.0 — Utilities
+   Cycle B compatible
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
    ============================================= */

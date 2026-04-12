@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.4.2 — API Integration
-   Planner-Creator-Evaluator Cycle 3
+   My Portfolio v5.5.0 — API Integration
+   Cycle B compatible
    Naver world stock, Promise.any parallel CORS
    ============================================= */
 

@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v5.4.2 — Charts (Chart.js)
+   My Portfolio v5.5.0 — Charts (Chart.js)
+   Cycle B compatible
    Soft Neutral: lavender/coral palette
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 const charts = { pie: null, catPie: null, catPies: {}, trend: null, incBar: null, incPie: null, growth: null };

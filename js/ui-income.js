@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v5.4.2 — Income UI
+   My Portfolio v5.5.0 — Income UI
+   Cycle B: amount hints + source presets (datalist)
    Soft Neutral palette + dash-charts 재사용
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 function renderIncome() {
@@ -210,6 +210,24 @@ function changeMonth(delta) {
   renderIncome();
 }
 
+// ── Preset datalist helper (Cycle B) ──
+function _renderIncSourceDatalist(listId) {
+  const presets = loadPresets();
+  const list = Array.isArray(presets.incomeSources) ? presets.incomeSources : [];
+  if (list.length === 0) return '';
+  return `<datalist id="${listId}">${list.map(v => `<option value="${escAttr(v)}"></option>`).join('')}</datalist>`;
+}
+
+// ── Amount hint helper (Cycle B, KRW only) ──
+function _setupIncomeAmountHint(inputId, hintId) {
+  const input = $(`#${inputId}`);
+  const hint = $(`#${hintId}`);
+  if (!input || !hint) return;
+  const update = () => { hint.textContent = fmtAmountHint(input.value); };
+  _modalCleanup.add(input, 'input', update);
+  update();
+}
+
 // ── Add Income Modal ──
 function openAddIncome() {
   _modalCleanup.removeAll();
@@ -235,6 +253,7 @@ function openAddIncome() {
           <div class="form-group">
             <label for="incAmount">금액 *</label>
             <input type="number" id="incAmount" placeholder="0" min="0" required>
+            <div class="amount-hint" id="incAmountHint"></div>
           </div>
           <div class="form-group">
             <label for="incDate">날짜</label>
@@ -243,7 +262,8 @@ function openAddIncome() {
         </div>
         <div class="form-group">
           <label for="incSource">출처</label>
-          <input type="text" id="incSource" placeholder="예: 회사, 알바 등" maxlength="100">
+          <input type="text" id="incSource" placeholder="예: 회사, 알바 등" maxlength="100" list="incSourcePresets">
+          ${_renderIncSourceDatalist('incSourcePresets')}
         </div>
         <div class="form-group">
           <label for="incMemo">메모</label>
@@ -261,20 +281,24 @@ function openAddIncome() {
   `;
   openModal('modalMain');
   _setupModalMainDelegation(container);
+  _setupIncomeAmountHint('incAmount', 'incAmountHint');
 }
 
 function doAddIncome() {
   const amount = safeNum($('#incAmount')?.value);
   if (amount <= 0) { showToast('금액을 입력하세요 (0보다 큰 값)', 'error'); return; }
   const cat = $('#modalMain .cat-btn.active')?.dataset?.cat || 'other';
+  const source = $('#incSource')?.value.trim() || '';
 
   addIncome({
     amount, cat,
     date: $('#incDate')?.value || today(),
-    source: $('#incSource')?.value.trim() || '',
+    source,
     memo: $('#incMemo')?.value.trim() || '',
     recurring: $('#incRecurring')?.checked || false,
   });
+
+  if (source) addPreset('incomeSources', source);
 
   closeModal('modalMain');
   showToast('수입 추가됨', 'success');
@@ -314,6 +338,7 @@ function openEditIncome(id) {
           <div class="form-group">
             <label for="editIncAmount">금액 *</label>
             <input type="number" id="editIncAmount" value="${safeNum(item.amount)}" min="0" required>
+            <div class="amount-hint" id="editIncAmountHint"></div>
           </div>
           <div class="form-group">
             <label for="editIncDate">날짜</label>
@@ -322,7 +347,8 @@ function openEditIncome(id) {
         </div>
         <div class="form-group">
           <label for="editIncSource">출처</label>
-          <input type="text" id="editIncSource" value="${escAttr(item.source || '')}" maxlength="100">
+          <input type="text" id="editIncSource" value="${escAttr(item.source || '')}" maxlength="100" list="editIncSourcePresets">
+          ${_renderIncSourceDatalist('editIncSourcePresets')}
         </div>
         <div class="form-group">
           <label for="editIncMemo">메모</label>
@@ -340,20 +366,24 @@ function openEditIncome(id) {
   `;
   openModal('modalMain');
   _setupModalMainDelegation(container);
+  _setupIncomeAmountHint('editIncAmount', 'editIncAmountHint');
 }
 
 function doEditIncome(id) {
   const amount = safeNum($('#editIncAmount')?.value);
   if (amount <= 0) { showToast('금액을 입력하세요 (0보다 큰 값)', 'error'); return; }
   const cat = $('#modalMain .cat-btn.active')?.dataset?.cat || 'other';
+  const source = $('#editIncSource')?.value.trim() || '';
 
   updateIncome(id, {
     amount, cat,
     date: $('#editIncDate')?.value || today(),
-    source: $('#editIncSource')?.value.trim() || '',
+    source,
     memo: $('#editIncMemo')?.value.trim() || '',
     recurring: $('#editIncRecurring')?.checked || false,
   });
+
+  if (source) addPreset('incomeSources', source);
 
   closeModal('modalMain');
   showToast('수입 수정됨', 'success');

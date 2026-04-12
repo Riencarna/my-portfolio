@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v5.4.2 — History & Export UI
+   My Portfolio v5.5.0 — History & Export UI
+   Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 function renderHistory() {
@@ -45,6 +45,29 @@ function renderHistory() {
       </div>
     </div>
 
+    <div class="hist-tabs" role="tablist" aria-label="기록 탭">
+      <button class="hist-tab ${UIState.historyTab === 'records' ? 'active' : ''}" role="tab"
+        aria-selected="${UIState.historyTab === 'records' ? 'true' : 'false'}"
+        data-action="set-hist-tab" data-tab="records">📈 자산 기록</button>
+      <button class="hist-tab ${UIState.historyTab === 'txns' ? 'active' : ''}" role="tab"
+        aria-selected="${UIState.historyTab === 'txns' ? 'true' : 'false'}"
+        data-action="set-hist-tab" data-tab="txns">🧾 거래 내역</button>
+    </div>
+
+    <div class="hist-tab-content" role="tabpanel">
+      ${UIState.historyTab === 'records' ? _renderRecordsTab() : _renderTxnsTab()}
+    </div>
+  `;
+
+  if (UIState.historyTab === 'records') {
+    requestAnimationFrame(() => renderGrowthChart(0, false));
+  }
+
+  _setupHistoryDelegation(container);
+}
+
+function _renderRecordsTab() {
+  return `
     <div class="card stagger-item" style="--i:1" role="region" aria-label="자산 기록">
       <div class="card-title">
         자산 기록
@@ -71,10 +94,161 @@ function renderHistory() {
       <div id="chartGrowthAlt"></div>
     </div>
   `;
+}
 
-  requestAnimationFrame(() => renderGrowthChart(0, false));
+function _renderTxnsTab() {
+  const totalCount = _getAllTxns().length;
+  return `
+    <div class="card stagger-item" style="--i:1" role="region" aria-label="거래 내역">
+      <div class="card-title"><span id="txnListTitle">거래 내역 (${totalCount}건)</span></div>
+      <div class="txn-filters">
+        <input type="search" id="txnSearchInput" class="txn-search-input"
+          value="${escAttr(UIState.txnSearch)}" placeholder="자산명·계좌·메모 검색"
+          aria-label="거래 검색" maxlength="100">
+        <div class="btn-group txn-period-group" role="group" aria-label="기간 필터">
+          ${[0, 7, 30, 90, 365].map(d => `
+            <button class="btn-sm ${UIState.txnFilterPeriod === d ? 'active' : ''}"
+              data-action="txn-filter-period" data-days="${d}" aria-pressed="${UIState.txnFilterPeriod === d}">${d === 0 ? '전체' : d === 365 ? '1년' : d + '일'}</button>
+          `).join('')}
+        </div>
+        <div class="txn-filter-row">
+          <select id="txnFilterType" aria-label="거래 유형 필터">
+            <option value="all" ${UIState.txnFilterType === 'all' ? 'selected' : ''}>유형: 전체</option>
+            <option value="buy" ${UIState.txnFilterType === 'buy' ? 'selected' : ''}>유형: 매수</option>
+            <option value="sell" ${UIState.txnFilterType === 'sell' ? 'selected' : ''}>유형: 매도</option>
+          </select>
+          <select id="txnFilterCat" aria-label="카테고리 필터">
+            <option value="all" ${UIState.txnFilterCat === 'all' ? 'selected' : ''}>카테고리: 전체</option>
+            ${CATEGORIES.map(c => `<option value="${escAttr(c.id)}" ${UIState.txnFilterCat === c.id ? 'selected' : ''}>${c.icon} ${escHtml(c.label)}</option>`).join('')}
+          </select>
+          <select id="txnSortSelect" aria-label="정렬">
+            <option value="date-desc" ${UIState.txnSort === 'date-desc' ? 'selected' : ''}>정렬: 날짜 ↓</option>
+            <option value="date-asc" ${UIState.txnSort === 'date-asc' ? 'selected' : ''}>정렬: 날짜 ↑</option>
+            <option value="amount-desc" ${UIState.txnSort === 'amount-desc' ? 'selected' : ''}>정렬: 금액 ↓</option>
+            <option value="amount-asc" ${UIState.txnSort === 'amount-asc' ? 'selected' : ''}>정렬: 금액 ↑</option>
+          </select>
+        </div>
+      </div>
+      <div id="txnListContainer">${_renderTxnListContent()}</div>
+    </div>
+  `;
+}
 
-  _setupHistoryDelegation(container);
+function _getAllTxns() {
+  const txns = [];
+  for (const a of appState.assets) {
+    if (!Array.isArray(a.txns)) continue;
+    for (const t of a.txns) {
+      txns.push({
+        id: t.id,
+        type: t.type,
+        price: t.price,
+        qty: t.qty,
+        date: t.date,
+        account: t.account,
+        memo: t.memo,
+        assetId: a.id,
+        assetName: a.name,
+        category: a.category,
+      });
+    }
+  }
+  return txns;
+}
+
+function _filterTxns(txns) {
+  let filtered = txns;
+
+  if (UIState.txnFilterPeriod > 0) {
+    const d = new Date();
+    d.setDate(d.getDate() - UIState.txnFilterPeriod);
+    const cutoff = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    filtered = filtered.filter(t => (t.date || '') >= cutoff);
+  }
+  if (UIState.txnFilterType !== 'all') {
+    filtered = filtered.filter(t => t.type === UIState.txnFilterType);
+  }
+  if (UIState.txnFilterCat !== 'all') {
+    filtered = filtered.filter(t => t.category === UIState.txnFilterCat);
+  }
+  if (UIState.txnSearch) {
+    const q = UIState.txnSearch.toLowerCase();
+    filtered = filtered.filter(t =>
+      (t.assetName || '').toLowerCase().includes(q) ||
+      (t.account || '').toLowerCase().includes(q) ||
+      (t.memo || '').toLowerCase().includes(q)
+    );
+  }
+
+  const sorted = filtered.slice();
+  switch (UIState.txnSort) {
+    case 'date-asc':
+      sorted.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      break;
+    case 'amount-desc':
+      sorted.sort((a, b) => (b.price * b.qty) - (a.price * a.qty));
+      break;
+    case 'amount-asc':
+      sorted.sort((a, b) => (a.price * a.qty) - (b.price * b.qty));
+      break;
+    case 'date-desc':
+    default:
+      sorted.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      break;
+  }
+  return sorted;
+}
+
+function _renderTxnListContent() {
+  const all = _getAllTxns();
+  const filtered = _filterTxns(all);
+
+  if (filtered.length === 0) {
+    return '<div class="empty-state">조건에 맞는 거래 내역이 없습니다</div>';
+  }
+
+  const visible = filtered.slice(0, UIState.txnShown);
+  const hasMore = filtered.length > UIState.txnShown;
+
+  return `
+    <div class="txn-result-count text-muted">${filtered.length}건 표시 중</div>
+    <div class="txn-flat-list" role="list">
+      ${visible.map(t => {
+        const cat = CAT_MAP[t.category];
+        const total = t.price * t.qty;
+        const metaParts = [];
+        if (t.account) metaParts.push(escHtml(t.account));
+        if (t.memo) metaParts.push(escHtml(t.memo));
+        return `
+          <div class="txn-flat-item" role="listitem" data-action="open-asset-from-txn" data-id="${escAttr(t.assetId)}" tabindex="0" aria-label="${escAttr(t.assetName)} ${t.type === 'buy' ? '매수' : '매도'} ${fmtKRW(total)}">
+            <div class="txn-flat-head">
+              <span class="txn-type ${t.type}">${t.type === 'buy' ? '매수' : '매도'}</span>
+              <span class="txn-flat-name"><span class="txn-cat-icon" aria-hidden="true">${cat?.icon || '📦'}</span>${escHtml(t.assetName)}</span>
+              <span class="txn-flat-total">${escHtml(fmtKRW(total))}</span>
+            </div>
+            <div class="txn-flat-sub text-muted">
+              <span>${escHtml(fmtPrice(t.price))} × ${escHtml(fmtNum(t.qty, t.qty % 1 !== 0 ? 4 : 0))}</span>
+              <span>${escHtml(fmtDate(t.date))}</span>
+            </div>
+            ${metaParts.length > 0 ? `<div class="txn-flat-meta text-muted">${metaParts.join(' · ')}</div>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+    ${hasMore ? `
+      <button class="btn-sm btn-full-width btn-mt" data-action="load-more-txn"
+        aria-label="거래 더 보기 (${filtered.length - UIState.txnShown}건 남음)">
+        더 보기 (${filtered.length - UIState.txnShown}건 남음)
+      </button>
+    ` : ''}
+  `;
+}
+
+function _rerenderTxnList() {
+  const container = $('#txnListContainer');
+  if (container) container.innerHTML = _renderTxnListContent();
+  const title = $('#txnListTitle');
+  if (title) title.textContent = `거래 내역 (${_getAllTxns().length}건)`;
 }
 
 function _setupHistoryDelegation(container) {
@@ -87,6 +261,10 @@ function _setupHistoryDelegation(container) {
     else if (action === 'reset-all') doResetAll();
     else if (action === 'history-filter') setHistoryFilter(Number(target.dataset.days));
     else if (action === 'load-more-history') loadMoreHistory();
+    else if (action === 'load-more-txn') loadMoreTxn();
+    else if (action === 'set-hist-tab') setHistoryTab(target.dataset.tab);
+    else if (action === 'txn-filter-period') setTxnFilterPeriod(Number(target.dataset.days));
+    else if (action === 'open-asset-from-txn') openAssetDetail(target.dataset.id);
     else if (action === 'growth-view') {
       const days = Number(target.dataset.days);
       const byCat = target.dataset.byCat === 'true';
@@ -104,6 +282,70 @@ function _setupHistoryDelegation(container) {
     const target = e.target.closest('[data-action]');
     if (target) { e.preventDefault(); handleAction(target); }
   };
+
+  // Txn search input (debounced + IME-safe)
+  const searchInput = $('#txnSearchInput');
+  if (searchInput) {
+    let searchTimer = null;
+    let composing = false;
+    searchInput.addEventListener('compositionstart', () => { composing = true; });
+    searchInput.addEventListener('compositionend', () => {
+      composing = false;
+      UIState.txnSearch = searchInput.value.trim();
+      UIState.txnShown = TXN_PAGE_SIZE;
+      _rerenderTxnList();
+    });
+    searchInput.addEventListener('input', () => {
+      if (composing) return;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        UIState.txnSearch = searchInput.value.trim();
+        UIState.txnShown = TXN_PAGE_SIZE;
+        _rerenderTxnList();
+      }, DEBOUNCE_MS);
+    });
+  }
+
+  // Filter/Sort selects
+  const typeSel = $('#txnFilterType');
+  if (typeSel) typeSel.addEventListener('change', () => {
+    UIState.txnFilterType = typeSel.value;
+    UIState.txnShown = TXN_PAGE_SIZE;
+    _rerenderTxnList();
+  });
+  const catSel = $('#txnFilterCat');
+  if (catSel) catSel.addEventListener('change', () => {
+    UIState.txnFilterCat = catSel.value;
+    UIState.txnShown = TXN_PAGE_SIZE;
+    _rerenderTxnList();
+  });
+  const sortSel = $('#txnSortSelect');
+  if (sortSel) sortSel.addEventListener('change', () => {
+    UIState.txnSort = sortSel.value;
+    _rerenderTxnList();
+  });
+}
+
+function setHistoryTab(tab) {
+  if (UIState.historyTab === tab) return;
+  UIState.historyTab = tab;
+  renderHistory();
+}
+
+function setTxnFilterPeriod(days) {
+  UIState.txnFilterPeriod = days;
+  UIState.txnShown = TXN_PAGE_SIZE;
+  _rerenderTxnList();
+  $$('#pgHist [data-action="txn-filter-period"]').forEach(b => {
+    const active = Number(b.dataset.days) === days;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function loadMoreTxn() {
+  UIState.txnShown += TXN_PAGE_SIZE;
+  _rerenderTxnList();
 }
 
 function _handleGrowthViewClick(days, byCategory, btn) {

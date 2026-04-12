@@ -1,8 +1,8 @@
 /* =============================================
-   My Portfolio v5.4.2 — Asset List UI
+   My Portfolio v5.5.0 — Asset List UI
+   Cycle B compatible
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1 (lines 290~507)
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let _dragAssetId = null;

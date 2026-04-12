@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.4.2
-   Planner-Creator-Evaluator Cycle 3
+/* Service Worker - My Portfolio v5.5.0
+   Cycle B: history tabs, dashboard customize, input presets, DeFi removed
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.4.2";
+var CACHE_NAME = "myportfolio-v5.5.0";
 
 var STATIC_ASSETS = [
   "./",

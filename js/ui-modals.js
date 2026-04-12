@@ -1,8 +1,8 @@
 /* =============================================
-   My Portfolio v5.4.2 — Modals UI
+   My Portfolio v5.5.0 — Modals UI
+   Cycle B: DeFi removed, input presets (datalist)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let _modalKeyHandler = null;
@@ -159,6 +159,14 @@ function selectIncCat(btn) {
   btn.setAttribute('aria-checked', 'true');
 }
 
+// ── Preset Datalist (v5.5.0) ──
+function _renderPresetDatalist(listId, type) {
+  const presets = loadPresets();
+  const list = Array.isArray(presets[type]) ? presets[type] : [];
+  if (list.length === 0) return '';
+  return `<datalist id="${listId}">${list.map(v => `<option value="${escAttr(v)}"></option>`).join('')}</datalist>`;
+}
+
 // ── Main Modal Delegation ──
 function _setupModalMainDelegation(container) {
   const handler = (e) => {
@@ -183,8 +191,6 @@ function _setupModalMainDelegation(container) {
     }
     else if (action === 'do-add-income') doAddIncome();
     else if (action === 'do-edit-income') doEditIncome(target.dataset.id);
-    else if (action === 'usdt-add-defi') _usdtAddDefiRow();
-    else if (action === 'usdt-remove-defi') target.closest('.usdt-row')?.remove();
     else if (action === 'do-save-usdt') doSaveUsdtBatch();
     else if (action === 'add-usdt-row') { const rows = $('#usdtRows'); if (rows) { rows.insertAdjacentHTML('beforeend', _buildUsdtDefaultRows(1)); } }
     else if (action === 'remove-usdt-row') { target.closest('.usdt-add-row')?.remove(); _recalcUsdtAddTotal(); }
@@ -265,7 +271,7 @@ function openAddAsset() {
     <div class="form-group hidden" id="coinCurrencyField"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button type="button" class="btn-sm active" data-action="set-add-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button type="button" class="btn-sm" data-action="set-add-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="addTxCurrency" value="KRW"></div>
     <div class="form-row"><div class="form-group"><label for="txPrice" id="addTxPriceLabel">단가</label><input type="number" id="txPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txPriceHint"></div></div><div class="form-group"><label for="txQty">수량</label><input type="number" id="txQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총 투자금: <span id="addTxTotal">₩0</span></div>
-    <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50"></div></div></div>
+    <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50" list="txAccountPresets">${_renderPresetDatalist('txAccountPresets', 'accounts')}</div></div></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-add-asset">추가</button></div></div></div>`;
   openModal('modalMain');
   updateFormFields('국내주식');
@@ -321,10 +327,11 @@ function doAddAsset() {
     txns,
   });
   if (asset) {
+    const acctVal = $('#txAccount')?.value.trim();
+    if (acctVal) addPreset('accounts', acctVal);
     closeModal('modalMain');
     showToast(`"${name}" 추가됨`, 'success');
     render();
-    // Auto-fetch current market price for investment assets
     if (isInvestment) _autoFetchNewAssetPrice(asset);
   }
 }
@@ -488,7 +495,7 @@ function openTransaction(assetId, type = 'buy') {
     ${showCurrency ? `<div class="form-group"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button class="btn-sm active" data-action="set-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button class="btn-sm" data-action="set-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="txCurrency" value="KRW"></div>` : ''}
     <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${showCurrency ? '(<span id="txCurrLabel">KRW</span>)' : ''}</label><input type="number" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" id="txnQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총액: <span id="txnTotal">₩0</span></div>
-    <div class="form-row"><div class="form-group"><label for="txnDate">날짜</label><input type="date" id="txnDate" value="${today()}"></div><div class="form-group"><label for="txnAccount">계좌</label><input type="text" id="txnAccount" placeholder="선택사항" maxlength="50"></div></div>
+    <div class="form-row"><div class="form-group"><label for="txnDate">날짜</label><input type="date" id="txnDate" value="${today()}"></div><div class="form-group"><label for="txnAccount">계좌</label><input type="text" id="txnAccount" placeholder="선택사항" maxlength="50" list="txnAccountPresets">${_renderPresetDatalist('txnAccountPresets', 'accounts')}</div></div>
     <div class="form-group"><label for="txnMemo">메모</label><input type="text" id="txnMemo" placeholder="선택사항" maxlength="200"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-sub-modal">취소</button><button class="btn-p" data-action="do-transaction" data-asset-id="${assetId}" data-type="${type}">${type === 'buy' ? '매수' : '매도'}</button></div></div></div>`;
   openModal('modalSub');
@@ -551,6 +558,8 @@ async function doTransaction(assetId, type) {
     memo: $('#txnMemo')?.value.trim() || null,
   }, price);
   if (success) {
+    const acctVal = $('#txnAccount')?.value.trim();
+    if (acctVal) addPreset('accounts', acctVal);
     closeModal('modalSub');
     showToast(`${type === 'buy' ? '매수' : '매도'} 완료`, 'success');
     openAssetDetail(assetId);
@@ -576,7 +585,7 @@ function openEditTransaction(assetId, txnId) {
     <div class="form-group"><label>유형</label><div class="btn-group" role="radiogroup" aria-label="거래 유형"><button type="button" class="btn-sm ${txn.type === 'buy' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="buy" role="radio" aria-checked="${txn.type === 'buy'}">매수</button><button type="button" class="btn-sm ${txn.type === 'sell' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="sell" role="radio" aria-checked="${txn.type === 'sell'}">매도</button></div><input type="hidden" id="editTxnType" value="${txn.type}"></div>
     <div class="form-row"><div class="form-group"><label for="editTxnPrice">단가</label><input type="number" id="editTxnPrice" value="${safeNum(txn.price)}" min="0" step="any"><div class="amount-hint" id="editTxnPriceHint"></div></div><div class="form-group"><label for="editTxnQty">수량</label><input type="number" id="editTxnQty" value="${safeNum(txn.qty)}" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총액: <span id="editTxnTotal">${escHtml(fmtKRW(txn.price * txn.qty))}</span></div>
-    <div class="form-row"><div class="form-group"><label for="editTxnDate">날짜</label><input type="date" id="editTxnDate" value="${txn.date || today()}"></div><div class="form-group"><label for="editTxnAccount">계좌</label><input type="text" id="editTxnAccount" value="${escAttr(txn.account || '')}" placeholder="선택사항" maxlength="50"></div></div>
+    <div class="form-row"><div class="form-group"><label for="editTxnDate">날짜</label><input type="date" id="editTxnDate" value="${txn.date || today()}"></div><div class="form-group"><label for="editTxnAccount">계좌</label><input type="text" id="editTxnAccount" value="${escAttr(txn.account || '')}" placeholder="선택사항" maxlength="50" list="editTxnAccountPresets">${_renderPresetDatalist('editTxnAccountPresets', 'accounts')}</div></div>
     <div class="form-group"><label for="editTxnMemo">메모</label><input type="text" id="editTxnMemo" value="${escAttr(txn.memo || '')}" placeholder="선택사항" maxlength="200"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-sub-modal">취소</button><button class="btn-p" data-action="do-edit-txn" data-asset-id="${assetId}" data-txn-id="${txnId}">저장</button></div></div></div>`;
   openModal('modalSub');
@@ -618,6 +627,8 @@ function doEditTxn(assetId, txnId) {
     memo: $('#editTxnMemo')?.value.trim() || null,
   });
   if (ok) {
+    const acctVal = $('#editTxnAccount')?.value.trim();
+    if (acctVal) addPreset('accounts', acctVal);
     closeModal('modalSub');
     showToast('거래 수정됨', 'success');
     openAssetDetail(assetId);
@@ -961,26 +972,14 @@ function _getExistingUsdtMap() {
   return map;
 }
 
-function _usdtRow(location, qty, isDefi) {
+function _usdtRow(location, qty) {
   return `<div class="usdt-row" data-location="${escAttr(location)}">
-    <span class="usdt-loc">${isDefi ? `<input type="text" class="usdt-defi-name" value="${escAttr(location)}" placeholder="프로토콜명" maxlength="50">` : escHtml(location)}</span>
+    <span class="usdt-loc">${escHtml(location)}</span>
     <div class="usdt-input-wrap">
       <input type="number" class="usdt-qty-input" value="${qty || ''}" placeholder="0" min="0" step="any">
       <span class="usdt-unit">USDT</span>
     </div>
-    ${isDefi ? `<button class="btn-icon btn-danger usdt-del" data-action="usdt-remove-defi" aria-label="삭제">✕</button>` : ''}
   </div>`;
-}
-
-function _usdtAddDefiRow() {
-  const section = $('#usdtDefiList');
-  if (!section) return;
-  const div = document.createElement('div');
-  div.innerHTML = _usdtRow('', 0, true);
-  section.appendChild(div.firstElementChild);
-  const newInput = section.lastElementChild.querySelector('.usdt-defi-name');
-  if (newInput) newInput.focus();
-  _usdtRecalcTotal();
 }
 
 function _usdtRecalcTotal() {
@@ -1007,36 +1006,15 @@ function openUsdtManager() {
   const existingMap = _getExistingUsdtMap();
   const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
 
-  const defiAssets = [];
-  const allPreset = [];
-  for (const sec of Object.values(USDT_LOCATIONS)) {
-    for (const item of sec.items) allPreset.push(item);
-  }
-  for (const [loc, asset] of Object.entries(existingMap)) {
-    if (!allPreset.includes(loc)) {
-      defiAssets.push({ name: loc, qty: asset.usdtQty || 0 });
-    }
-  }
-
   const buildSection = (key) => {
     const sec = USDT_LOCATIONS[key];
     const subtotalHtml = `<span class="usdt-subtotal">0 USDT</span>`;
-    if (key === 'defi') {
-      return `<div class="usdt-section" data-section="${key}">
-        <div class="usdt-section-header">${sec.icon} ${sec.label} ${subtotalHtml}
-          <button class="btn-sm usdt-add-btn" data-action="usdt-add-defi">+ 추가</button>
-        </div>
-        <div id="usdtDefiList">
-          ${defiAssets.map(d => _usdtRow(d.name, d.qty, true)).join('')}
-        </div>
-      </div>`;
-    }
     return `<div class="usdt-section" data-section="${key}">
       <div class="usdt-section-header">${sec.icon} ${sec.label} ${subtotalHtml}</div>
       ${sec.items.map(item => {
         const existing = existingMap[item];
         const qty = existing?.usdtQty || 0;
-        return _usdtRow(item, qty, false);
+        return _usdtRow(item, qty);
       }).join('')}
     </div>`;
   };
@@ -1046,7 +1024,6 @@ function openUsdtManager() {
     <div class="usdt-rate-bar">현재 USDT 환율: <strong>${escHtml(fmtNum(rate, 0))}원</strong><span class="usdt-rate-src">${cachedUsdt?.source || ''}</span></div>
     ${buildSection('overseas')}
     ${buildSection('wallet')}
-    ${buildSection('defi')}
     ${buildSection('domestic')}
     <div class="usdt-summary">
       <div class="usdt-summary-row"><span>합계</span><span><strong id="usdtTotal">0</strong> USDT</span></div>
@@ -1069,40 +1046,10 @@ function doSaveUsdtBatch() {
   const existingMap = _getExistingUsdtMap();
   const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
   const rows = $$('#modalMain .usdt-row');
-  const seen = new Set();
   let addCount = 0, updateCount = 0;
 
-  // Validate: check for empty DeFi names
   for (const row of rows) {
-    const defiInput = row.querySelector('.usdt-defi-name');
-    if (defiInput && !defiInput.value.trim()) {
-      const qty = safeNum(row.querySelector('.usdt-qty-input')?.value);
-      if (qty > 0) {
-        showToast('DeFi 프로토콜 이름을 입력하세요', 'error');
-        defiInput.focus();
-        return;
-      }
-    }
-  }
-
-  // Validate: check for duplicate DeFi names
-  for (const row of rows) {
-    let location = row.dataset.location;
-    const defiInput = row.querySelector('.usdt-defi-name');
-    if (defiInput) location = defiInput.value.trim();
-    if (!location) continue;
-    if (seen.has(location)) {
-      showToast(`"${location}" 중복 — 이름을 다르게 입력하세요`, 'error');
-      return;
-    }
-    seen.add(location);
-  }
-
-  // Save
-  for (const row of rows) {
-    let location = row.dataset.location;
-    const defiInput = row.querySelector('.usdt-defi-name');
-    if (defiInput) location = defiInput.value.trim();
+    const location = row.dataset.location;
     if (!location) continue;
 
     const qty = safeNum(row.querySelector('.usdt-qty-input')?.value);

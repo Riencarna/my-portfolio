@@ -1,8 +1,7 @@
 /* =============================================
-   My Portfolio v5.4.2 — State Management
-   Planner-Creator-Evaluator Cycle 2
+   My Portfolio v5.5.0 — State Management
+   Cycle B: dashboard prefs, input presets, history tabs
    All IDs from uid() are STRINGS — never use Number() on them
-   sanitizeAsset/sanitizeTxn/sanitizeIncome coerce IDs to String
    ============================================= */
 
 // ── Default State ──
@@ -182,10 +181,8 @@ function loadData() {
         if (!appState.categoryOrder.includes(cid)) appState.categoryOrder.push(cid);
       }
       appState.categoryOrder = appState.categoryOrder.filter(c => CAT_IDS.includes(c));
-      // sanitizeAsset coerces IDs to String (fixes v2.x numeric ID compatibility)
       appState.assets = appState.assets.slice(0, LIMITS.assets).map(sanitizeAsset);
       appState.history = appState.history.slice(-LIMITS.history);
-      // sanitizeIncome coerces IDs to String
       appState.income = appState.income.map(sanitizeIncome);
     } else {
       appState = defaultState();
@@ -196,7 +193,6 @@ function loadData() {
     showToast('데이터 로드 실패. 기본값으로 초기화됩니다.', 'error');
   }
   invalidateCalcCache();
-  // Ensure today has a snapshot on load — prevents stale getPreviousTotal() after first mutation
   makeSnapshot();
   EventBus.emit('dataLoaded');
 }
@@ -299,7 +295,6 @@ function addTransactionWithPrice(assetId, txn, price) {
     return false;
   }
   const newTxns = [...asset.txns, sanitizeTxn({ ...txn, id: uid() })];
-  // Preserve market price from auto-update; only overwrite for non-updatable assets
   const hasAutoUpdate = asset.stockCode || asset.coinId || asset.isUsdt;
   const newAmount = (hasAutoUpdate && asset.amount > 0) ? asset.amount : safeNum(price);
   appState.assets[idx] = sanitizeAsset({ ...asset, amount: newAmount, txns: newTxns });
@@ -360,8 +355,6 @@ function deleteIncome(id) {
 }
 
 // ── Reorder ──
-// v4.4.1: 대칭 시맨틱 — "타겟 X에 드롭 → 이동 아이템이 X의 슬롯 차지,
-// X 및 이후가 한 칸씩 밀림". 앞→뒤 드래그의 off-by-one 수정.
 function reorderAsset(fromId, toId, insertBefore = false) {
   const arr = appState.assets;
   const fromIdx = arr.findIndex(a => a.id === fromId);
@@ -400,6 +393,77 @@ function setGoal(amount, date) {
 function clearGoal() {
   appState.goal = null;
   saveData();
+}
+
+// ── Dashboard Prefs (v5.5.0) ──
+function loadDashPrefs() {
+  try {
+    const raw = localStorage.getItem(DASH_PREFS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          hidden: Array.isArray(parsed.hidden) ? parsed.hidden.map(String) : [],
+          order: Array.isArray(parsed.order) ? parsed.order.map(String) : [],
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('loadDashPrefs failed:', e);
+  }
+  return { hidden: [], order: [] };
+}
+
+function saveDashPrefs(prefs) {
+  try {
+    localStorage.setItem(DASH_PREFS_KEY, JSON.stringify({
+      hidden: Array.isArray(prefs.hidden) ? prefs.hidden.slice(0, 50) : [],
+      order: Array.isArray(prefs.order) ? prefs.order.slice(0, 50) : [],
+    }));
+  } catch (e) {
+    console.warn('saveDashPrefs failed:', e);
+  }
+}
+
+function resetDashPrefs() {
+  try { localStorage.removeItem(DASH_PREFS_KEY); } catch (e) {
+    console.warn('resetDashPrefs failed:', e);
+  }
+}
+
+// ── Input Presets (v5.5.0) ──
+function loadPresets() {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          accounts: Array.isArray(parsed.accounts) ? parsed.accounts.map(String).slice(0, PRESET_MAX) : [],
+          incomeSources: Array.isArray(parsed.incomeSources) ? parsed.incomeSources.map(String).slice(0, PRESET_MAX) : [],
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('loadPresets failed:', e);
+  }
+  return { accounts: [], incomeSources: [] };
+}
+
+function addPreset(type, value) {
+  const v = stripHtml(value, 50).trim();
+  if (!v) return;
+  const presets = loadPresets();
+  const list = presets[type];
+  if (!Array.isArray(list)) return;
+  const filtered = list.filter(x => x !== v);
+  filtered.unshift(v);
+  presets[type] = filtered.slice(0, PRESET_MAX);
+  try {
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+  } catch (e) {
+    console.warn('addPreset failed:', e);
+  }
 }
 
 // ── Storage Info ──

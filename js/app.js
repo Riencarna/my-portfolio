@@ -1,7 +1,7 @@
 /* =============================================
-   My Portfolio v5.4.2 — App Entry Point
+   My Portfolio v5.5.0 — App Entry Point
+   Cycle B compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
-   Planner-Creator-Evaluator Cycle 3
    ============================================= */
 
 let currentTab = 'pgDash';

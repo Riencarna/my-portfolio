@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.4.2 — Configuration
-   Soft Neutral palette, Planner-Creator-Evaluator Cycle 3
+   My Portfolio v5.5.0 — Configuration
+   Soft Neutral palette, Cycle B (pgHist tabs, dash customize, presets)
    ============================================= */
 
-const APP_VERSION = '5.4.2';
+const APP_VERSION = '5.5.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -48,6 +48,10 @@ const LAZY_RENDER_PAGE = 20;
 
 // History pagination
 const HISTORY_PAGE_SIZE = 50;
+const TXN_PAGE_SIZE = 50;
+
+// Preset sizes
+const PRESET_MAX = 10;
 
 // Focusable element selector (WCAG)
 const FOCUSABLE_SEL = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href]';
@@ -60,6 +64,8 @@ const TAB_KEY = 'mp_last_tab';
 const RATE_KEY = 'mp_ex_rate';
 const WALLET_KEY = 'wl_addr';
 const CUSTOM_PROXY_KEY = 'mp_custom_proxy';
+const DASH_PREFS_KEY = 'mp_dash_prefs';
+const PRESETS_KEY = 'mp_presets';
 
 // Limits
 const LIMITS = Object.freeze({
@@ -89,7 +95,7 @@ const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c]))
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));
 const INVESTMENT_CATS = Object.freeze(['국내주식', '해외주식', '코인']);
 
-// USDT location presets (exchange/wallet/DeFi/domestic)
+// USDT location presets (exchange/wallet/domestic — DeFi removed in v5.5.0)
 const USDT_LOCATIONS = Object.freeze({
   overseas: {
     label: '해외 CEX',
@@ -100,11 +106,6 @@ const USDT_LOCATIONS = Object.freeze({
     label: '지갑',
     icon: '👛',
     items: ['OKX wallet', 'Rabby wallet'],
-  },
-  defi: {
-    label: 'DeFi',
-    icon: '🔗',
-    items: [],
   },
   domestic: {
     label: '국내 CEX',
@@ -247,10 +248,18 @@ const UIState = {
   listCategoryShown: {},
   dashboardCategoryOpen: {},
   dashboardTrendDays: 30,
+  dashboardEditMode: false,
   isEditMode: false,
   listSearchQuery: '',
+  historyTab: 'records',
   historyFilter: 30,
   historyShown: HISTORY_PAGE_SIZE,
+  txnSearch: '',
+  txnFilterPeriod: 0,
+  txnFilterType: 'all',
+  txnFilterCat: 'all',
+  txnSort: 'date-desc',
+  txnShown: TXN_PAGE_SIZE,
   incomeMonth: (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -261,9 +270,17 @@ const UIState = {
     this.listCategoryShown = {};
     this.dashboardCategoryOpen = {};
     this.dashboardTrendDays = 30;
+    this.dashboardEditMode = false;
     this.isEditMode = false;
     this.listSearchQuery = '';
+    this.historyTab = 'records';
     this.historyFilter = 30;
     this.historyShown = HISTORY_PAGE_SIZE;
+    this.txnSearch = '';
+    this.txnFilterPeriod = 0;
+    this.txnFilterType = 'all';
+    this.txnFilterCat = 'all';
+    this.txnSort = 'date-desc';
+    this.txnShown = TXN_PAGE_SIZE;
   },
 };
