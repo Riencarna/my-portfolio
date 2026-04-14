@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.8.0 — Dashboard UI
+   My Portfolio v5.9.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -69,22 +69,35 @@ function _buildDashContext() {
   const prevTotal = getPreviousTotal();
   const change = total - prevTotal;
   const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
-  const prevCatTotals = getPreviousCategoryTotals();
-  return { total, catTotals, prevTotal, change, changePct, prevCatTotals };
+  const prevSnap = getPreviousSnapshot();
+  const prevCatTotals = prevSnap ? prevSnap.byCategory || null : null;
+  const prevAssetValues = prevSnap ? prevSnap.byAsset || null : null;
+  return { total, catTotals, prevTotal, change, changePct, prevCatTotals, prevAssetValues };
 }
 
-// 오늘 이전의 가장 최근 스냅샷에서 카테고리별 총액을 반환. 없으면 null.
-function getPreviousCategoryTotals() {
+// 오늘 이전의 가장 최근 스냅샷 entry 반환. 없으면 null.
+function getPreviousSnapshot() {
   const hist = appState.history;
   if (!Array.isArray(hist) || hist.length === 0) return null;
   const todayStr = today();
   for (let i = hist.length - 1; i >= 0; i--) {
     const snap = hist[i];
-    if (snap && snap.date && snap.date < todayStr && snap.byCategory) {
-      return snap.byCategory;
-    }
+    if (snap && snap.date && snap.date < todayStr) return snap;
   }
   return null;
+}
+
+// 하위 호환: 기존 호출부 유지
+function getPreviousCategoryTotals() {
+  const snap = getPreviousSnapshot();
+  return snap ? snap.byCategory || null : null;
+}
+
+function _shouldShowAssetDelta(asset) {
+  if (!asset) return false;
+  if (typeof ASSET_DELTA_ENABLED_CATS !== 'undefined' && ASSET_DELTA_ENABLED_CATS.includes(asset.category)) return true;
+  if (asset.isUsdt === true) return true;
+  return false;
 }
 
 function _getDashOrder(prefs) {
@@ -111,7 +124,7 @@ function _renderDashCardInner(id, ctx) {
     case 'pie':         return _renderPieCard(ctx);
     case 'trend':       return _renderTrendCard(ctx);
     case 'auto-update': return renderAutoUpdateSection();
-    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total, ctx.prevCatTotals);
+    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total, ctx.prevCatTotals, ctx.prevAssetValues);
     default: return '';
   }
 }
@@ -474,18 +487,18 @@ function renderPieLegend(catTotals, total) {
   return `<div class="pie-legend" role="list" aria-label="자산 분포 범례">${items}</div>`;
 }
 
-function renderCategoryBreakdown(catTotals, total, prevCatTotals) {
+function renderCategoryBreakdown(catTotals, total, prevCatTotals, prevAssetValues) {
   const cats = appState.categoryOrder.filter(c => catTotals[c] > 0);
   if (cats.length === 0) return '';
   return `
     <div class="card" role="region" aria-label="카테고리별 상세">
       <div class="card-title">카테고리별 상세</div>
-      ${cats.map(c => renderCategorySection(c, catTotals[c], total, prevCatTotals)).join('')}
+      ${cats.map(c => renderCategorySection(c, catTotals[c], total, prevCatTotals, prevAssetValues)).join('')}
     </div>
   `;
 }
 
-function renderCategorySection(catId, catTotal, total, prevCatTotals) {
+function renderCategorySection(catId, catTotal, total, prevCatTotals, prevAssetValues) {
   const cat = CAT_MAP[catId];
   const pct = total > 0 ? ((catTotal / total) * 100).toFixed(1) : 0;
   const assets = appState.assets.filter(a => a.category === catId);
@@ -504,7 +517,7 @@ function renderCategorySection(catId, catTotal, total, prevCatTotals) {
           <span class="chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▸</span>
         </span>
       </div>
-      ${isOpen ? `<div class="cat-assets" role="list">${assets.map(a => renderDashAsset(a)).join('')}</div>` : ''}
+      ${isOpen ? `<div class="cat-assets" role="list">${assets.map(a => renderDashAsset(a, prevAssetValues)).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -529,19 +542,39 @@ function _renderCatDeltaBadge(catId, catTotal, prevCatTotals) {
   return `<span class="cat-delta ${cls}" aria-label="${escAttr(label)}">${sign} ${escHtml(fmtKRW(Math.abs(diff)))}</span>`;
 }
 
-function renderDashAsset(asset) {
+function renderDashAsset(asset, prevAssetValues) {
   const v = calcAssetValue(asset);
   const isInv = INVESTMENT_CATS.includes(asset.category);
+  const assetDeltaBadge = _renderAssetDeltaBadge(asset, v.value, prevAssetValues);
   return `
     <div class="dash-asset" data-action="open-asset-detail" data-id="${asset.id}" role="listitem"
       tabindex="0" aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
-      <div class="dash-asset-name">${escHtml(asset.name)}</div>
+      <div class="dash-asset-name">${escHtml(asset.name)}${assetDeltaBadge}</div>
       <div class="dash-asset-info">
         <span class="dash-asset-value">${escHtml(fmtKRW(v.value))}</span>
         ${isInv ? `<span class="${profitClass(v.profit)}">${escHtml(fmtPct(v.profitPct))}</span>` : ''}
       </div>
     </div>
   `;
+}
+
+// 자산별 이전 기록 대비 일일 델타 배지.
+// - 활성 카테고리(ASSET_DELTA_ENABLED_CATS) 또는 USDT 자산만 표시
+// - 이전 스냅샷에 byAsset이 없거나 해당 자산 ID가 없으면 미표시 (신규 자산 포함)
+// - 변동액이 반올림 후 0이면 미표시 (자산 행은 공간이 좁아 ±0 노이즈 방지)
+function _renderAssetDeltaBadge(asset, currValue, prevAssetValues) {
+  if (!_shouldShowAssetDelta(asset)) return '';
+  if (!prevAssetValues) return '';
+  const prev = prevAssetValues[asset.id];
+  if (prev === undefined || prev === null) return '';
+  const prevN = safeNum(prev, 0);
+  const curr = safeNum(currValue, 0);
+  const diff = Math.round(curr - prevN);
+  if (diff === 0) return '';
+  const sign = diff > 0 ? '▲' : '▼';
+  const cls = diff > 0 ? 'positive' : 'negative';
+  const label = `이전 기록 대비 ${diff > 0 ? '증가' : '감소'} ${fmtKRW(Math.abs(diff))}`;
+  return `<span class="asset-delta ${cls}" aria-label="${escAttr(label)}">${sign} ${escHtml(fmtKRW(Math.abs(diff)))}</span>`;
 }
 
 function toggleDashCat(catId) {
@@ -561,10 +594,12 @@ function toggleDashCat(catId) {
   if (isOpen) {
     if (!existingBody) {
       const assets = appState.assets.filter(a => a.category === catId);
+      const prevSnap = getPreviousSnapshot();
+      const prevAssetValues = prevSnap ? prevSnap.byAsset || null : null;
       const assetsDiv = document.createElement('div');
       assetsDiv.className = 'cat-assets';
       assetsDiv.setAttribute('role', 'list');
-      assetsDiv.innerHTML = assets.map(a => renderDashAsset(a)).join('');
+      assetsDiv.innerHTML = assets.map(a => renderDashAsset(a, prevAssetValues)).join('');
       section.appendChild(assetsDiv);
     }
   } else {

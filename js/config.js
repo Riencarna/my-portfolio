@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.8.0 — Configuration
+   My Portfolio v5.9.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.8.0';
+const APP_VERSION = '5.9.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -94,6 +94,11 @@ const CATEGORIES = Object.freeze([
 const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c])));
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));
 const INVESTMENT_CATS = Object.freeze(['국내주식', '해외주식', '코인']);
+
+// 자산별 일일 델타 배지 활성 카테고리. 데이터는 항상 수집(store.js byAsset)되므로
+// 나중에 현금/예적금/부동산 등을 표시하려면 이 배열에 카테고리명만 추가하면 됨.
+// 현금 카테고리는 기본적으로 제외되지만, asset.isUsdt === true 자산은 예외적으로 표시됨.
+const ASSET_DELTA_ENABLED_CATS = Object.freeze(['국내주식', '해외주식', '코인']);
 
 // USDT location presets (exchange/wallet/domestic — DeFi removed in v5.5.0)
 const USDT_LOCATIONS = Object.freeze({
