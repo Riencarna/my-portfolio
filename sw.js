@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.7.1
+/* Service Worker - My Portfolio v5.8.0
    Cycle C: per-category daily delta badges
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.7.1";
+var CACHE_NAME = "myportfolio-v5.8.0";
 
 var STATIC_ASSETS = [
   "./",

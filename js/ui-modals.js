@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.7.1 — Modals UI
+   My Portfolio v5.8.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -231,6 +231,8 @@ function updateFormFields(cat) {
   const priceLabel = $('#editPriceLabel');
   const nameInput = $('#assetName') || $('#editName');
   if (stockF) { stockF.classList.toggle('hidden', !isStock); stockF.classList.toggle('form-row-visible', isStock); }
+  const stockKrHint = $('#stockKrHint');
+  if (stockKrHint) stockKrHint.classList.toggle('hidden', cat !== '국내주식');
   if (coinF) coinF.classList.toggle('hidden', !isCoin);
   if (usdtF) usdtF.classList.toggle('hidden', !isCash);
   const usdtMultiF = $('#usdtMultiField');
@@ -257,6 +259,7 @@ function openAddAsset() {
     <div class="form-group"><label id="catSelectLabel">카테고리</label>${renderCategorySelector('국내주식', 'catSelect')}</div>
     <div class="form-group"><label for="assetName">자산명 *</label><input type="text" id="assetName" placeholder="예: 삼성전자, SK하이닉스" maxlength="100" required></div>
     <div class="form-row" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" placeholder="예: 005930" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket"><option value="KOSPI">KOSPI</option><option value="KOSDAQ">KOSDAQ</option><option value="NYSE">NYSE</option><option value="NASDAQ">NASDAQ</option><option value="">기타</option></select></div></div>
+    <div class="form-hint-info" id="stockKrHint" role="note">💡 TIGER/KODEX 미국·나스닥 등 <strong>해외 지수 추종 ETF</strong>는 "해외주식" 카테고리를 선택하세요</div>
     <div class="form-group hidden" id="coinField"><label for="coinSelect">코인 ID (CoinGecko)</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, id]) => `<option value="${escAttr(id)}">${escHtml(sym)} (${escHtml(id)})</option>`).join('')}<option value="__custom__">직접 입력</option></select><input type="text" id="coinCustomId" class="hidden" placeholder="CoinGecko ID 입력 (예: tether-gold)" maxlength="100" style="margin-top:6px"></div>
     <div class="form-group hidden" id="usdtField"><label><input type="checkbox" id="isUsdt"> USDT (자동 환율 업데이트)</label></div>
     <div class="hidden" id="usdtMultiField">
@@ -368,6 +371,7 @@ function openEditAsset(id) {
     <div class="form-group"><label id="editCatSelectLabel">카테고리</label>${renderCategorySelector(asset.category, 'editCatSelect')}</div>
     <div class="form-group"><label for="editName">자산명</label><input type="text" id="editName" value="${escAttr(asset.name)}" maxlength="100"></div>
     <div class="form-row ${isStock ? '' : 'hidden'}" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" value="${escAttr(asset.stockCode)}" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${['KOSPI', 'KOSDAQ', 'NYSE', 'NASDAQ', ''].map(m => `<option value="${escAttr(m)}" ${asset.market === m ? 'selected' : ''}>${m || '기타'}</option>`).join('')}</select></div></div>
+    <div class="form-hint-info ${asset.category === '국내주식' ? '' : 'hidden'}" id="stockKrHint" role="note">💡 TIGER/KODEX 미국·나스닥 등 <strong>해외 지수 추종 ETF</strong>는 "해외주식" 카테고리를 선택하세요</div>
     <div class="form-group ${isCoin ? '' : 'hidden'}" id="coinField"><label for="coinSelect">코인 ID</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, cid]) => `<option value="${escAttr(cid)}" ${asset.coinId === cid ? 'selected' : ''}>${escHtml(sym)}</option>`).join('')}<option value="__custom__" ${asset.coinId && !Object.values(COIN_IDS).includes(asset.coinId) ? 'selected' : ''}>직접 입력</option></select><input type="text" id="coinCustomId" class="${asset.coinId && !Object.values(COIN_IDS).includes(asset.coinId) ? '' : 'hidden'}" value="${escAttr(asset.coinId && !Object.values(COIN_IDS).includes(asset.coinId) ? asset.coinId : '')}" placeholder="CoinGecko ID 입력 (예: tether-gold)" maxlength="100" style="margin-top:6px"></div>
     <div class="form-group ${isCash ? '' : 'hidden'}" id="usdtField"><label><input type="checkbox" id="isUsdt" ${asset.isUsdt ? 'checked' : ''}> USDT</label></div>
     <div class="${asset.isUsdt ? '' : 'hidden'}" id="usdtMultiField">
