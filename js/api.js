@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.6.0 — API Integration
+   My Portfolio v5.7.1 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    ============================================= */

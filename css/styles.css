@@ -1,6 +1,6 @@
 /* =============================================
-   My Portfolio v5.6.0 — Stylesheet
-   Cycle B: history tabs, dashboard customize, input presets
+   My Portfolio v5.7.1 — Stylesheet
+   Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
    ============================================= */
@@ -562,6 +562,15 @@ input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px;vertic
 .cat-header:hover{background:var(--surface-alt)}
 .cat-value{font-weight:600;margin-right:8px;color:var(--t1)}
 .cat-pct{color:var(--t4);font-size:12px;margin-right:8px}
+.cat-delta{
+  display:inline-flex;align-items:center;gap:2px;
+  padding:2px 7px;margin-right:8px;border-radius:999px;
+  font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;
+  white-space:nowrap;line-height:1.4}
+.cat-delta.positive{background:var(--success-soft);color:var(--success)}
+.cat-delta.negative{background:var(--danger-soft);color:var(--danger)}
+.cat-delta-zero{background:var(--surface-alt);color:var(--t4)}
+.cat-delta-new{background:var(--surface-alt);color:var(--t3);font-size:10px;letter-spacing:.3px}
 .chevron{font-size:10px;color:var(--t4);transition:transform .25s cubic-bezier(.4,0,.2,1);display:inline-block}
 .chevron.open{transform:rotate(90deg)}
 .cat-assets{padding:0 0 8px;overflow:hidden;transition:max-height .3s ease,opacity .3s ease}

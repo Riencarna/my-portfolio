@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.6.0 — Dashboard UI
+   My Portfolio v5.7.1 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -69,7 +69,22 @@ function _buildDashContext() {
   const prevTotal = getPreviousTotal();
   const change = total - prevTotal;
   const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
-  return { total, catTotals, prevTotal, change, changePct };
+  const prevCatTotals = getPreviousCategoryTotals();
+  return { total, catTotals, prevTotal, change, changePct, prevCatTotals };
+}
+
+// 오늘 이전의 가장 최근 스냅샷에서 카테고리별 총액을 반환. 없으면 null.
+function getPreviousCategoryTotals() {
+  const hist = appState.history;
+  if (!Array.isArray(hist) || hist.length === 0) return null;
+  const todayStr = today();
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const snap = hist[i];
+    if (snap && snap.date && snap.date < todayStr && snap.byCategory) {
+      return snap.byCategory;
+    }
+  }
+  return null;
 }
 
 function _getDashOrder(prefs) {
@@ -96,7 +111,7 @@ function _renderDashCardInner(id, ctx) {
     case 'pie':         return _renderPieCard(ctx);
     case 'trend':       return _renderTrendCard(ctx);
     case 'auto-update': return renderAutoUpdateSection();
-    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total);
+    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total, ctx.prevCatTotals);
     default: return '';
   }
 }
@@ -459,22 +474,23 @@ function renderPieLegend(catTotals, total) {
   return `<div class="pie-legend" role="list" aria-label="자산 분포 범례">${items}</div>`;
 }
 
-function renderCategoryBreakdown(catTotals, total) {
+function renderCategoryBreakdown(catTotals, total, prevCatTotals) {
   const cats = appState.categoryOrder.filter(c => catTotals[c] > 0);
   if (cats.length === 0) return '';
   return `
     <div class="card" role="region" aria-label="카테고리별 상세">
       <div class="card-title">카테고리별 상세</div>
-      ${cats.map(c => renderCategorySection(c, catTotals[c], total)).join('')}
+      ${cats.map(c => renderCategorySection(c, catTotals[c], total, prevCatTotals)).join('')}
     </div>
   `;
 }
 
-function renderCategorySection(catId, catTotal, total) {
+function renderCategorySection(catId, catTotal, total, prevCatTotals) {
   const cat = CAT_MAP[catId];
   const pct = total > 0 ? ((catTotal / total) * 100).toFixed(1) : 0;
   const assets = appState.assets.filter(a => a.category === catId);
   const isOpen = UIState.dashboardCategoryOpen[catId] || false;
+  const deltaBadge = _renderCatDeltaBadge(catId, catTotal, prevCatTotals);
 
   return `
     <div class="cat-section" id="dashCat-${escAttr(catId)}">
@@ -483,6 +499,7 @@ function renderCategorySection(catId, catTotal, total) {
         <span>${cat.icon} ${escHtml(cat.label)} (${assets.length})</span>
         <span>
           <span class="cat-value">${escHtml(fmtKRW(catTotal))}</span>
+          ${deltaBadge}
           <span class="cat-pct">${pct}%</span>
           <span class="chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▸</span>
         </span>
@@ -490,6 +507,26 @@ function renderCategorySection(catId, catTotal, total) {
       ${isOpen ? `<div class="cat-assets" role="list">${assets.map(a => renderDashAsset(a)).join('')}</div>` : ''}
     </div>
   `;
+}
+
+// 카테고리 이전 기록 대비 증감 배지. 이전 스냅샷 없으면 빈 문자열.
+// aria-label은 '이전 기록 대비'로 표기 — 사용자가 매일 들어오지 않을 경우 실제 비교 기준이 전일이 아닐 수 있음.
+function _renderCatDeltaBadge(catId, catTotal, prevCatTotals) {
+  if (!prevCatTotals) return '';
+  const prev = safeNum(prevCatTotals[catId], 0);
+  const curr = safeNum(catTotal, 0);
+  if (prev === 0 && curr === 0) return '';
+  if (prev === 0) {
+    return `<span class="cat-delta cat-delta-new" aria-label="신규 카테고리">NEW</span>`;
+  }
+  const diff = curr - prev;
+  if (diff === 0) {
+    return `<span class="cat-delta cat-delta-zero" aria-label="이전 기록 대비 변동 없음">±0</span>`;
+  }
+  const sign = diff > 0 ? '▲' : '▼';
+  const cls = diff > 0 ? 'positive' : 'negative';
+  const label = `이전 기록 대비 ${diff > 0 ? '증가' : '감소'} ${fmtKRW(Math.abs(diff))}`;
+  return `<span class="cat-delta ${cls}" aria-label="${escAttr(label)}">${sign} ${escHtml(fmtKRW(Math.abs(diff)))}</span>`;
 }
 
 function renderDashAsset(asset) {

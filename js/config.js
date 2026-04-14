@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.6.0 — Configuration
-   Soft Neutral palette, Cycle B (pgHist tabs, dash customize, presets)
+   My Portfolio v5.7.1 — Configuration
+   Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.6.0';
+const APP_VERSION = '5.7.1';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──

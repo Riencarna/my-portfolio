@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.6.0
-   Cycle C: list tabs (held/sold), asset detail txn stats
+/* Service Worker - My Portfolio v5.7.1
+   Cycle C: per-category daily delta badges
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.6.0";
+var CACHE_NAME = "myportfolio-v5.7.1";
 
 var STATIC_ASSETS = [
   "./",
