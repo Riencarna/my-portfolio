@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.0 — Utilities
+   My Portfolio v5.9.1 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management

@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.9.0 — Configuration
+   My Portfolio v5.9.1 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.9.0';
+const APP_VERSION = '5.9.1';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -204,23 +204,23 @@ const EVM_TOKENS = Object.freeze([
 
 // CORS proxies
 const CORS_PROXIES = [
-  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
   u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,
   u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-  u => `https://corsproxy.org/?${encodeURIComponent(u)}`,
 ];
 
 // API endpoints
 const API = Object.freeze({
-  coingecko:   'https://api.coingecko.com/api/v3',
-  yahoo:       'https://query1.finance.yahoo.com',
-  naver:       'https://m.stock.naver.com/api/stock',
-  naverWorld:  'https://api.stock.naver.com/stock',
-  stooq:       'https://stooq.com/q/l/',
-  openER:      'https://open.er-api.com/v6/latest/USD',
-  floatRates:  'https://www.floatrates.com/daily/usd.json',
-  upbit:       'https://api.upbit.com/v1/ticker',
-  bithumb:     'https://api.bithumb.com/public/ticker',
+  coingecko:     'https://api.coingecko.com/api/v3',
+  yahoo:         'https://query1.finance.yahoo.com',
+  naver:         'https://m.stock.naver.com/api/stock',
+  naverPolling:  'https://polling.finance.naver.com/api/realtime/domestic/stock',
+  naverWorld:    'https://api.stock.naver.com/stock',
+  stooq:         'https://stooq.com/q/l/',
+  openER:        'https://open.er-api.com/v6/latest/USD',
+  floatRates:    'https://www.floatrates.com/daily/usd.json',
+  upbit:         'https://api.upbit.com/v1/ticker',
+  bithumb:       'https://api.bithumb.com/public/ticker',
 });
 
 // Benchmark indices

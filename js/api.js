@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.0 — API Integration
+   My Portfolio v5.9.1 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    ============================================= */
@@ -173,6 +173,7 @@ async function fetchStockPrice(asset) {
 }
 
 async function fetchKoreanStockPrice(code) {
+  // 1. Naver mobile API
   try {
     const r = await corsFetch(`${API.naver}/${code}/basic`, API_TIMEOUT);
     const d = await r.json();
@@ -181,6 +182,19 @@ async function fetchKoreanStockPrice(code) {
   } catch (e) {
     console.warn('fetchKoreanStockPrice naver failed:', code, e.message);
   }
+  // 2. Naver polling API (실시간 데이터)
+  try {
+    const r = await corsFetch(`${API.naverPolling}/${code}`, API_TIMEOUT);
+    const d = await r.json();
+    const item = d.datas?.[0];
+    if (item) {
+      const price = item.closePriceRaw ?? safeNum(String(item.closePrice).replace(/,/g, ''));
+      if (price && isFinite(price)) return Math.round(price);
+    }
+  } catch (e) {
+    console.warn('fetchKoreanStockPrice naver polling failed:', code, e.message);
+  }
+  // 3. Yahoo Finance fallback
   for (const suffix of ['.KS', '.KQ']) {
     try {
       const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${code}${suffix}?interval=1d&range=1d`, API_TIMEOUT);
