@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.1 — Dashboard UI
+   My Portfolio v5.9.3 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -440,8 +440,10 @@ function renderAutoUpdateSection() {
 }
 
 async function startAutoUpdate() {
-  const btn = $('#btnAutoUpdate') || $('#btnAutoUpdateHeader');
+  const btn = $('#btnAutoUpdate');
+  const btn2 = $('#btnAutoUpdateHeader');
   if (btn) btn.disabled = true;
+  if (btn2) btn2.disabled = true;
   const wrap = $('#updateProgressWrap');
   if (wrap) { wrap.classList.remove('hidden'); wrap.classList.add('visible'); wrap.setAttribute('aria-busy', 'true'); }
 

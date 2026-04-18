@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.9.1 — Configuration
+   My Portfolio v5.9.3 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.9.1';
+const APP_VERSION = '5.9.3';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -203,9 +203,11 @@ const EVM_TOKENS = Object.freeze([
 ]);
 
 // CORS proxies
+// ── My Proxy (Cloudflare Worker) ──
+const MY_PROXY_URL = 'https://asset-manage-alpaca.wnsduf0306.workers.dev';
+
+// Public proxies — fallback only
 const CORS_PROXIES = [
-  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,
   u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
 ];
 

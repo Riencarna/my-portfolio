@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.1 — App Entry Point
+   My Portfolio v5.9.3 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -266,7 +266,7 @@ function renderPageHeader() {
       ${currentTab === 'pgDash' ? `
         <button class="btn-p" id="btnAutoUpdateHeader" data-action="auto-update"
           aria-label="전체 가격 업데이트" ${autoUpdateProgress.running ? 'disabled' : ''}>
-          ${autoUpdateProgress.running ? '업데이트 중...' : '🔄 가격 업데이트'}
+          ${autoUpdateProgress.running ? '업데이트 중...' : '🔄 전체 업데이트'}
         </button>
       ` : ''}
       ${currentTab === 'pgList' ? `

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.1 — API Integration
+   My Portfolio v5.9.3 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    ============================================= */
@@ -28,7 +28,15 @@ async function corsFetch(url, timeout = API_TIMEOUT) {
     console.warn('corsFetch direct failed:', url.split('?')[0], e.message);
   }
 
-  // 2. Custom proxy (power-user setting)
+  // 2. My proxy (Cloudflare Worker) — primary
+  try {
+    const r = await fetchWithTimeout(`${MY_PROXY_URL}/?url=${encodeURIComponent(url)}`, timeout);
+    if (r.ok) return r;
+  } catch (e) {
+    console.warn('corsFetch my proxy failed:', e.message);
+  }
+
+  // 3. Custom proxy (power-user setting)
   try {
     const customProxy = localStorage.getItem(CUSTOM_PROXY_KEY);
     if (customProxy) {
@@ -40,16 +48,24 @@ async function corsFetch(url, timeout = API_TIMEOUT) {
     console.warn('corsFetch custom proxy failed:', e.message);
   }
 
-  // 3. Public proxies — parallel race (fastest wins)
+  // 4. Public proxies — fallback race (fastest wins)
   try {
-    return await Promise.any(
-      CORS_PROXIES.map(proxy =>
-        fetchWithTimeout(proxy(url), timeout).then(r => {
-          if (r.ok) return r;
-          throw new Error('not ok: ' + r.status);
-        })
-      )
+    const proxyPromises = CORS_PROXIES.map(proxy =>
+      fetchWithTimeout(proxy(url), timeout).then(r => {
+        if (r.ok) return r;
+        throw new Error('not ok: ' + r.status);
+      })
     );
+    proxyPromises.push(
+      fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, timeout)
+        .then(async r => {
+          if (!r.ok) throw new Error('allorigins not ok: ' + r.status);
+          const d = await r.json();
+          if (!d.contents) throw new Error('allorigins empty');
+          return new Response(d.contents, { status: 200, headers: { 'Content-Type': 'application/json' } });
+        })
+    );
+    return await Promise.any(proxyPromises);
   } catch (e) {
     throw new Error(`네트워크 요청 실패: ${url.split('?')[0]}`);
   }
