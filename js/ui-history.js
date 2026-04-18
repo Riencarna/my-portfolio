@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.3 — History & Export UI
+   My Portfolio v5.11.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -231,6 +231,10 @@ function _renderTxnListContent() {
               <span>${escHtml(fmtDate(t.date))}</span>
             </div>
             ${metaParts.length > 0 ? `<div class="txn-flat-meta text-muted">${metaParts.join(' · ')}</div>` : ''}
+            <div class="txn-flat-actions">
+              <button class="btn-txn-act" data-action="edit-txn-hist" data-asset-id="${escAttr(t.assetId)}" data-txn-id="${escAttr(t.id)}" aria-label="거래 수정" title="수정">✎</button>
+              <button class="btn-txn-act btn-txn-del" data-action="delete-txn-hist" data-asset-id="${escAttr(t.assetId)}" data-txn-id="${escAttr(t.id)}" aria-label="거래 삭제" title="삭제">✕</button>
+            </div>
           </div>
         `;
       }).join('')}
@@ -260,10 +264,13 @@ function _setupHistoryDelegation(container) {
     else if (action === 'export-pdf') doExportPDF();
     else if (action === 'reset-all') doResetAll();
     else if (action === 'history-filter') setHistoryFilter(Number(target.dataset.days));
+    else if (action === 'delete-history') confirmDeleteHistory(target.dataset.date);
     else if (action === 'load-more-history') loadMoreHistory();
     else if (action === 'load-more-txn') loadMoreTxn();
     else if (action === 'set-hist-tab') setHistoryTab(target.dataset.tab);
     else if (action === 'txn-filter-period') setTxnFilterPeriod(Number(target.dataset.days));
+    else if (action === 'edit-txn-hist') openEditTransaction(target.dataset.assetId, target.dataset.txnId);
+    else if (action === 'delete-txn-hist') _confirmDeleteTxnFromList(target.dataset.assetId, target.dataset.txnId);
     else if (action === 'open-asset-from-txn') openAssetDetail(target.dataset.id);
     else if (action === 'growth-view') {
       const days = Number(target.dataset.days);
@@ -390,6 +397,7 @@ function renderHistoryList() {
             <span class="history-date">${escHtml(fmtDate(h.date))}</span>
             <span class="history-total">${escHtml(fmtKRW(h.total))}</span>
             ${change !== 0 ? `<span class="${changeClass}" aria-label="변동: ${fmtKRW(change)}">${change > 0 ? '+' : ''}${escHtml(fmtKRW(change))}</span>` : ''}
+            <button class="btn-hist-del" data-action="delete-history" data-date="${escAttr(h.date)}" aria-label="${escAttr(fmtDate(h.date))} 기록 삭제" title="삭제">×</button>
           </div>
         `;
       }).join('')}
@@ -401,6 +409,26 @@ function renderHistoryList() {
       </button>
     ` : ''}
   `;
+}
+
+function _confirmDeleteTxnFromList(assetId, txnId) {
+  openConfirmModal('이 거래를 삭제하시겠습니까?', () => {
+    deleteTransaction(assetId, txnId);
+    showToast('거래 삭제됨', 'success');
+    _rerenderTxnList();
+  });
+}
+
+function confirmDeleteHistory(date) {
+  openConfirmModal(
+    `${fmtDate(date)} 기록을 삭제하시겠습니까?`,
+    () => {
+      if (deleteHistoryRecord(date)) {
+        showToast('기록이 삭제되었습니다', 'success');
+        renderHistory();
+      }
+    }
+  );
 }
 
 function loadMoreHistory() {

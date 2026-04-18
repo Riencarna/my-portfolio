@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.9.3
-   Cycle C: per-category daily delta badges
+/* Service Worker - My Portfolio v5.11.0
+   Feature: 자산 기록 개별 삭제
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.9.3";
+var CACHE_NAME = "myportfolio-v5.11.0";
 
 var STATIC_ASSETS = [
   "./",

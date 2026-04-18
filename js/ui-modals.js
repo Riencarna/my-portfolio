@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.3 — Modals UI
+   My Portfolio v5.11.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -636,7 +636,11 @@ function doEditTxn(assetId, txnId) {
     if (acctVal) addPreset('accounts', acctVal);
     closeModal('modalSub');
     showToast('거래 수정됨', 'success');
-    openAssetDetail(assetId);
+    if (_getTopmostModal()) {
+      openAssetDetail(assetId);
+    } else if (typeof _rerenderTxnList === 'function') {
+      _rerenderTxnList();
+    }
   }
 }
 

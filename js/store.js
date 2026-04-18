@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.9.3 — State Management
+   My Portfolio v5.11.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -213,6 +213,16 @@ function makeSnapshot() {
   if (appState.history.length > LIMITS.history) {
     appState.history = appState.history.slice(-LIMITS.history);
   }
+}
+
+// ── History Delete ──
+function deleteHistoryRecord(date) {
+  const idx = appState.history.findIndex(h => h.date === date);
+  if (idx < 0) return false;
+  appState.history.splice(idx, 1);
+  saveData();
+  EventBus.emit('historyChanged', { type: 'delete', date });
+  return true;
 }
 
 // ── Asset CRUD ──
