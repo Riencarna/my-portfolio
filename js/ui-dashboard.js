@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.11.1 — Dashboard UI
+   My Portfolio v5.12.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -428,12 +428,17 @@ function renderAutoUpdateSection() {
         <div class="progress-text" id="updateProgressText" aria-live="polite">준비 중...</div>
       </div>
       <div id="updateLogs" class="update-logs" aria-label="업데이트 로그">
-        ${updateLogs.slice(-10).map(l => `
-          <div class="log-item ${l.ok ? 'log-ok' : 'log-fail'}" role="listitem">
+        ${updateLogs.slice(-10).map(l => {
+          const cls = !l.ok ? 'log-fail' : (l.stale ? 'log-stale' : 'log-ok');
+          const prefix = l.stale ? '⚠️ ' : '';
+          const right = !l.ok ? '✗ 실패'
+            : (l.price ? prefix + escHtml(fmtPrice(l.price)) : '✓');
+          const title = l.stale ? 'title="값 미변화 의심 — 이전 가격과 동일합니다"' : '';
+          return `<div class="log-item ${cls}" role="listitem" ${title}>
             <span>${escHtml(l.name)}</span>
-            <span>${l.ok ? (l.price ? escHtml(fmtPrice(l.price)) : '✓') : '✗ 실패'}</span>
-          </div>
-        `).join('')}
+            <span>${right}</span>
+          </div>`;
+        }).join('')}
       </div>
     </div>
   `;
@@ -458,10 +463,14 @@ async function startAutoUpdate() {
   });
 
   if (summary && summary.total > 0) {
-    const msg = summary.failed > 0
-      ? `가격 업데이트: ${summary.success}/${summary.total} 성공 (실패: ${summary.failed}건)`
+    const extras = [];
+    if (summary.failed > 0) extras.push(`실패 ${summary.failed}건`);
+    if (summary.stale > 0) extras.push(`⚠️ 값 미변화 의심 ${summary.stale}건`);
+    const msg = extras.length > 0
+      ? `가격 업데이트: ${summary.success}/${summary.total} 성공 (${extras.join(', ')})`
       : `가격 업데이트 완료: ${summary.success}/${summary.total} 성공`;
-    showToast(msg, summary.failed > 0 ? 'info' : 'success');
+    const toastType = (summary.failed > 0 || summary.stale > 0) ? 'info' : 'success';
+    showToast(msg, toastType);
   } else {
     showToast('업데이트할 자산이 없습니다', 'info');
   }

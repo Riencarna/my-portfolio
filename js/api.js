@@ -1,8 +1,9 @@
 /* =============================================
-   My Portfolio v5.11.1 — API Integration
+   My Portfolio v5.12.0 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
+   v5.12.0: stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -331,6 +332,7 @@ async function _doAutoUpdate(onProgress) {
   const pendingUpdates = [];
   let successCount = 0;
   let failCount = 0;
+  let staleCount = 0;
 
   for (const a of assets) {
     if (a.category === '코인' && a.coinId) coinAssets.push(a);
@@ -342,10 +344,23 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  const log = (name, ok, price) => {
-    updateLogs.push({ name, ok, price, time: new Date().toISOString() });
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.12.0
+  const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
+  const isStale = (asset, newPrice) => {
+    if (newPrice == null || !isFinite(newPrice)) return false;
+    const prev = prevMap.get(asset.id);
+    if (!prev || prev.amount !== newPrice) return false;
+    if (!prev.lpu) return false;
+    const prevLpuMs = new Date(prev.lpu).getTime();
+    if (!isFinite(prevLpuMs) || prevLpuMs <= 0) return false;
+    return (Date.now() - prevLpuMs) > STALE_DETECT_MS;
+  };
+
+  const log = (name, ok, price, stale = false) => {
+    updateLogs.push({ name, ok, price, stale, time: new Date().toISOString() });
     if (updateLogs.length > LIMITS.logs) updateLogs.shift();
     if (ok) successCount++; else failCount++;
+    if (stale) staleCount++;
   };
 
   const now = new Date().toLocaleString('ko-KR');
@@ -358,7 +373,7 @@ async function _doAutoUpdate(onProgress) {
         const qty = item.asset.usdtQty;
         const amt = (qty != null && qty > 0) ? Math.round(rate * qty) : rate;
         pendingUpdates.push({ id: item.asset.id, amount: amt, lpu: now });
-        log(item.asset.name, true, amt);
+        log(item.asset.name, true, amt, isStale(item.asset, amt));
       } else {
         log(item.asset.name, false);
         failed.push(item);
@@ -380,7 +395,7 @@ async function _doAutoUpdate(onProgress) {
       for (const a of coinAssets) {
         if (prices[a.coinId] && isFinite(prices[a.coinId])) {
           pendingUpdates.push({ id: a.id, amount: prices[a.coinId], lpu: now });
-          log(a.name, true, prices[a.coinId]);
+          log(a.name, true, prices[a.coinId], isStale(a, prices[a.coinId]));
         } else {
           log(a.name, false);
           failed.push({ asset: a, type: 'coin' });
@@ -400,7 +415,7 @@ async function _doAutoUpdate(onProgress) {
       const price = await fetchStockPrice(item.asset);
       if (price != null && isFinite(price)) {
         pendingUpdates.push({ id: item.asset.id, amount: price, lpu: now });
-        log(item.asset.name, true, price);
+        log(item.asset.name, true, price, isStale(item.asset, price));
       } else {
         log(item.asset.name, false);
         failed.push(item);
@@ -433,7 +448,7 @@ async function _doAutoUpdate(onProgress) {
         }
         if (price != null && isFinite(price)) {
           pendingUpdates.push({ id: item.asset.id, amount: price, lpu: now });
-          log(item.asset.name + ' (재시도)', true, price);
+          log(item.asset.name + ' (재시도)', true, price, isStale(item.asset, price));
           failCount--;
         }
       } catch (e) {
@@ -447,7 +462,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.running = false;
   onProgress?.({ ...autoUpdateProgress, done: autoUpdateProgress.total });
 
-  const summary = { success: successCount, failed: failCount, total: totalAssets };
+  const summary = { success: successCount, failed: failCount, stale: staleCount, total: totalAssets };
   EventBus.emit('updateComplete', { logs: updateLogs, summary });
   return summary;
 }

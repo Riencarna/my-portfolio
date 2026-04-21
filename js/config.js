@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.11.1 — Configuration
+   My Portfolio v5.12.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.11.1';
+const APP_VERSION = '5.12.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -18,6 +18,8 @@ const CACHE_TTL_BENCH = 3_600_000;
 const API_TIMEOUT = 8000;
 const STOCK_DELAY_MS = 300;
 const RETRY_DELAY_MS = 2000;
+// v5.12.0 stale 가격 감지 임계값: 이전 가격과 동일 + lpu가 이 시간 이상 지났으면 "값 미변화 의심"
+const STALE_DETECT_MS = 18 * 60 * 60 * 1000;
 const PDF_PRINT_DELAY_MS = 500;
 const PAGE_ENTER_MS = 400;
 const DYNAMIC_COLOR_DELAY_MS = 50;

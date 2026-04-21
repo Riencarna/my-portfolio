@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.11.1 — Analysis UI
+   My Portfolio v5.12.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
