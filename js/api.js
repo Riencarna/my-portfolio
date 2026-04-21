@@ -1,7 +1,8 @@
 /* =============================================
-   My Portfolio v5.11.0 — API Integration
+   My Portfolio v5.11.1 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
+   국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
    ============================================= */
 
 // ── Cache ──
@@ -189,16 +190,7 @@ async function fetchStockPrice(asset) {
 }
 
 async function fetchKoreanStockPrice(code) {
-  // 1. Naver mobile API
-  try {
-    const r = await corsFetch(`${API.naver}/${code}/basic`, API_TIMEOUT);
-    const d = await r.json();
-    const price = d.closePrice || d.currentPrice;
-    if (price) return safeNum(String(price).replace(/,/g, ''));
-  } catch (e) {
-    console.warn('fetchKoreanStockPrice naver failed:', code, e.message);
-  }
-  // 2. Naver polling API (실시간 데이터)
+  // 1. Naver polling API (실시간) — Worker 화이트리스트 통과, 1순위로 승격(v5.11.1)
   try {
     const r = await corsFetch(`${API.naverPolling}/${code}`, API_TIMEOUT);
     const d = await r.json();
@@ -209,6 +201,15 @@ async function fetchKoreanStockPrice(code) {
     }
   } catch (e) {
     console.warn('fetchKoreanStockPrice naver polling failed:', code, e.message);
+  }
+  // 2. Naver mobile API (보조)
+  try {
+    const r = await corsFetch(`${API.naver}/${code}/basic`, API_TIMEOUT);
+    const d = await r.json();
+    const price = d.closePrice || d.currentPrice;
+    if (price) return safeNum(String(price).replace(/,/g, ''));
+  } catch (e) {
+    console.warn('fetchKoreanStockPrice naver failed:', code, e.message);
   }
   // 3. Yahoo Finance fallback
   for (const suffix of ['.KS', '.KQ']) {

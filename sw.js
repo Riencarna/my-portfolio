@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.11.0
-   Feature: 자산 기록 개별 삭제
+/* Service Worker - My Portfolio v5.11.1
+   Fix: Cloudflare Worker 프록시 응답이 cache-first에 갇혀 stale 가격 반환되던 회귀 수정
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.11.0";
+var CACHE_NAME = "myportfolio-v5.11.1";
 
 var STATIC_ASSETS = [
   "./",
@@ -27,9 +27,14 @@ var STATIC_ASSETS = [
   "./js/app.js"
 ];
 
+// 네트워크-우선 + 캐시 폴백 대상. Cloudflare Worker 프록시와 polling.finance.naver.com이
+// 빠져있어 가격 응답이 영구 캐싱되던 회귀(v5.9.3 이후)를 v5.11.1에서 수정.
 var API_HOSTS = [
   "api.coingecko.com", "query1.finance.yahoo.com",
-  "m.stock.naver.com", "api.stock.naver.com", "stooq.com",
+  "m.stock.naver.com", "api.stock.naver.com",
+  "polling.finance.naver.com",
+  "asset-manage-alpaca.wnsduf0306.workers.dev",
+  "stooq.com",
   "open.er-api.com", "www.floatrates.com",
   "api.upbit.com", "api.bithumb.com",
   "ethereum-rpc.publicnode.com", "bsc-dataseed.binance.org",
