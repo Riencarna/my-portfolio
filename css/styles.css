@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.12.0 — Stylesheet
+   My Portfolio v5.13.1 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -754,12 +754,12 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .txn-type.buy{background:var(--success-soft);color:var(--success)}
 .txn-type.sell{background:var(--danger-soft);color:var(--danger)}
 .txn-info{display:flex;align-items:center;gap:8px;flex:1}
-.txn-values{display:flex;align-items:center;gap:10px}
+.txn-values{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .txn-total{font-weight:700;color:var(--t1)}
 .txn-acct{color:var(--t4);font-size:11px}
-.txn-memo{width:100%;font-size:11px;color:var(--t4);padding-left:8px}
-.txn-actions{position:absolute;right:6px;top:6px;display:flex;gap:4px}
-.txn-edit,.txn-del{width:28px;height:28px;font-size:10px}
+.txn-memo{flex-basis:100%;order:99;font-size:11px;color:var(--t4);padding-left:8px}
+.txn-actions{display:flex;gap:6px;flex-shrink:0}
+.txn-edit,.txn-del{width:36px;height:36px;font-size:14px}
 .tx-total{font-size:16px;font-weight:700;text-align:right;padding:10px 0;color:var(--primary)}
 .amount-hint{font-size:12px;color:var(--primary);margin-top:3px;min-height:16px;font-variant-numeric:tabular-nums;font-weight:500}
 .form-hint-info{
@@ -1134,12 +1134,6 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .txn-flat-total{font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700}
 .txn-flat-sub{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--t4);font-variant-numeric:tabular-nums}
 .txn-flat-meta{font-size:12px;color:var(--t4);border-top:1px dashed var(--border);padding-top:5px;margin-top:2px;word-break:break-all}
-.txn-flat-actions{display:flex;gap:4px;justify-content:flex-end;margin-top:2px;opacity:0;transition:opacity .15s}
-.txn-flat-item:hover .txn-flat-actions,.txn-flat-item:focus-within .txn-flat-actions{opacity:1}
-.btn-txn-act{background:none;border:1px solid var(--border);cursor:pointer;
-  color:var(--t3);font-size:13px;padding:3px 10px;border-radius:6px;transition:all .15s}
-.btn-txn-act:hover{color:var(--primary);border-color:var(--primary);background:var(--primary-soft, rgba(124,111,240,.08))}
-.btn-txn-del:hover{color:var(--danger);border-color:var(--danger);background:var(--danger-soft)}
 
 /* ── Dashboard edit mode (ui-dashboard.js) ── */
 .dash-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;margin-bottom:12px;background:var(--bg-2);border:1px dashed var(--primary);border-radius:var(--radius-lg)}
@@ -1194,7 +1188,6 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .txn-period-group{justify-content:space-between}
   .txn-period-btn{flex:1;padding:7px 6px;font-size:11px}
   .txn-flat-item{padding:10px 12px;gap:10px}
-  .txn-flat-actions{opacity:1}
   .btn-hist-del{opacity:1}
   .txn-cat-icon{width:28px;height:28px;font-size:17px}
   .txn-stats-grid{grid-template-columns:1fr}

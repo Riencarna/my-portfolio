@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.12.0 — Dashboard UI
+   My Portfolio v5.13.1 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -235,6 +235,7 @@ function _renderTrendCard() {
       <div class="card-title">
         <span>자산 추이</span>
         <div class="btn-group" id="trendBtns" role="group" aria-label="기간 선택">
+          <button class="btn-sm ${UIState.dashboardTrendDays === 7 ? 'active' : ''}" data-action="trend" data-days="7" aria-pressed="${UIState.dashboardTrendDays === 7}">7일</button>
           <button class="btn-sm ${UIState.dashboardTrendDays === 30 ? 'active' : ''}" data-action="trend" data-days="30" aria-pressed="${UIState.dashboardTrendDays === 30}">30일</button>
           <button class="btn-sm ${UIState.dashboardTrendDays === 90 ? 'active' : ''}" data-action="trend" data-days="90" aria-pressed="${UIState.dashboardTrendDays === 90}">90일</button>
           <button class="btn-sm ${UIState.dashboardTrendDays === 0 ? 'active' : ''}" data-action="trend" data-days="0" aria-pressed="${UIState.dashboardTrendDays === 0}">전체</button>
