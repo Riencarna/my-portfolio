@@ -65,16 +65,29 @@
 - 표시 위치: 업데이트 로그 ⚠️ 배지, 완료 토스트
 - 새 가격 fetch 로직을 추가/변경할 때 **반드시 prev/new 비교 경로가 깨지지 않는지 확인**.
 
-## 📝 버전 Bump 시 건드릴 17곳
+## 📝 버전 Bump — `bump.js` 자동화 스크립트 사용 (v5.12.0+)
 
-아직 자동화 스크립트 없음(개선 항목 #3). 수동으로 전체 치환:
+**수동으로 17곳 고치지 말 것.** 프로젝트 루트의 `bump.js`가 대신 처리합니다.
 
-- `index.html` ×2 (주석, `<title>`)
-- `css/styles.css` 헤더
-- `js/config.js` (`APP_VERSION` + 헤더)
-- `sw.js` (`CACHE_NAME` + 헤더) ← **CACHE_NAME 안 바꾸면 SW 업데이트 안 됨**
-- `manifest.json` (`description`)
-- `js/` 11개 파일 헤더 (api, app, charts, store, ui-ai/dashboard/history/income/list/modals, utils, wallet)
+```bash
+node bump.js patch     # 5.12.0 -> 5.12.1 (버그 수정)
+node bump.js minor     # 5.12.0 -> 5.13.0 (기능 추가)
+node bump.js major     # 5.12.0 -> 6.0.0  (큰 변화)
+node bump.js 5.12.5    # 명시 버전
+node bump.js --dry patch   # 미리보기 (파일 수정 안 함)
+```
+
+### 스크립트가 건드리는 파일
+- `index.html`, `css/styles.css`, `manifest.json`, `sw.js`
+- `js/` 디렉토리의 모든 `.js` 파일
+
+자기 자신(`bump.js`)은 제외. 기준 버전은 `js/config.js`의 `APP_VERSION`.
+
+### 주의 (컨벤션)
+
+피처 설명 주석에 버전 번호를 박지 말 것 (예: `// v5.12.0 stale 감지 추가`).
+bump 시 함께 치환되어 "v5.12.1에 추가됐다"로 의미가 틀어집니다.
+**피처가 어느 버전에 들어왔는지는 `git log`로 확인하세요.** 주석은 "무엇을 하는지"에 집중.
 
 ## 핵심 인프라 정보
 
