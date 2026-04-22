@@ -101,5 +101,5 @@ bump 시 함께 치환되어 "v5.12.1에 추가됐다"로 의미가 틀어집니
 메모리 `project_recurring_patterns.md` 참조. 진행 상태:
 - [x] #1 Silent Fallback 감지 (v5.12.0)
 - [x] #2 캐시 배관도 체크리스트 (이 문서)
-- [ ] #3 버전 bump 자동화 스크립트
-- [ ] #4 로컬 dev server 명령 README화
+- [x] #3 버전 bump 자동화 스크립트 (`bump.js`, v5.12.0)
+- [x] #4 로컬 dev server 명령 README화 (`README.md`)
