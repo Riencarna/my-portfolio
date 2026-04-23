@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.15.0 — API Integration
+   My Portfolio v5.15.1 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
-   v5.15.0: stale 가격 감지 (사일런트 실패 방지)
+   v5.15.1: stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -344,7 +344,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.15.0
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.15.1
   const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
   const isStale = (asset, newPrice) => {
     if (newPrice == null || !isFinite(newPrice)) return false;
