@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.14.0 — State Management
+   My Portfolio v5.15.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -434,11 +434,21 @@ function reorderCategory(fromCat, toCat, insertBefore = false) {
 }
 
 // ── Goal ──
-function setGoal(amount, date) {
-  const amt = safeNum(amount);
+function setGoal(opts, legacyDate) {
+  // Backward compat: setGoal(amount, date) → object form
+  const o = (opts && typeof opts === 'object') ? opts : { amount: opts, date: legacyDate };
+  const amt = safeNum(o.amount);
   if (amt <= 0) { showToast('유효한 금액을 입력하세요', 'error'); return; }
-  if (!isValidDate(date)) { showToast('유효한 날짜를 입력하세요', 'error'); return; }
-  appState.goal = { amount: amt, date, setDate: today() };
+  if (!isValidDate(o.date)) { showToast('유효한 날짜를 입력하세요', 'error'); return; }
+  const prev = appState.goal || {};
+  appState.goal = {
+    amount: amt,
+    date: o.date,
+    setDate: today(),
+    monthlySaving: safeNum(o.monthlySaving != null ? o.monthlySaving : prev.monthlySaving),
+    expectedReturn: safeNum(o.expectedReturn != null ? o.expectedReturn : (prev.expectedReturn != null ? prev.expectedReturn : 7)),
+    monthlyExpense: safeNum(o.monthlyExpense != null ? o.monthlyExpense : prev.monthlyExpense),
+  };
   saveData();
 }
 

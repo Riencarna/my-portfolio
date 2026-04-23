@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.14.0 — Dashboard UI
+   My Portfolio v5.15.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -8,6 +8,7 @@
 const DASH_CARD_REGISTRY = Object.freeze([
   { id: 'hero',        label: '총 자산 헤더' },
   { id: 'stats',       label: '요약 지표' },
+  { id: 'fire-goal',   label: '재무 목표 & FIRE' },
   { id: 'pie',         label: '자산 분포' },
   { id: 'trend',       label: '자산 추이' },
   { id: 'auto-update', label: '가격 업데이트' },
@@ -121,6 +122,7 @@ function _renderDashCardInner(id, ctx) {
   switch (id) {
     case 'hero':        return _renderHeroCard(ctx);
     case 'stats':       return _renderStatsCard(ctx);
+    case 'fire-goal':   return _renderFireGoalCard(ctx);
     case 'pie':         return _renderPieCard(ctx);
     case 'trend':       return _renderTrendCard(ctx);
     case 'auto-update': return renderAutoUpdateSection();
@@ -213,6 +215,63 @@ function _renderStatsCard(ctx) {
         </div>
       ` : ''}
     </section>
+  `;
+}
+
+function _renderFireGoalCard(ctx) {
+  const goal = appState.goal;
+  if (!goal) {
+    return `
+      <div class="card dash-fire-empty" role="region" aria-label="재무 목표 없음">
+        <div class="card-title">재무 목표 & FIRE</div>
+        <p class="text-muted" style="margin:8px 0 12px">목표를 설정하면 달성 예상 시점과 FIRE 진행률이 표시됩니다.</p>
+        <button class="btn-p" data-action="go-tab" data-tab="pgAi" aria-label="목표 설정하러 가기">목표 설정</button>
+      </div>
+    `;
+  }
+  const total = ctx.total;
+  const pct = goal.amount > 0 ? (total / goal.amount) * 100 : 0;
+  const monthlySaving = safeNum(goal.monthlySaving);
+  const expectedReturn = safeNum(goal.expectedReturn != null ? goal.expectedReturn : 7);
+  const monthlyExpense = safeNum(goal.monthlyExpense);
+  const projMonths = projectMonthsToTarget(total, goal.amount, monthlySaving, expectedReturn);
+  const projLabel = isFinite(projMonths) ? fmtMonthsToKorean(projMonths) : '도달 불가';
+  const projDate = isFinite(projMonths) ? addMonthsFromNow(projMonths) : '';
+  const fireAmount = calcFireAmount(monthlyExpense);
+  const firePct = fireAmount > 0 ? (total / fireAmount) * 100 : 0;
+
+  return `
+    <div class="card dash-fire-card" role="region" aria-label="재무 목표 요약">
+      <div class="card-title">
+        재무 목표 & FIRE
+        <button class="btn-sm" data-action="go-tab" data-tab="pgAi" aria-label="재무 목표 상세">상세</button>
+      </div>
+      <div class="dash-fire-row">
+        <div class="dash-fire-label">목표 달성률</div>
+        <div class="progress-bar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-fill" style="width:${Math.min(pct, 100)}%"></div>
+        </div>
+        <div class="dash-fire-stats">
+          <span>${escHtml(fmtPct(pct, 1))}</span>
+          <span class="text-muted">${escHtml(fmtKRW(total))} / ${escHtml(fmtKRW(goal.amount))}</span>
+        </div>
+        ${goal.amount > total ? `
+          <div class="dash-fire-proj text-muted">예상 도달: ${escHtml(projLabel)}${projDate ? ` (${escHtml(projDate)})` : ''}</div>
+        ` : '<div class="dash-fire-proj positive">🎉 목표 달성!</div>'}
+      </div>
+      ${monthlyExpense > 0 ? `
+        <div class="dash-fire-row">
+          <div class="dash-fire-label">🔥 FIRE 진행률</div>
+          <div class="progress-bar" role="progressbar" aria-valuenow="${Math.round(firePct)}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-fill fire-fill" style="width:${Math.min(firePct, 100)}%"></div>
+          </div>
+          <div class="dash-fire-stats">
+            <span>${escHtml(fmtPct(firePct, 1))}</span>
+            <span class="text-muted">${escHtml(fmtKRW(total))} / ${escHtml(fmtKRW(fireAmount))}</span>
+          </div>
+        </div>
+      ` : ''}
+    </div>
   `;
 }
 

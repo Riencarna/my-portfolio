@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.14.0 — Stylesheet
+   My Portfolio v5.15.0 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -866,9 +866,28 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
    ANALYSIS
    ============================================= */
 .goal-progress{text-align:center}
-.goal-stats{display:flex;justify-content:space-between;font-size:13px;color:var(--t3);margin-top:12px}
+.goal-stats{display:flex;justify-content:space-between;font-size:13px;color:var(--t3);margin-top:12px;flex-wrap:wrap;gap:8px}
 .goal-detail{display:flex;justify-content:space-between;font-size:14px;margin-top:10px;color:var(--t2)}
 .goal-monthly{font-size:13px;margin-top:10px;color:var(--t3)}
+.goal-form{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.goal-field{display:flex;flex-direction:column;gap:4px}
+.goal-label{font-size:13px;font-weight:600;color:var(--t2)}
+.goal-submit{margin-top:4px;align-self:flex-start}
+.goal-projection{margin-top:14px;padding:12px;background:var(--surface-alt);border-radius:var(--radius-md);border:1px solid var(--bd)}
+.goal-projection-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:2px 0}
+.goal-projection-label{color:var(--t3);font-weight:600}
+.goal-projection-value{color:var(--t1);font-weight:700}
+.card-title-actions{display:flex;gap:6px}
+.fire-section{margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)}
+.fire-title{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:10px}
+.progress-fill.fire-fill{background:linear-gradient(90deg,#E8788A,#E8B474)}
+.dash-fire-card{display:flex;flex-direction:column;gap:14px}
+.dash-fire-empty{text-align:center}
+.dash-fire-row{display:flex;flex-direction:column;gap:6px}
+.dash-fire-label{font-size:13px;font-weight:600;color:var(--t2)}
+.dash-fire-stats{display:flex;justify-content:space-between;font-size:13px;color:var(--t1);font-weight:600}
+.dash-fire-proj{font-size:12px;margin-top:2px}
+.dash-fire-proj.positive{color:var(--success);font-weight:600}
 .score-display{display:flex;gap:24px;align-items:center}
 .score-circle{
   width:96px;height:96px;border-radius:50%;border:5px solid;

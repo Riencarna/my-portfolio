@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.14.0 — Analysis UI
+   My Portfolio v5.15.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -30,18 +30,27 @@ function renderAnalysis() {
 }
 
 function _setupGoalAmountHint() {
-  const input = document.getElementById('goalAmount');
-  const hint = document.getElementById('goalAmountHint');
-  if (!input || !hint) return;
-  const update = () => { hint.textContent = fmtAmountHint(input.value); };
-  input.addEventListener('input', update);
-  update();
+  const pairs = [
+    ['goalAmount', 'goalAmountHint'],
+    ['goalMonthlySaving', 'goalMonthlySavingHint'],
+    ['goalMonthlyExpense', 'goalMonthlyExpenseHint'],
+  ];
+  for (const [inputId, hintId] of pairs) {
+    const input = document.getElementById(inputId);
+    const hint = document.getElementById(hintId);
+    if (!input || !hint) continue;
+    const update = () => { hint.textContent = fmtAmountHint(input.value); };
+    input.addEventListener('input', update);
+    update();
+  }
 }
 
 function _setupAnalysisDelegation(container) {
   function handleAction(target) {
     const action = target.dataset.action;
     if (action === 'set-goal') doSetGoal();
+    else if (action === 'edit-goal') doEditGoal();
+    else if (action === 'cancel-goal-edit') doCancelGoalEdit();
     else if (action === 'clear-goal') doClearGoal();
     else if (action === 'load-benchmark') loadBenchmark();
   }
@@ -59,18 +68,48 @@ function _setupAnalysisDelegation(container) {
 // ── Goal Section ──
 function renderGoalSection(total) {
   const goal = appState.goal;
-  if (!goal) {
+  const editing = UIState.goalEditMode;
+  if (!goal || editing) {
+    const defaultDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]; })();
+    const prefill = {
+      amount: goal && goal.amount ? goal.amount : '',
+      date: goal && goal.date ? goal.date : defaultDate,
+      monthlySaving: goal && goal.monthlySaving ? goal.monthlySaving : '',
+      expectedReturn: goal && goal.expectedReturn != null ? goal.expectedReturn : 7,
+      monthlyExpense: goal && goal.monthlyExpense ? goal.monthlyExpense : '',
+    };
     return `
-      <div class="card" role="region" aria-label="목표 설정">
-        <div class="card-title">목표 설정</div>
-        <p class="text-muted">자산 목표를 설정하면 진행률을 추적할 수 있습니다.</p>
-        <div class="form-row">
-          <div class="form-col-grow">
-            <input type="number" id="goalAmount" placeholder="목표 금액" min="0" aria-label="목표 금액">
+      <div class="card" role="region" aria-label="재무 목표 설정">
+        <div class="card-title">
+          재무 목표 & FIRE 계산기
+          ${editing ? '<button class="btn-sm" data-action="cancel-goal-edit" aria-label="편집 취소">취소</button>' : ''}
+        </div>
+        <p class="text-muted">목표 금액과 저축 계획을 입력하면 달성 예상 시점과 FIRE 진행률을 계산합니다.</p>
+        <div class="goal-form">
+          <label class="goal-field">
+            <span class="goal-label">목표 금액</span>
+            <input type="number" id="goalAmount" placeholder="예: 100000000" min="0" value="${escAttr(prefill.amount)}" aria-label="목표 금액">
             <div class="amount-hint" id="goalAmountHint"></div>
-          </div>
-          <input type="date" id="goalDate" value="${(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().split('T')[0]; })()}" aria-label="목표 날짜">
-          <button class="btn-p" data-action="set-goal">설정</button>
+          </label>
+          <label class="goal-field">
+            <span class="goal-label">목표 날짜</span>
+            <input type="date" id="goalDate" value="${escAttr(prefill.date)}" aria-label="목표 날짜">
+          </label>
+          <label class="goal-field">
+            <span class="goal-label">월 저축액</span>
+            <input type="number" id="goalMonthlySaving" placeholder="예: 1000000" min="0" value="${escAttr(prefill.monthlySaving)}" aria-label="월 저축액">
+            <div class="amount-hint" id="goalMonthlySavingHint"></div>
+          </label>
+          <label class="goal-field">
+            <span class="goal-label">연 기대 수익률 (%)</span>
+            <input type="number" id="goalExpectedReturn" value="${escAttr(prefill.expectedReturn)}" step="0.1" aria-label="연 기대 수익률">
+          </label>
+          <label class="goal-field">
+            <span class="goal-label">월 생활비 <span class="text-muted">(FIRE용, 선택)</span></span>
+            <input type="number" id="goalMonthlyExpense" placeholder="예: 3000000" min="0" value="${escAttr(prefill.monthlyExpense)}" aria-label="월 생활비">
+            <div class="amount-hint" id="goalMonthlyExpenseHint"></div>
+          </label>
+          <button class="btn-p goal-submit" data-action="set-goal">${editing ? '저장' : '설정'}</button>
         </div>
       </div>
     `;
@@ -79,12 +118,26 @@ function renderGoalSection(total) {
   const pct = goal.amount > 0 ? (total / goal.amount) * 100 : 0;
   const remain = goal.amount - total;
   const daysLeft = Math.max(0, Math.ceil((new Date(goal.date) - new Date()) / 86400000));
+  const monthlySaving = safeNum(goal.monthlySaving);
+  const expectedReturn = safeNum(goal.expectedReturn != null ? goal.expectedReturn : 7);
+  const monthlyExpense = safeNum(goal.monthlyExpense);
+
+  const projMonths = projectMonthsToTarget(total, goal.amount, monthlySaving, expectedReturn);
+  const projReachable = isFinite(projMonths);
+  const projDate = projReachable ? addMonthsFromNow(projMonths) : '';
+  const projLabel = projReachable ? fmtMonthsToKorean(projMonths) : '현재 계획으로는 도달 불가';
+
+  const fireAmount = calcFireAmount(monthlyExpense);
+  const firePct = fireAmount > 0 ? (total / fireAmount) * 100 : 0;
 
   return `
-    <div class="card" role="region" aria-label="목표 달성률">
+    <div class="card" role="region" aria-label="재무 목표 달성률">
       <div class="card-title">
-        목표 달성률
-        <button class="btn-sm" data-action="clear-goal" aria-label="목표 초기화">초기화</button>
+        재무 목표 달성률
+        <div class="card-title-actions">
+          <button class="btn-sm" data-action="edit-goal" aria-label="목표 수정">수정</button>
+          <button class="btn-sm" data-action="clear-goal" aria-label="목표 초기화">초기화</button>
+        </div>
       </div>
       <div class="goal-progress">
         <div class="progress-bar progress-lg" role="progressbar"
@@ -94,18 +147,38 @@ function renderGoalSection(total) {
         <div class="goal-stats">
           <span>${escHtml(fmtPct(pct, 1))} 달성</span>
           <span>남은 금액: ${escHtml(fmtKRW(Math.max(0, remain)))}</span>
-          <span>D-${daysLeft}</span>
+          ${goal.date ? `<span>D-${daysLeft}</span>` : ''}
         </div>
         <div class="goal-detail">
           <span>현재: ${escHtml(fmtKRW(total))}</span>
           <span>목표: ${escHtml(fmtKRW(goal.amount))}</span>
         </div>
-        ${daysLeft > 0 && remain > 0 ? `
-          <div class="goal-monthly text-muted">
-            월 ${escHtml(fmtKRW(Math.ceil(remain / Math.max(1, Math.ceil(daysLeft / 30)))))} 추가 필요
+        ${remain > 0 ? `
+          <div class="goal-projection">
+            <div class="goal-projection-row">
+              <span class="goal-projection-label">예상 도달</span>
+              <span class="goal-projection-value">${escHtml(projLabel)}${projDate ? ` <span class="text-muted">(${escHtml(projDate)})</span>` : ''}</span>
+            </div>
+            <div class="goal-projection-row text-muted">
+              월 ${escHtml(fmtKRW(monthlySaving))} 저축 · 연 ${expectedReturn}% 복리 기준
+            </div>
           </div>
         ` : ''}
       </div>
+      ${monthlyExpense > 0 ? `
+        <div class="fire-section">
+          <div class="fire-title">🔥 FIRE 진행률 <span class="text-muted">(월 생활비 × 300, 4% 룰)</span></div>
+          <div class="progress-bar progress-lg" role="progressbar"
+            aria-valuenow="${Math.round(firePct)}" aria-valuemin="0" aria-valuemax="100" aria-label="FIRE ${Math.round(firePct)}% 달성">
+            <div class="progress-fill fire-fill" style="width:${Math.min(firePct, 100)}%"></div>
+          </div>
+          <div class="goal-stats">
+            <span>${escHtml(fmtPct(firePct, 1))} 달성</span>
+            <span>FIRE 자산: ${escHtml(fmtKRW(fireAmount))}</span>
+            <span>남은 금액: ${escHtml(fmtKRW(Math.max(0, fireAmount - total)))}</span>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -113,16 +186,36 @@ function renderGoalSection(total) {
 function doSetGoal() {
   const amount = safeNum($('#goalAmount')?.value);
   const date = $('#goalDate')?.value;
-  if (amount <= 0) { showToast('유효한 금액을 입력하세요', 'error'); return; }
+  const monthlySaving = safeNum($('#goalMonthlySaving')?.value);
+  const expectedReturn = safeNum($('#goalExpectedReturn')?.value);
+  const monthlyExpense = safeNum($('#goalMonthlyExpense')?.value);
+  if (amount <= 0) { showToast('유효한 목표 금액을 입력하세요', 'error'); return; }
   if (!date || !isValidDate(date)) { showToast('유효한 날짜를 입력하세요', 'error'); return; }
-  setGoal(amount, date);
+  setGoal({ amount, date, monthlySaving, expectedReturn, monthlyExpense });
+  UIState.goalEditMode = false;
   renderAnalysis();
+  renderDashboard();
   showToast('목표 설정 완료', 'success');
 }
 
-function doClearGoal() {
-  clearGoal();
+function doEditGoal() {
+  UIState.goalEditMode = true;
   renderAnalysis();
+}
+
+function doCancelGoalEdit() {
+  UIState.goalEditMode = false;
+  renderAnalysis();
+}
+
+function doClearGoal() {
+  openConfirmModal('재무 목표를 초기화하시겠습니까?', () => {
+    clearGoal();
+    UIState.goalEditMode = false;
+    renderAnalysis();
+    renderDashboard();
+    showToast('목표가 초기화되었습니다', 'success');
+  });
 }
 
 // ── Diversification ──

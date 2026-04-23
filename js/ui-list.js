@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.14.0 — Asset List UI
+   My Portfolio v5.15.0 — Asset List UI
    Cycle C: 보유중/매도완료 탭 (C-15)
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1

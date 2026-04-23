@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.14.0 — Utilities
+   My Portfolio v5.15.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -111,6 +111,53 @@ function isValidDate(str) {
 function clampDay(year, month, day) {
   const maxDay = new Date(year, month, 0).getDate();
   return Math.min(day, maxDay);
+}
+
+// ── FIRE / Goal Projection ──
+// 현재자산(PV) + 월저축(PMT) + 연수익률(r*12)로 목표(target) 도달까지 개월수 반환.
+// 도달 불가 시 Infinity. 이미 달성했으면 0.
+function projectMonthsToTarget(currentAmount, targetAmount, monthlySaving, annualReturnPct) {
+  const pv = safeNum(currentAmount);
+  const tg = safeNum(targetAmount);
+  const pmt = safeNum(monthlySaving);
+  const r = safeNum(annualReturnPct) / 100 / 12;
+  if (tg <= pv) return 0;
+  if (r === 0) {
+    if (pmt <= 0) return Infinity;
+    return Math.ceil((tg - pv) / pmt);
+  }
+  // PV*(1+r)^n + PMT*((1+r)^n - 1)/r = tg
+  // → (1+r)^n = (tg + PMT/r) / (PV + PMT/r)
+  const denom = pv + pmt / r;
+  if (denom <= 0) return Infinity;
+  const x = (tg + pmt / r) / denom;
+  if (x <= 1) return Infinity;
+  const n = Math.log(x) / Math.log(1 + r);
+  if (!isFinite(n) || n < 0) return Infinity;
+  return Math.ceil(n);
+}
+
+// 4% 룰: 월 생활비 × 12 × 25 = FIRE 자산
+function calcFireAmount(monthlyExpense) {
+  return safeNum(monthlyExpense) * 12 * 25;
+}
+
+function fmtMonthsToKorean(months) {
+  if (!isFinite(months) || months < 0) return '—';
+  if (months === 0) return '지금 달성';
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return `${m}개월`;
+  if (m === 0) return `${y}년`;
+  return `${y}년 ${m}개월`;
+}
+
+function addMonthsFromNow(months) {
+  if (!isFinite(months) || months < 0) return '';
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
 }
 
 // ── Calculations (NaN-safe, cached per render cycle) ──
