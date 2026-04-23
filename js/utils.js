@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.15.1 — Utilities
+   My Portfolio v5.16.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -158,6 +158,103 @@ function addMonthsFromNow(months) {
   d.setDate(1);
   d.setMonth(d.getMonth() + months);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+}
+
+// ── Allocation Drift ──
+// 반환: [{ kind: 'category'|'asset', id, label, targetPct, actualPct, targetAmt, actualAmt, driftPct, driftAmt, status }]
+// status: 'over' (target 초과), 'under' (target 부족), 'ok' (임계값 이내)
+function calcAllocationDrift(assets, allocation, total, catTotals) {
+  if (!allocation || !allocation.enabled) return [];
+  const t = safeNum(total);
+  if (t <= 0) return [];
+  const threshold = safeNum(allocation.driftThreshold != null ? allocation.driftThreshold : ALLOC_DRIFT_THRESHOLD_DEFAULT);
+  const cats = allocation.categories || {};
+  const assetTargets = (allocation.assetOverride && allocation.assets) ? allocation.assets : {};
+  const rows = [];
+  const assetsById = new Map(assets.map(a => [String(a.id), a]));
+
+  // 개별 종목 타겟이 설정된 카테고리별 carve-out 합계
+  const carveByCatTarget = {};
+  const carveByCatActual = {};
+
+  // 개별 종목 행
+  for (const [aid, targetPct] of Object.entries(assetTargets)) {
+    const a = assetsById.get(String(aid));
+    if (!a) continue;
+    const val = safeNum(calcAssetValue(a).value);
+    const actualPct = (val / t) * 100;
+    const tp = safeNum(targetPct);
+    const targetAmt = t * tp / 100;
+    const driftPct = actualPct - tp;
+    rows.push({
+      kind: 'asset',
+      id: String(aid),
+      label: a.name,
+      category: a.category,
+      targetPct: tp,
+      actualPct,
+      targetAmt,
+      actualAmt: val,
+      driftPct,
+      driftAmt: val - targetAmt,
+      status: Math.abs(driftPct) > threshold ? (driftPct > 0 ? 'over' : 'under') : 'ok',
+    });
+    carveByCatTarget[a.category] = safeNum(carveByCatTarget[a.category]) + tp;
+    carveByCatActual[a.category] = safeNum(carveByCatActual[a.category]) + val;
+  }
+
+  // 카테고리 행 (carve-out 제외분)
+  for (const cat of CATEGORIES) {
+    const cid = cat.id;
+    const rawTargetPct = safeNum(cats[cid]);
+    const rawActualAmt = safeNum(catTotals[cid]);
+    const carveT = safeNum(carveByCatTarget[cid]);
+    const carveA = safeNum(carveByCatActual[cid]);
+    const adjTargetPct = Math.max(0, rawTargetPct - carveT);
+    const adjActualAmt = Math.max(0, rawActualAmt - carveA);
+    if (adjTargetPct === 0 && adjActualAmt === 0) continue;
+    const adjActualPct = (adjActualAmt / t) * 100;
+    const targetAmt = t * adjTargetPct / 100;
+    const driftPct = adjActualPct - adjTargetPct;
+    const hasCarve = carveT > 0 || carveA > 0;
+    rows.push({
+      kind: 'category',
+      id: cid,
+      label: hasCarve ? `${cid} (기타)` : cid,
+      category: cid,
+      targetPct: adjTargetPct,
+      actualPct: adjActualPct,
+      targetAmt,
+      actualAmt: adjActualAmt,
+      driftPct,
+      driftAmt: adjActualAmt - targetAmt,
+      status: Math.abs(driftPct) > threshold ? (driftPct > 0 ? 'over' : 'under') : 'ok',
+    });
+  }
+
+  return rows;
+}
+
+// 리밸런싱 제안 — driftRows 중 임계값 넘는 것만, 절댓값 큰 순
+function getRebalancingSuggestions(driftRows, threshold) {
+  if (!Array.isArray(driftRows)) return [];
+  const th = safeNum(threshold != null ? threshold : ALLOC_DRIFT_THRESHOLD_DEFAULT);
+  return driftRows
+    .filter(r => Math.abs(r.driftPct) > th)
+    .sort((a, b) => Math.abs(b.driftPct) - Math.abs(a.driftPct))
+    .map(r => ({
+      ...r,
+      direction: r.driftPct > 0 ? 'sell' : 'buy',
+      rebalanceAmt: Math.abs(r.driftAmt),
+    }));
+}
+
+// 카테고리 목표 합계 (편집기 상단 표시용)
+function sumAllocationCategoryPct(categories) {
+  if (!categories || typeof categories !== 'object') return 0;
+  let s = 0;
+  for (const cid of CAT_IDS) s += safeNum(categories[cid]);
+  return s;
 }
 
 // ── Calculations (NaN-safe, cached per render cycle) ──

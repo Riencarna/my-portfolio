@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.15.1 — Analysis UI
+   My Portfolio v5.16.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -13,6 +13,7 @@ function renderAnalysis() {
 
   const sections = [
     renderGoalSection(total),
+    renderAllocationSection(total, catTotals),
     renderDiversificationSection(catTotals, total),
     renderRiskSection(catTotals, total),
     renderPeriodReturnsSection(),
@@ -27,6 +28,7 @@ function renderAnalysis() {
 
   _setupAnalysisDelegation(container);
   _setupGoalAmountHint();
+  _setupAllocationLiveSum();
 }
 
 function _setupGoalAmountHint() {
@@ -52,6 +54,11 @@ function _setupAnalysisDelegation(container) {
     else if (action === 'edit-goal') doEditGoal();
     else if (action === 'cancel-goal-edit') doCancelGoalEdit();
     else if (action === 'clear-goal') doClearGoal();
+    else if (action === 'set-allocation') doSetAllocation();
+    else if (action === 'edit-allocation') doEditAllocation();
+    else if (action === 'cancel-alloc-edit') doCancelAllocEdit();
+    else if (action === 'clear-allocation') doClearAllocation();
+    else if (action === 'toggle-alloc-override') doToggleAllocOverride();
     else if (action === 'load-benchmark') loadBenchmark();
   }
   container.onclick = (e) => {
@@ -215,6 +222,298 @@ function doClearGoal() {
     renderAnalysis();
     renderDashboard();
     showToast('목표가 초기화되었습니다', 'success');
+  });
+}
+
+// ── Allocation Targets ──
+function renderAllocationSection(total, catTotals) {
+  if (total <= 0) return '';
+  const alloc = appState.allocation;
+  const editing = UIState.allocationEditMode;
+  const hasAlloc = alloc && alloc.enabled;
+
+  if (!hasAlloc || editing) {
+    return _renderAllocationEditor(alloc, editing);
+  }
+  return _renderAllocationView(alloc, total, catTotals);
+}
+
+function _renderAllocationEditor(alloc, editing) {
+  const enabled = editing ? !!(alloc && alloc.enabled) : true;
+  const assetOverride = !!(alloc && alloc.assetOverride);
+  const cats = (alloc && alloc.categories) || DEFAULT_ALLOCATION_CATEGORIES;
+  const assetTargets = (alloc && alloc.assets) || {};
+  const threshold = (alloc && alloc.driftThreshold != null) ? alloc.driftThreshold : ALLOC_DRIFT_THRESHOLD_DEFAULT;
+  const sumPct = sumAllocationCategoryPct(cats);
+  const sumOk = Math.abs(sumPct - 100) < 0.1;
+
+  const catInputs = CATEGORIES.map(c => `
+    <label class="alloc-cat-field">
+      <span class="alloc-cat-label"><span class="alloc-cat-icon" aria-hidden="true">${c.icon}</span>${escHtml(c.label)}</span>
+      <span class="alloc-pct-wrap">
+        <input type="number" class="alloc-cat-input" data-alloc-cat="${escAttr(c.id)}"
+          value="${escAttr(safeNum(cats[c.id]))}" min="0" max="100" step="0.1"
+          aria-label="${escAttr(c.label)} 목표 비율">
+        <span class="alloc-pct-suffix">%</span>
+      </span>
+    </label>
+  `).join('');
+
+  return `
+    <div class="card" role="region" aria-label="자산 배분 목표 설정">
+      <div class="card-title">
+        자산 배분 목표
+        ${editing ? '<button class="btn-sm" data-action="cancel-alloc-edit" aria-label="편집 취소">취소</button>' : ''}
+      </div>
+      <p class="text-muted">카테고리별 목표 비율을 설정하면 편차를 추적하고 리밸런싱 제안을 받을 수 있습니다.</p>
+
+      <div class="alloc-form">
+        <label class="alloc-toggle-row">
+          <input type="checkbox" id="allocEnabled" ${enabled ? 'checked' : ''} aria-label="배분 목표 사용">
+          <span class="alloc-toggle-label">배분 목표 사용</span>
+        </label>
+
+        <div class="alloc-section-title">카테고리별 목표 비율</div>
+        <div class="alloc-cat-grid">${catInputs}</div>
+        <div class="alloc-sum-indicator ${sumOk ? 'ok' : 'warn'}" id="allocSumIndicator">
+          합계: <strong>${sumPct.toFixed(1)}%</strong> ${sumOk ? '✓' : '⚠️ 100%가 아닙니다'}
+        </div>
+
+        <label class="alloc-toggle-row">
+          <input type="checkbox" id="allocOverride" ${assetOverride ? 'checked' : ''}
+            data-action="toggle-alloc-override" aria-label="개별 종목 타겟 활성화">
+          <span class="alloc-toggle-label">개별 종목 타겟 활성화 <span class="text-muted">(일부 종목에 별도 목표 설정)</span></span>
+        </label>
+
+        ${assetOverride ? _renderAssetTargetList(assetTargets) : ''}
+
+        <label class="alloc-field">
+          <span class="alloc-label">편차 경고 임계값 (%)</span>
+          <input type="number" id="allocThreshold" value="${escAttr(threshold)}" min="0" max="50" step="0.5"
+            aria-label="편차 경고 임계값">
+          <div class="text-muted" style="font-size:12px">이 값 이상 벗어나면 🚨 경고를 표시합니다.</div>
+        </label>
+
+        <div class="alloc-actions">
+          <button class="btn-p" data-action="set-allocation">저장</button>
+          ${alloc ? '<button class="btn-sm" data-action="clear-allocation" aria-label="배분 목표 초기화">초기화</button>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _renderAssetTargetList(assetTargets) {
+  if (!appState.assets || appState.assets.length === 0) {
+    return '<div class="alloc-asset-empty text-muted">보유 자산이 없습니다.</div>';
+  }
+  const byCat = {};
+  for (const a of appState.assets) {
+    if (!byCat[a.category]) byCat[a.category] = [];
+    byCat[a.category].push(a);
+  }
+  const groups = CATEGORIES.map(c => {
+    const arr = byCat[c.id];
+    if (!arr || arr.length === 0) return '';
+    const rows = arr.map(a => {
+      const v = safeNum(assetTargets[String(a.id)]);
+      const hasTarget = assetTargets[String(a.id)] != null;
+      return `
+        <label class="alloc-asset-row">
+          <span class="alloc-asset-name">${escHtml(a.name)}</span>
+          <span class="alloc-pct-wrap">
+            <input type="number" class="alloc-asset-input" data-alloc-asset="${escAttr(String(a.id))}"
+              value="${hasTarget ? escAttr(v) : ''}" placeholder="미설정" min="0" max="100" step="0.1"
+              aria-label="${escAttr(a.name)} 목표 비율">
+            <span class="alloc-pct-suffix">%</span>
+          </span>
+        </label>
+      `;
+    }).join('');
+    return `
+      <div class="alloc-asset-group">
+        <div class="alloc-asset-group-title">${c.icon} ${escHtml(c.label)}</div>
+        ${rows}
+      </div>
+    `;
+  }).filter(Boolean).join('');
+  return `
+    <div class="alloc-asset-wrap">
+      <div class="text-muted" style="font-size:12px;margin-bottom:6px">개별 타겟을 두고 싶은 종목에만 % 입력. 빈 칸은 해당 카테고리 일반 배분에 포함됩니다.</div>
+      ${groups}
+    </div>
+  `;
+}
+
+function _renderAllocationView(alloc, total, catTotals) {
+  const driftRows = calcAllocationDrift(appState.assets, alloc, total, catTotals);
+  const threshold = safeNum(alloc.driftThreshold != null ? alloc.driftThreshold : ALLOC_DRIFT_THRESHOLD_DEFAULT);
+  const suggestions = getRebalancingSuggestions(driftRows, threshold);
+
+  return `
+    <div class="card" role="region" aria-label="자산 배분 목표 및 편차">
+      <div class="card-title">
+        자산 배분 목표
+        <div class="card-title-actions">
+          <button class="btn-sm" data-action="edit-allocation" aria-label="배분 목표 수정">수정</button>
+          <button class="btn-sm" data-action="clear-allocation" aria-label="배분 목표 초기화">초기화</button>
+        </div>
+      </div>
+
+      <div class="alloc-view-section">
+        <div class="alloc-view-title">목표 vs 현재 편차 (임계값 ±${threshold}%)</div>
+        ${_renderAllocDriftBars(driftRows, threshold)}
+      </div>
+
+      <div class="alloc-view-section">
+        <div class="alloc-view-title">리밸런싱 제안</div>
+        ${_renderAllocSuggestions(suggestions, threshold)}
+      </div>
+    </div>
+  `;
+}
+
+function _renderAllocDriftBars(rows, threshold) {
+  if (!rows || rows.length === 0) {
+    return '<div class="text-muted">표시할 편차가 없습니다. 카테고리 목표를 설정하세요.</div>';
+  }
+  const MAX_VISUAL_DRIFT = Math.max(10, threshold * 2);  // 막대 스케일 기준점
+  return `<div class="alloc-drift-list">${
+    rows.map(r => {
+      const absDrift = Math.min(Math.abs(r.driftPct), MAX_VISUAL_DRIFT);
+      const fillWidth = (absDrift / MAX_VISUAL_DRIFT) * 50;  // 중앙에서 뻗어나가므로 최대 50%
+      const side = r.driftPct >= 0 ? 'right' : 'left';
+      const statusIcon = r.status === 'over' ? '🚨' : (r.status === 'under' ? '🚨' : '✅');
+      const sign = r.driftPct > 0 ? '+' : (r.driftPct < 0 ? '' : '±');
+      return `
+        <div class="alloc-drift-row alloc-${r.status}" role="listitem"
+          aria-label="${escAttr(r.label)} 편차 ${sign}${r.driftPct.toFixed(1)}%">
+          <div class="alloc-drift-label">${escHtml(r.label)}</div>
+          <div class="alloc-drift-bar" role="presentation">
+            <div class="alloc-drift-center"></div>
+            <div class="alloc-drift-fill" data-drift-fill="${side}"
+              style="width:${fillWidth.toFixed(2)}%"></div>
+          </div>
+          <div class="alloc-drift-pct">${sign}${r.driftPct.toFixed(1)}%</div>
+          <div class="alloc-drift-stats">
+            <span>${escHtml(fmtPct(r.actualPct, 1))} / 목표 ${escHtml(fmtPct(r.targetPct, 1))}</span>
+            <span class="text-muted">${statusIcon}</span>
+          </div>
+        </div>
+      `;
+    }).join('')
+  }</div>`;
+}
+
+function _renderAllocSuggestions(suggestions, threshold) {
+  if (!suggestions || suggestions.length === 0) {
+    return `<div class="alloc-sug-ok">✅ 모든 카테고리가 목표 ±${threshold}% 이내입니다. 리밸런싱 불필요.</div>`;
+  }
+  return `<ul class="alloc-sug-list">${
+    suggestions.map(s => {
+      const verb = s.direction === 'sell' ? '매도' : '추가';
+      const icon = s.direction === 'sell' ? '📤' : '📥';
+      return `
+        <li class="alloc-sug-item alloc-${s.status}">
+          <span aria-hidden="true">${icon}</span>
+          <strong>${escHtml(s.label)}</strong>
+          <span class="alloc-sug-detail">${s.direction === 'sell' ? '+' : '-'}${Math.abs(s.driftPct).toFixed(1)}% → 약 ${escHtml(fmtKRW(s.rebalanceAmt))} ${verb} 권장</span>
+        </li>
+      `;
+    }).join('')
+  }</ul>`;
+}
+
+function _readAllocationForm() {
+  const enabled = !!$('#allocEnabled')?.checked;
+  const assetOverride = !!$('#allocOverride')?.checked;
+  const threshold = safeNum($('#allocThreshold')?.value);
+  const categories = {};
+  document.querySelectorAll('.alloc-cat-input').forEach(el => {
+    categories[el.dataset.allocCat] = safeNum(el.value);
+  });
+  const assets = {};
+  if (assetOverride) {
+    document.querySelectorAll('.alloc-asset-input').forEach(el => {
+      const v = el.value.trim();
+      if (v === '') return;
+      const n = safeNum(v);
+      assets[el.dataset.allocAsset] = n;
+    });
+  }
+  return { enabled, assetOverride, categories, assets, driftThreshold: threshold };
+}
+
+function doSetAllocation() {
+  const opts = _readAllocationForm();
+  if (!opts.enabled) {
+    showToast('먼저 "배분 목표 사용"을 켜주세요', 'error');
+    return;
+  }
+  setAllocation(opts);
+  UIState.allocationEditMode = false;
+  renderAnalysis();
+  renderDashboard();
+  const sum = sumAllocationCategoryPct(opts.categories);
+  if (Math.abs(sum - 100) >= 0.1) {
+    showToast(`⚠️ 저장됨 (합계 ${sum.toFixed(1)}%, 권장 100%)`, 'info');
+  } else {
+    showToast('배분 목표 저장 완료', 'success');
+  }
+}
+
+function doEditAllocation() {
+  UIState.allocationEditMode = true;
+  renderAnalysis();
+}
+
+function doCancelAllocEdit() {
+  UIState.allocationEditMode = false;
+  renderAnalysis();
+}
+
+function doClearAllocation() {
+  openConfirmModal('자산 배분 목표를 초기화하시겠습니까?', () => {
+    clearAllocation();
+    UIState.allocationEditMode = false;
+    renderAnalysis();
+    renderDashboard();
+    showToast('배분 목표가 초기화되었습니다', 'success');
+  });
+}
+
+function doToggleAllocOverride() {
+  // 체크박스 click 이벤트 시점에는 checked가 이미 변경됨.
+  // 자산 목록 DOM을 삽입/제거만 하면 됨 (카테고리 입력값은 유지).
+  const override = !!$('#allocOverride')?.checked;
+  const wrap = document.querySelector('.alloc-asset-wrap');
+  if (override && !wrap) {
+    const overrideRow = $('#allocOverride')?.closest('.alloc-toggle-row');
+    if (overrideRow) {
+      const html = _renderAssetTargetList((appState.allocation && appState.allocation.assets) || {});
+      overrideRow.insertAdjacentHTML('afterend', html);
+    }
+  } else if (!override && wrap) {
+    wrap.remove();
+  }
+}
+
+// 카테고리 입력 합계를 실시간 업데이트
+function _setupAllocationLiveSum() {
+  const indicator = document.getElementById('allocSumIndicator');
+  if (!indicator) return;
+  const update = () => {
+    const cats = {};
+    document.querySelectorAll('.alloc-cat-input').forEach(el => {
+      cats[el.dataset.allocCat] = safeNum(el.value);
+    });
+    const sum = sumAllocationCategoryPct(cats);
+    const ok = Math.abs(sum - 100) < 0.1;
+    indicator.className = `alloc-sum-indicator ${ok ? 'ok' : 'warn'}`;
+    indicator.innerHTML = `합계: <strong>${sum.toFixed(1)}%</strong> ${ok ? '✓' : '⚠️ 100%가 아닙니다'}`;
+  };
+  document.querySelectorAll('.alloc-cat-input').forEach(el => {
+    el.addEventListener('input', update);
   });
 }
 

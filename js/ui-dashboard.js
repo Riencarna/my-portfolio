@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.15.1 — Dashboard UI
+   My Portfolio v5.16.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -9,6 +9,7 @@ const DASH_CARD_REGISTRY = Object.freeze([
   { id: 'hero',        label: '총 자산 헤더' },
   { id: 'stats',       label: '요약 지표' },
   { id: 'fire-goal',   label: '재무 목표 & FIRE' },
+  { id: 'allocation',  label: '배분 편차' },
   { id: 'pie',         label: '자산 분포' },
   { id: 'trend',       label: '자산 추이' },
   { id: 'auto-update', label: '가격 업데이트' },
@@ -123,6 +124,7 @@ function _renderDashCardInner(id, ctx) {
     case 'hero':        return _renderHeroCard(ctx);
     case 'stats':       return _renderStatsCard(ctx);
     case 'fire-goal':   return _renderFireGoalCard(ctx);
+    case 'allocation':  return _renderAllocationCard(ctx);
     case 'pie':         return _renderPieCard(ctx);
     case 'trend':       return _renderTrendCard(ctx);
     case 'auto-update': return renderAutoUpdateSection();
@@ -271,6 +273,72 @@ function _renderFireGoalCard(ctx) {
           </div>
         </div>
       ` : ''}
+    </div>
+  `;
+}
+
+function _renderAllocationCard(ctx) {
+  const alloc = appState.allocation;
+  if (!alloc || !alloc.enabled) {
+    return `
+      <div class="card" role="region" aria-label="자산 배분 편차">
+        <div class="card-title">
+          배분 편차
+          <button class="btn-sm" data-action="go-tab" data-tab="pgAi" aria-label="배분 목표 설정">설정</button>
+        </div>
+        <p class="text-muted">배분 목표를 설정하면 여기에 편차가 표시됩니다.</p>
+      </div>
+    `;
+  }
+  const driftRows = calcAllocationDrift(appState.assets, alloc, ctx.total, ctx.catTotals);
+  const threshold = safeNum(alloc.driftThreshold != null ? alloc.driftThreshold : ALLOC_DRIFT_THRESHOLD_DEFAULT);
+  if (!driftRows.length) {
+    return `
+      <div class="card" role="region" aria-label="자산 배분 편차">
+        <div class="card-title">
+          배분 편차
+          <button class="btn-sm" data-action="go-tab" data-tab="pgAi" aria-label="배분 목표 상세">상세</button>
+        </div>
+        <p class="text-muted">표시할 편차가 없습니다.</p>
+      </div>
+    `;
+  }
+  const MAX_VISUAL_DRIFT = Math.max(10, threshold * 2);
+  const alerts = driftRows.filter(r => r.status !== 'ok').length;
+
+  return `
+    <div class="card" role="region" aria-label="자산 배분 편차">
+      <div class="card-title">
+        배분 편차
+        <div class="card-title-actions">
+          ${alerts > 0 ? `<span class="dash-alloc-alert-badge" aria-label="경고 ${alerts}건">🚨 ${alerts}</span>` : ''}
+          <button class="btn-sm" data-action="go-tab" data-tab="pgAi" aria-label="배분 목표 상세">상세</button>
+        </div>
+      </div>
+      <div class="alloc-drift-list dash-alloc-list">
+        ${driftRows.map(r => {
+          const absDrift = Math.min(Math.abs(r.driftPct), MAX_VISUAL_DRIFT);
+          const fillWidth = (absDrift / MAX_VISUAL_DRIFT) * 50;
+          const side = r.driftPct >= 0 ? 'right' : 'left';
+          const sign = r.driftPct > 0 ? '+' : (r.driftPct < 0 ? '' : '±');
+          const statusIcon = r.status === 'ok' ? '✅' : '🚨';
+          return `
+            <div class="alloc-drift-row alloc-${r.status}">
+              <div class="alloc-drift-label">${escHtml(r.label)}</div>
+              <div class="alloc-drift-bar" role="presentation">
+                <div class="alloc-drift-center"></div>
+                <div class="alloc-drift-fill" data-drift-fill="${side}"
+                  style="width:${fillWidth.toFixed(2)}%"></div>
+              </div>
+              <div class="alloc-drift-pct">${sign}${r.driftPct.toFixed(1)}%</div>
+              <div class="alloc-drift-stats">
+                <span>${escHtml(fmtPct(r.actualPct, 1))} / 목표 ${escHtml(fmtPct(r.targetPct, 1))}</span>
+                <span class="text-muted">${statusIcon}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }

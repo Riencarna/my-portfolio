@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.15.1 — Modals UI
+   My Portfolio v5.16.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.15.1 — Stylesheet
+   My Portfolio v5.16.0 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -888,6 +888,73 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .dash-fire-stats{display:flex;justify-content:space-between;font-size:13px;color:var(--t1);font-weight:600}
 .dash-fire-proj{font-size:12px;margin-top:2px}
 .dash-fire-proj.positive{color:var(--success);font-weight:600}
+
+/* Allocation Targets (배분 목표 / 리밸런싱) */
+.alloc-form{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+.alloc-section-title{font-size:13px;font-weight:700;color:var(--t2);margin-top:4px}
+.alloc-cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.alloc-cat-field{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:8px 10px;background:var(--surface-alt);border:1px solid var(--bd);border-radius:var(--radius-md)}
+.alloc-cat-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--t2)}
+.alloc-cat-icon{font-size:14px}
+.alloc-cat-input,.alloc-asset-input{width:64px;text-align:right;padding:4px 6px;font-size:13px}
+.alloc-pct-wrap{display:inline-flex;align-items:center;gap:2px}
+.alloc-pct-suffix{font-size:12px;color:var(--t3);font-weight:600}
+.alloc-sum-indicator{font-size:13px;padding:8px 12px;border-radius:var(--radius-md);text-align:center}
+.alloc-sum-indicator.ok{background:rgba(107,191,138,.12);color:var(--success)}
+.alloc-sum-indicator.warn{background:rgba(232,180,116,.15);color:var(--warning)}
+.alloc-toggle-row{display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer}
+.alloc-toggle-row input[type=checkbox]{width:18px;height:18px;cursor:pointer}
+.alloc-toggle-label{font-size:14px;font-weight:600;color:var(--t1)}
+.alloc-field{display:flex;flex-direction:column;gap:4px}
+.alloc-label{font-size:13px;font-weight:600;color:var(--t2)}
+.alloc-actions{display:flex;gap:8px;align-items:center;margin-top:4px}
+.alloc-asset-wrap{display:flex;flex-direction:column;gap:10px;padding:10px;background:var(--surface-alt);
+  border:1px solid var(--bd);border-radius:var(--radius-md);max-height:360px;overflow-y:auto}
+.alloc-asset-group{display:flex;flex-direction:column;gap:4px}
+.alloc-asset-group-title{font-size:12px;font-weight:700;color:var(--t3);padding:4px 0 2px;
+  border-bottom:1px solid var(--bd)}
+.alloc-asset-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 2px;font-size:13px}
+.alloc-asset-name{color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alloc-asset-empty{padding:12px;text-align:center}
+
+/* Drift visualization (옵션 C — 중앙선 기준 좌우 막대) */
+.alloc-view-section{margin-top:14px}
+.alloc-view-title{font-size:13px;font-weight:700;color:var(--t2);margin-bottom:10px}
+.alloc-drift-list{display:flex;flex-direction:column;gap:10px}
+.alloc-drift-row{display:grid;grid-template-columns:110px 1fr 58px;grid-template-rows:auto auto;
+  gap:4px 10px;align-items:center;padding:8px 10px;background:var(--surface-alt);
+  border:1px solid var(--bd);border-radius:var(--radius-md)}
+.alloc-drift-label{font-size:13px;font-weight:600;color:var(--t1);grid-column:1;grid-row:1}
+.alloc-drift-bar{position:relative;height:10px;background:var(--surface-sunken);border-radius:var(--radius-full);
+  grid-column:2;grid-row:1}
+.alloc-drift-center{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:var(--t4);border-radius:1px}
+.alloc-drift-fill{position:absolute;top:0;bottom:0;height:100%;border-radius:inherit;
+  transition:width .4s cubic-bezier(.4,0,.2,1)}
+.alloc-drift-fill[data-drift-fill="right"]{left:50%;background:linear-gradient(90deg,var(--warning),var(--danger))}
+.alloc-drift-fill[data-drift-fill="left"]{right:50%;background:linear-gradient(270deg,var(--info),var(--primary))}
+.alloc-drift-pct{grid-column:3;grid-row:1;text-align:right;font-size:13px;font-weight:700;color:var(--t1)}
+.alloc-drift-stats{grid-column:1 / -1;grid-row:2;display:flex;justify-content:space-between;
+  font-size:11px;color:var(--t3)}
+.alloc-drift-row.alloc-over{border-color:rgba(232,120,138,.35)}
+.alloc-drift-row.alloc-under{border-color:rgba(107,157,199,.35)}
+.alloc-drift-row.alloc-ok{opacity:.85}
+.alloc-drift-row.alloc-ok .alloc-drift-fill{background:var(--t4) !important}
+
+/* Rebalancing suggestions */
+.alloc-sug-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.alloc-sug-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-alt);
+  border:1px solid var(--bd);border-radius:var(--radius-md);font-size:14px;color:var(--t2);flex-wrap:wrap}
+.alloc-sug-item.alloc-over{border-color:rgba(232,120,138,.35)}
+.alloc-sug-item.alloc-under{border-color:rgba(107,157,199,.35)}
+.alloc-sug-detail{color:var(--t3);font-size:13px}
+.alloc-sug-ok{padding:14px;text-align:center;color:var(--success);font-weight:600;
+  background:rgba(107,191,138,.1);border-radius:var(--radius-md)}
+
+/* Dashboard allocation card */
+.dash-alloc-list .alloc-drift-row{padding:6px 10px}
+.dash-alloc-alert-badge{background:rgba(232,120,138,.15);color:var(--danger);padding:2px 8px;
+  border-radius:var(--radius-full);font-size:12px;font-weight:700}
 .score-display{display:flex;gap:24px;align-items:center}
 .score-circle{
   width:96px;height:96px;border-radius:50%;border:5px solid;

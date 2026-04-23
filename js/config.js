@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.15.1 — Configuration
+   My Portfolio v5.16.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.15.1';
+const APP_VERSION = '5.16.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -42,6 +42,13 @@ const ANALYSIS_THRESHOLDS = Object.freeze({
   domesticRisk: 80,
   singleAssetMax: 50,
   bigLoss: -30,
+});
+
+// ── Allocation Targets (배분 목표) ──
+const ALLOC_DRIFT_THRESHOLD_DEFAULT = 5;
+const DEFAULT_ALLOCATION_CATEGORIES = Object.freeze({
+  '국내주식': 0, '해외주식': 0, '코인': 0,
+  '현금': 0, '예적금': 0, '부동산': 0, '기타': 0,
 });
 
 // Lazy-render threshold
@@ -260,6 +267,7 @@ const UIState = {
   dashboardEditMode: false,
   isEditMode: false,
   goalEditMode: false,
+  allocationEditMode: false,
   listSearchQuery: '',
   listFilter: 'all',
   historyTab: 'records',
@@ -283,6 +291,7 @@ const UIState = {
     this.dashboardTrendDays = 30;
     this.dashboardEditMode = false;
     this.isEditMode = false;
+    this.allocationEditMode = false;
     this.listSearchQuery = '';
     this.listFilter = 'all';
     this.historyTab = 'records';

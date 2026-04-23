@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.15.1 — State Management
+   My Portfolio v5.16.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -13,6 +13,7 @@ function defaultState() {
     categoryOrder: [...CAT_IDS],
     goal: null,
     income: [],
+    allocation: null,
   };
 }
 
@@ -454,6 +455,44 @@ function setGoal(opts, legacyDate) {
 
 function clearGoal() {
   appState.goal = null;
+  saveData();
+}
+
+// ── Allocation Targets ──
+function setAllocation(opts) {
+  const o = (opts && typeof opts === 'object') ? opts : {};
+  const prev = appState.allocation || {};
+
+  const rawCats = (o.categories && typeof o.categories === 'object') ? o.categories : (prev.categories || {});
+  const categories = {};
+  for (const cid of CAT_IDS) {
+    categories[cid] = Math.max(0, Math.min(100, safeNum(rawCats[cid])));
+  }
+
+  const rawAssets = (o.assets && typeof o.assets === 'object') ? o.assets : (prev.assets || {});
+  const assets = {};
+  const validIds = new Set(appState.assets.map(a => String(a.id)));
+  for (const [aid, pct] of Object.entries(rawAssets)) {
+    const sid = String(aid);
+    if (!validIds.has(sid)) continue;
+    const n = safeNum(pct);
+    if (n < 0 || n > 100) continue;
+    assets[sid] = n;
+  }
+
+  appState.allocation = {
+    enabled: o.enabled !== undefined ? !!o.enabled : !!prev.enabled,
+    assetOverride: o.assetOverride !== undefined ? !!o.assetOverride : !!prev.assetOverride,
+    categories,
+    assets,
+    driftThreshold: Math.max(0, Math.min(100, safeNum(o.driftThreshold != null ? o.driftThreshold : (prev.driftThreshold != null ? prev.driftThreshold : ALLOC_DRIFT_THRESHOLD_DEFAULT)))),
+    updatedAt: today(),
+  };
+  saveData();
+}
+
+function clearAllocation() {
+  appState.allocation = null;
   saveData();
 }
 
