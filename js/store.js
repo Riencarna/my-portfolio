@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — State Management
+   My Portfolio v5.14.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -218,11 +218,16 @@ function makeSnapshot() {
 // ── History Delete ──
 function deleteHistoryRecord(date) {
   const idx = appState.history.findIndex(h => h.date === date);
-  if (idx < 0) return false;
+  if (idx < 0) return null;
+  const snap = appState.history[idx];
   appState.history.splice(idx, 1);
   saveData();
   EventBus.emit('historyChanged', { type: 'delete', date });
-  return true;
+  return () => {
+    appState.history.splice(idx, 0, snap);
+    saveData();
+    EventBus.emit('historyChanged', { type: 'restore', date });
+  };
 }
 
 // ── Asset CRUD ──
@@ -270,12 +275,21 @@ function batchUpdatePrices(updates) {
 }
 
 function deleteAsset(id) {
-  const asset = appState.assets.find(a => a.id === id);
-  appState.assets = appState.assets.filter(a => a.id !== id);
+  const idx = appState.assets.findIndex(a => a.id === id);
+  if (idx < 0) return null;
+  const asset = appState.assets[idx];
+  appState.assets.splice(idx, 1);
   invalidateCalcCache();
   makeSnapshot();
   saveData();
-  if (asset) EventBus.emit('assetChanged', { type: 'delete', asset });
+  EventBus.emit('assetChanged', { type: 'delete', asset });
+  return () => {
+    appState.assets.splice(idx, 0, asset);
+    invalidateCalcCache();
+    makeSnapshot();
+    saveData();
+    EventBus.emit('assetChanged', { type: 'restore', asset });
+  };
 }
 
 function getAsset(id) {
@@ -337,14 +351,30 @@ function updateTransaction(assetId, txnId, updates) {
 
 function deleteTransaction(assetId, txnId) {
   const idx = appState.assets.findIndex(a => a.id === assetId);
-  if (idx < 0) return;
+  if (idx < 0) return null;
   const asset = appState.assets[idx];
-  const newTxns = asset.txns.filter(t => t.id !== txnId);
+  const txnIdx = asset.txns.findIndex(t => t.id === txnId);
+  if (txnIdx < 0) return null;
+  const deletedTxn = asset.txns[txnIdx];
+  const newTxns = [...asset.txns];
+  newTxns.splice(txnIdx, 1);
   appState.assets[idx] = sanitizeAsset({ ...asset, txns: newTxns });
   invalidateCalcCache();
   makeSnapshot();
   saveData();
   EventBus.emit('assetChanged', { type: 'deleteTxn', assetId, txnId });
+  return () => {
+    const curIdx = appState.assets.findIndex(a => a.id === assetId);
+    if (curIdx < 0) return;
+    const cur = appState.assets[curIdx];
+    const restoredTxns = [...cur.txns];
+    restoredTxns.splice(txnIdx, 0, deletedTxn);
+    appState.assets[curIdx] = sanitizeAsset({ ...cur, txns: restoredTxns });
+    invalidateCalcCache();
+    makeSnapshot();
+    saveData();
+    EventBus.emit('assetChanged', { type: 'restoreTxn', assetId, txnId });
+  };
 }
 
 // ── Income CRUD ──
@@ -363,9 +393,17 @@ function updateIncome(id, updates) {
 }
 
 function deleteIncome(id) {
-  appState.income = appState.income.filter(i => i.id !== id);
+  const idx = appState.income.findIndex(i => i.id === id);
+  if (idx < 0) return null;
+  const item = appState.income[idx];
+  appState.income.splice(idx, 1);
   saveData();
   EventBus.emit('incomeChanged', { type: 'delete', id });
+  return () => {
+    appState.income.splice(idx, 0, item);
+    saveData();
+    EventBus.emit('incomeChanged', { type: 'restore', id });
+  };
 }
 
 // ── Reorder ──

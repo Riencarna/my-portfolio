@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — Modals UI
+   My Portfolio v5.14.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -108,9 +108,10 @@ function closeAllModals() {
 function openConfirmModal(msg, onConfirm) {
   const container = $('#modalConfirm');
   if (!container) return;
+  _modalCleanup.removeForElement(container);
   container.innerHTML = `<div class="modal-backdrop"></div>
     <div class="modal-box" role="alertdialog" aria-label="confirm" aria-describedby="confirmMsg">
-      <div class="modal-body"><p id="confirmMsg" style="margin-bottom:8px">${escHtml(msg)}</p>
+      <div class="modal-body"><p id="confirmMsg" style="margin-bottom:8px;white-space:pre-line">${escHtml(msg)}</p>
         <div class="modal-actions"><button class="btn-s" data-action="close-confirm">취소</button>
           <button class="btn-p btn-danger" data-action="confirm-ok">확인</button></div></div></div>`;
   openModal('modalConfirm');
@@ -573,9 +574,10 @@ async function doTransaction(assetId, type) {
 
 function doDeleteTxn(assetId, txnId) {
   openConfirmModal('이 거래를 삭제하시겠습니까?', () => {
-    deleteTransaction(assetId, txnId);
+    const undo = deleteTransaction(assetId, txnId);
     openAssetDetail(assetId);
-    showToast('거래 삭제됨');
+    if (undo) showUndoToast('거래 삭제됨', () => { undo(); openAssetDetail(assetId); });
+    else showToast('거래 삭제됨');
   });
 }
 
@@ -730,12 +732,17 @@ function openRenameModal(pid, currentName) {
 }
 
 function doDeletePortfolio(pid, name) {
-  openConfirmModal(`"${name}" 포트폴리오를 삭제하시겠습니까?`, async () => {
-    deletePortfolio(pid);
-    loadData();
-    await closeAllModals();
-    render();
-    showToast('삭제됨');
+  openConfirmModal(`"${name}" 포트폴리오를 삭제하시겠습니까?`, () => {
+    openConfirmModal(
+      `정말로 삭제하시겠습니까?\n"${name}" 안의 모든 자산 데이터가 영구 삭제되며 복구할 수 없습니다.`,
+      async () => {
+        deletePortfolio(pid);
+        loadData();
+        await closeAllModals();
+        render();
+        showToast('포트폴리오 삭제됨');
+      }
+    );
   });
 }
 

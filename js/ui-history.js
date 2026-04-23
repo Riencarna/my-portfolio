@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — History & Export UI
+   My Portfolio v5.14.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -409,9 +409,10 @@ function confirmDeleteHistory(date) {
   openConfirmModal(
     `${fmtDate(date)} 기록을 삭제하시겠습니까?`,
     () => {
-      if (deleteHistoryRecord(date)) {
-        showToast('기록이 삭제되었습니다', 'success');
+      const undo = deleteHistoryRecord(date);
+      if (undo) {
         renderHistory();
+        showUndoToast('기록이 삭제되었습니다', () => { undo(); renderHistory(); });
       }
     }
   );

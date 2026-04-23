@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — Asset List UI
+   My Portfolio v5.14.0 — Asset List UI
    Cycle C: 보유중/매도완료 탭 (C-15)
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1
@@ -579,6 +579,11 @@ function confirmDeleteAsset(id) {
   if (!asset) return;
   openConfirmModal(
     `"${asset.name}" 자산을 삭제하시겠습니까?`,
-    () => { deleteAsset(id); renderList(); showToast('삭제되었습니다'); }
+    () => {
+      const undo = deleteAsset(id);
+      renderList();
+      if (undo) showUndoToast(`"${asset.name}" 삭제됨`, () => { undo(); renderList(); });
+      else showToast('삭제되었습니다');
+    }
   );
 }

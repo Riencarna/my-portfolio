@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — Utilities
+   My Portfolio v5.14.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -282,6 +282,33 @@ function showToast(msg, type = 'info') {
     t.classList.remove('show');
     setTimeout(() => t.remove(), TOAST_FADE_MS);
   }, TOAST_DURATION_MS);
+}
+
+function showUndoToast(msg, undoFn, durationMs = 5000) {
+  const existing = $('.toast');
+  if (existing) existing.remove();
+  const t = el('div', { class: 'toast toast-info toast-undo', role: 'status' });
+  t.appendChild(el('span', { class: 'toast-undo-msg', text: msg }));
+  const btn = el('button', { class: 'toast-undo-btn', type: 'button', text: '실행 취소' });
+  t.appendChild(btn);
+  const container = $('#toastContainer') || document.body;
+  container.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), TOAST_FADE_MS);
+  };
+  btn.addEventListener('click', () => {
+    if (dismissed) return;
+    dismissed = true;
+    t.remove();
+    if (typeof undoFn === 'function') undoFn();
+    showToast('복원되었습니다', 'success');
+  });
+  setTimeout(dismiss, durationMs);
 }
 
 // ── Chart.js Safety ──

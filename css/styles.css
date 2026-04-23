@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — Stylesheet
+   My Portfolio v5.14.0 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -951,6 +951,13 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .toast-success{border-color:var(--success);color:var(--success);background:var(--success-soft)}
 .toast-error{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
 .toast-info{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.toast-undo{display:flex;align-items:center;gap:14px;pointer-events:auto;
+  padding:10px 12px 10px 22px;text-align:left}
+.toast-undo-msg{flex:1}
+.toast-undo-btn{background:var(--primary);color:#fff;border:none;
+  padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;
+  cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.toast-undo-btn:hover{opacity:0.85}
 
 /* =============================================
    SPLASH

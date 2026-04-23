@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — Income UI
+   My Portfolio v5.14.0 — Income UI
    Cycle C compatible
    Soft Neutral palette + dash-charts 재사용
    ============================================= */
@@ -307,9 +307,10 @@ function doAddIncome() {
 
 function doDeleteIncome(id) {
   openConfirmModal('이 수입 기록을 삭제하시겠습니까?', () => {
-    deleteIncome(id);
+    const undo = deleteIncome(id);
     renderIncome();
-    showToast('삭제됨');
+    if (undo) showUndoToast('수입 삭제됨', () => { undo(); renderIncome(); });
+    else showToast('삭제됨');
   });
 }
 

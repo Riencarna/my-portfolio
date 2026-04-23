@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.13.1 — EVM Wallet Integration
+   My Portfolio v5.14.0 — EVM Wallet Integration
    Cycle C compatible
    ============================================= */
 
