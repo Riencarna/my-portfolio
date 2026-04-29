@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.17.0 — API Integration
+   My Portfolio v5.18.0 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
-   v5.17.0: stale 가격 감지 (사일런트 실패 방지)
+   v5.18.0: stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -12,6 +12,44 @@ let cachedUsdt = null;
 let cachedBenchmark = null;
 let updateLogs = [];
 let autoUpdateProgress = { total: 0, done: 0, running: false };
+
+// ── Last-Known Rate Snapshot (localStorage) ──
+// 모든 라이브 시세 소스가 실패했을 때 1350원 하드코딩 폴백 대신 사용.
+// 키: 'usdkrw' (환율), 'usdt' (테더 KRW 시세). 키 이름은 상수가 아닌 문자열로 두어
+// 스냅샷 JSON 구조가 단순하게 유지되도록 했음.
+function saveLastRate(kind, rate, source) {
+  if (!Number.isFinite(rate) || rate <= 0) return;
+  try {
+    const raw = localStorage.getItem(RATE_KEY);
+    const snap = raw ? JSON.parse(raw) : {};
+    snap[kind] = { rate, time: Date.now(), source };
+    localStorage.setItem(RATE_KEY, JSON.stringify(snap));
+  } catch (e) {
+    console.warn('saveLastRate failed:', e.message);
+  }
+}
+
+function getLastRate(kind) {
+  try {
+    const raw = localStorage.getItem(RATE_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    const entry = snap?.[kind];
+    if (!entry || !Number.isFinite(entry.rate) || entry.rate <= 0) return null;
+    return entry;
+  } catch (e) {
+    return null;
+  }
+}
+
+function formatRateAge(time) {
+  const diffMin = Math.floor((Date.now() - time) / 60_000);
+  if (diffMin < 1) return '방금 전';
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}시간 전`;
+  return `${Math.floor(diffH / 24)}일 전`;
+}
 
 // ── Fetch with Timeout ──
 function fetchWithTimeout(url, ms = API_TIMEOUT, options = {}) {
@@ -83,6 +121,7 @@ async function fetchExchangeRate(force = false) {
     const d = await r.json();
     if (d.rates?.KRW) {
       cachedRate = { rate: d.rates.KRW, time: Date.now(), source: 'open.er-api' };
+      saveLastRate('usdkrw', cachedRate.rate, 'open.er-api');
       return cachedRate.rate;
     }
   } catch (e) {
@@ -93,14 +132,22 @@ async function fetchExchangeRate(force = false) {
     const d = await r.json();
     if (d.krw?.rate) {
       cachedRate = { rate: d.krw.rate, time: Date.now(), source: 'floatrates' };
+      saveLastRate('usdkrw', cachedRate.rate, 'floatrates');
       return cachedRate.rate;
     }
   } catch (e) {
     console.warn('fetchExchangeRate floatrates failed:', e.message);
   }
   if (cachedRate?.rate) return cachedRate.rate;
+  const last = getLastRate('usdkrw');
+  if (last) {
+    console.warn('Exchange rate: using last-known snapshot', last);
+    showToast(`환율 API 실패. 마지막 저장 환율(${Math.round(last.rate)}원, ${formatRateAge(last.time)}) 사용 중`, 'info');
+    cachedRate = { rate: last.rate, time: Date.now(), source: 'last-known' };
+    return last.rate;
+  }
   console.warn('Exchange rate: using fallback', FALLBACK_USD_KRW);
-  showToast(`환율 정보 불러오기 실패. 기본값(${FALLBACK_USD_KRW}원) 사용 중`, 'info');
+  showToast(`환율 정보 불러오기 실패. 기본값(${FALLBACK_USD_KRW}원) 사용 중`, 'warning');
   return FALLBACK_USD_KRW;
 }
 
@@ -114,6 +161,7 @@ async function fetchUsdtRate() {
     const d = await r.json();
     if (d[0]?.trade_price) {
       cachedUsdt = { rate: d[0].trade_price, time: Date.now(), source: 'Upbit' };
+      saveLastRate('usdt', cachedUsdt.rate, 'Upbit');
       return cachedUsdt.rate;
     }
   } catch (e) {
@@ -124,11 +172,26 @@ async function fetchUsdtRate() {
     const d = await r.json();
     if (d.data?.closing_price) {
       cachedUsdt = { rate: Number(d.data.closing_price), time: Date.now(), source: 'Bithumb' };
+      saveLastRate('usdt', cachedUsdt.rate, 'Bithumb');
       return cachedUsdt.rate;
     }
   } catch (e) {
     console.warn('fetchUsdtRate bithumb failed:', e.message);
   }
+  // 직거래 시세 두 곳 모두 실패. 라이브 환율(USD/KRW)이 캐시에 살아있으면 그걸 프록시로 사용.
+  // 없으면 마지막에 봤던 USDT 시세 → 마지막 환율 → 1350원 순으로 폴백.
+  if (cachedRate && Date.now() - cachedRate.time < CACHE_TTL_RATE && cachedRate.source !== 'last-known') {
+    cachedUsdt = { rate: cachedRate.rate, time: Date.now(), source: 'Exchange' };
+    return cachedRate.rate;
+  }
+  const lastUsdt = getLastRate('usdt');
+  if (lastUsdt) {
+    console.warn('USDT rate: using last-known USDT snapshot', lastUsdt);
+    showToast(`USDT 시세 API 실패. 마지막 저장 시세(${Math.round(lastUsdt.rate)}원, ${formatRateAge(lastUsdt.time)}) 사용 중`, 'info');
+    cachedUsdt = { rate: lastUsdt.rate, time: Date.now(), source: 'last-known' };
+    return lastUsdt.rate;
+  }
+  // 마지막 카드: fetchExchangeRate가 자체 last-known/fallback 처리 후 토스트도 띄움
   try {
     const rate = await fetchExchangeRate();
     cachedUsdt = { rate, time: Date.now(), source: 'Exchange' };
@@ -137,7 +200,8 @@ async function fetchUsdtRate() {
     console.warn('fetchUsdtRate exchange fallback failed:', e.message);
   }
   if (cachedUsdt?.rate) return cachedUsdt.rate;
-  console.warn('USDT rate: using fallback', FALLBACK_USD_KRW);
+  console.warn('USDT rate: using hardcoded fallback', FALLBACK_USD_KRW);
+  showToast(`USDT 시세를 불러올 수 없습니다. 기본값(${FALLBACK_USD_KRW}원) 사용 중`, 'warning');
   return FALLBACK_USD_KRW;
 }
 
@@ -344,7 +408,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.17.0
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.18.0
   const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
   const isStale = (asset, newPrice) => {
     if (newPrice == null || !isFinite(newPrice)) return false;
