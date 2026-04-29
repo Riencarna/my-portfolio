@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.16.0 — Utilities
+   My Portfolio v5.17.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -360,6 +360,12 @@ function sanitizeAsset(a) {
     isUsdt: !!a.isUsdt,
     usdtQty: a.usdtQty != null ? safeNum(a.usdtQty) : undefined,
     usdtDetails: Array.isArray(a.usdtDetails) ? a.usdtDetails.slice(0, 50).map(d => ({ name: stripHtml(d.name, 50), qty: safeNum(d.qty) })) : undefined,
+    usdtHistory: Array.isArray(a.usdtHistory) ? a.usdtHistory.slice(-LIMITS.usdtHistory).map(h => ({
+      at: typeof h.at === 'string' ? h.at : new Date().toISOString(),
+      usdtQty: safeNum(h.usdtQty),
+      usdtDetails: Array.isArray(h.usdtDetails) ? h.usdtDetails.slice(0, 50).map(d => ({ name: stripHtml(d.name, 50), qty: safeNum(d.qty) })) : [],
+      amount: safeNum(h.amount),
+    })) : undefined,
     walletCoinId: a.walletCoinId ? stripHtml(String(a.walletCoinId), 100) : undefined,
     lpu: (a.lpu && typeof a.lpu === 'string') ? stripHtml(a.lpu, 50) : null,
     txns: Array.isArray(a.txns) ? a.txns.slice(0, LIMITS.txns).map(sanitizeTxn) : [],

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.16.0 — Modals UI
+   My Portfolio v5.17.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -183,6 +183,11 @@ function _setupModalMainDelegation(container) {
     else if (action === 'edit-asset-from-detail') openEditAsset(target.dataset.id);
     else if (action === 'edit-txn') { e.stopPropagation(); openEditTransaction(target.dataset.assetId, target.dataset.txnId); }
     else if (action === 'delete-txn') { e.stopPropagation(); doDeleteTxn(target.dataset.assetId, target.dataset.txnId); }
+    else if (action === 'restore-usdt-history') { e.stopPropagation(); doRestoreUsdtHistory(target.dataset.id, target.dataset.idx); }
+    else if (action === 'delete-usdt-history') { e.stopPropagation(); doDeleteUsdtHistory(target.dataset.id, target.dataset.idx); }
+    else if (action === 'restore-auto-backup') { doRestoreAutoBackup(target.dataset.id); }
+    else if (action === 'delete-auto-backup') { e.stopPropagation(); doDeleteAutoBackup(target.dataset.id); }
+    else if (action === 'open-auto-backup-manager') openAutoBackupManager();
     else if (action === 'create-portfolio') doCreatePortfolio();
     else if (action === 'wallet-scan') doWalletScan();
     else if (action === 'import-wallet') doImportWallet();
@@ -392,6 +397,8 @@ function openEditAsset(id) {
 }
 
 function doEditAsset(id) {
+  const prevAsset = getAsset(id);
+  if (prevAsset) tryAutoBackup('major', `자산 수정 직전: ${prevAsset.name}`);
   const cat = $$('#modalMain .cat-btn.active')[0]?.dataset?.cat || '기타';
   const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
   let newAmount, usdtQty, usdtDetails;
@@ -416,6 +423,13 @@ function doEditAsset(id) {
     amount: newAmount,
     note: $('#editNote')?.value.trim() || null,
   };
+  // Capture USDT pre-change snapshot into asset history
+  if (isUsdtChecked && prevAsset && prevAsset.isUsdt) {
+    const prevSnap = _buildUsdtHistoryEntry(prevAsset);
+    updates.usdtHistory = appendUsdtHistory(prevAsset, prevSnap);
+  } else if (prevAsset && Array.isArray(prevAsset.usdtHistory)) {
+    updates.usdtHistory = prevAsset.usdtHistory;
+  }
   if (!INVESTMENT_CATS.includes(cat)) {
     updates.txns = newAmount > 0
       ? [{ id: uid(), type: 'buy', price: newAmount, qty: 1, date: today(), account: null, memo: null }]
@@ -460,6 +474,9 @@ function openAssetDetail(id) {
       <button class="btn-sm" data-action="edit-asset-from-detail" data-id="${id}">수정</button>
     </div>
     ${isInv && asset.txns.length > 0 ? _renderTxnStats(v) : ''}
+    ${asset.isUsdt && Array.isArray(asset.usdtHistory) && asset.usdtHistory.length > 0
+      ? _renderUsdtHistorySection(asset)
+      : ''}
     ${isInv ? `
     <div class="txn-section" role="region" aria-label="거래 내역"><h4>거래 내역 (${asset.txns.length}건)</h4><div class="txn-list" role="list">
       ${asset.txns.length > 0
@@ -487,6 +504,157 @@ function openAssetDetail(id) {
     </div></div>`;
   openModal('modalMain');
   _setupModalMainDelegation(container);
+}
+
+// ── USDT 변경 이력 섹션 (v5.17.0) ──
+function _renderUsdtHistorySection(asset) {
+  const list = asset.usdtHistory || [];
+  const items = list.slice().reverse().map((h, revIdx) => {
+    const realIdx = list.length - 1 - revIdx;
+    const dt = (typeof h.at === 'string' && h.at.length >= 16)
+      ? `${h.at.slice(0, 10)} ${h.at.slice(11, 16)}`
+      : '시간 미상';
+    const details = Array.isArray(h.usdtDetails) ? h.usdtDetails.filter(d => safeNum(d.qty) > 0) : [];
+    return `
+      <div class="usdt-hist-item" role="listitem">
+        <div class="usdt-hist-meta">
+          <span class="usdt-hist-date">${escHtml(dt)}</span>
+          <span class="usdt-hist-qty">${escHtml(fmtNum(safeNum(h.usdtQty), 2))} USDT</span>
+          <span class="usdt-hist-amt">${escHtml(fmtKRW(safeNum(h.amount)))}</span>
+        </div>
+        ${details.length > 0 ? `
+          <ul class="usdt-hist-details">
+            ${details.map(d => `<li>${escHtml(d.name || '(미상)')}: ${escHtml(fmtNum(safeNum(d.qty), 2))} USDT</li>`).join('')}
+          </ul>
+        ` : '<div class="usdt-hist-details-empty">상세 내역 없음</div>'}
+        <div class="usdt-hist-actions">
+          <button class="btn-sm" data-action="restore-usdt-history" data-id="${asset.id}" data-idx="${realIdx}">이 값으로 되돌리기</button>
+          <button class="btn-icon btn-danger" data-action="delete-usdt-history" data-id="${asset.id}" data-idx="${realIdx}" aria-label="이 이력 삭제" title="이력 삭제">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="usdt-hist-section" role="region" aria-label="USDT 변경 이력">
+      <h4>변경 이력 (${list.length}건)</h4>
+      <div class="usdt-hist-list" role="list">${items}</div>
+    </div>
+  `;
+}
+
+function doRestoreUsdtHistory(assetId, idxStr) {
+  const idx = Number(idxStr);
+  if (!Number.isInteger(idx) || idx < 0) return;
+  const asset = getAsset(assetId);
+  if (!asset) return;
+  const entry = (asset.usdtHistory || [])[idx];
+  if (!entry) { showToast('이력 항목을 찾을 수 없습니다', 'error'); return; }
+  const dt = (typeof entry.at === 'string' && entry.at.length >= 16)
+    ? `${entry.at.slice(0, 10)} ${entry.at.slice(11, 16)}`
+    : '시간 미상';
+  openConfirmModal(
+    `${dt} 시점 값 (${fmtNum(safeNum(entry.usdtQty), 2)} USDT) 으로 되돌리시겠습니까?\n현재 값은 자동으로 이력에 보관됩니다.`,
+    () => {
+      tryAutoBackup('major', `USDT 이력 복원 직전: ${asset.name}`);
+      if (restoreUsdtHistoryEntry(assetId, idx)) {
+        showToast('USDT 이력 복원 완료', 'success');
+        openAssetDetail(assetId);
+        render();
+      }
+    }
+  );
+}
+
+function doDeleteUsdtHistory(assetId, idxStr) {
+  const idx = Number(idxStr);
+  if (!Number.isInteger(idx) || idx < 0) return;
+  openConfirmModal('이 변경 이력을 삭제하시겠습니까?', () => {
+    if (deleteUsdtHistoryEntry(assetId, idx)) {
+      showToast('이력 삭제됨', 'success');
+      openAssetDetail(assetId);
+    }
+  });
+}
+
+// ── Auto Backup Manager (v5.17.0) ──
+function openAutoBackupManager() {
+  _modalCleanup.removeAll();
+  const container = $('#modalMain');
+  const list = loadAutoBackups().slice().reverse();
+  const totalBytes = list.reduce((s, b) => s + (b.json ? b.json.length : 0), 0);
+  const triggerLabel = (t) => t === 'daily' ? '🗓 일일' : (t === 'major' ? '⚡ 변경' : '🔖 ' + t);
+
+  const items = list.length === 0
+    ? '<div class="empty-state">자동 백업이 아직 없습니다. 자산을 추가/수정하거나 다음 날 다시 확인해보세요.</div>'
+    : list.map(b => {
+        const dt = (typeof b.savedAt === 'string' && b.savedAt.length >= 16)
+          ? `${b.savedAt.slice(0, 10)} ${b.savedAt.slice(11, 16)}`
+          : '시간 미상';
+        return `
+          <div class="auto-bk-item" role="listitem">
+            <div class="auto-bk-header">
+              <span class="auto-bk-trigger">${triggerLabel(b.trigger)}</span>
+              <span class="auto-bk-date">${escHtml(dt)}</span>
+            </div>
+            <div class="auto-bk-label">${escHtml(b.label || '')}</div>
+            <div class="auto-bk-meta">
+              <span>자산 ${b.assetCount || 0}개</span>
+              <span>총액 ${escHtml(fmtKRW(safeNum(b.total)))}</span>
+              <span class="auto-bk-size">${((b.json ? b.json.length : 0) / 1024).toFixed(0)}KB</span>
+            </div>
+            <div class="auto-bk-actions">
+              <button class="btn-p btn-sm" data-action="restore-auto-backup" data-id="${escAttr(b.id)}">복원</button>
+              <button class="btn-icon btn-danger" data-action="delete-auto-backup" data-id="${escAttr(b.id)}" aria-label="백업 삭제" title="삭제">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box modal-large">
+    <div class="modal-header">
+      <h3>🗂 자동 백업 관리</h3>
+      <button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="auto-bk-summary">
+        <div>보관 중: <strong>${list.length}/${LIMITS.autoBackup}건</strong></div>
+        <div>차지 용량: <strong>${(totalBytes / 1024).toFixed(0)}KB</strong></div>
+      </div>
+      <div class="auto-bk-info">
+        매일 자동 + 자산 추가/삭제/수정 시 자동 저장됩니다. 최대 ${LIMITS.autoBackup}건까지 보관.
+      </div>
+      <div class="auto-bk-list" role="list">${items}</div>
+    </div>
+  </div>`;
+  openModal('modalMain');
+  _setupModalMainDelegation(container);
+}
+
+function doRestoreAutoBackup(id) {
+  const list = loadAutoBackups();
+  const entry = list.find(b => b.id === id);
+  if (!entry) { showToast('백업을 찾을 수 없습니다', 'error'); return; }
+  const dt = (typeof entry.savedAt === 'string' && entry.savedAt.length >= 16)
+    ? `${entry.savedAt.slice(0, 10)} ${entry.savedAt.slice(11, 16)}`
+    : '시간 미상';
+  openConfirmModal(
+    `${dt} 시점으로 복원하시겠습니까?\n현재 데이터는 자동 백업에 한 번 더 저장되며, 복원 후에도 다시 되돌릴 수 있습니다.`,
+    () => {
+      if (restoreAutoBackup(id)) {
+        showToast('자동 백업 복원 완료', 'success');
+        closeModal('modalMain');
+        render();
+      }
+    }
+  );
+}
+
+function doDeleteAutoBackup(id) {
+  openConfirmModal('이 자동 백업을 삭제하시겠습니까?', () => {
+    deleteAutoBackup(id);
+    showToast('백업 삭제됨', 'success');
+    openAutoBackupManager();
+  });
 }
 
 // ── Transaction ──

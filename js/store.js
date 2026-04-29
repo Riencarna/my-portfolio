@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.16.0 — State Management
+   My Portfolio v5.17.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -50,6 +50,7 @@ function _doSave() {
     localStorage.setItem(getStorageKey(activePortfolioId), json);
     _invalidateStorageCache();
     EventBus.emit('dataSaved');
+    tryAutoBackup('daily');
     return true;
   } catch (e) {
     console.error('Failed to save data:', e);
@@ -58,6 +59,127 @@ function _doSave() {
     } else {
       showToast('데이터 저장 실패', 'error');
     }
+    return false;
+  }
+}
+
+// ── Auto Backup (v5.17.0) ──
+let _autoBackupCache = null;
+
+function loadAutoBackups() {
+  if (_autoBackupCache) return _autoBackupCache;
+  try {
+    const raw = localStorage.getItem(AUTO_BACKUP_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        _autoBackupCache = parsed.filter(b => b && b.id && typeof b.json === 'string');
+        return _autoBackupCache;
+      }
+    }
+  } catch (e) {
+    console.warn('loadAutoBackups failed:', e);
+  }
+  _autoBackupCache = [];
+  return _autoBackupCache;
+}
+
+function _saveAutoBackups(list) {
+  _autoBackupCache = list;
+  try {
+    localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(list));
+    _invalidateStorageCache();
+    return true;
+  } catch (e) {
+    console.warn('_saveAutoBackups failed:', e);
+    if (e.name === 'QuotaExceededError' && list.length > 1) {
+      return _saveAutoBackups(list.slice(1));
+    }
+    return false;
+  }
+}
+
+function _pruneAutoBackups(list) {
+  let result = list.slice();
+  if (result.length > LIMITS.autoBackup) {
+    result = result.slice(-LIMITS.autoBackup);
+  }
+  let totalSize = result.reduce((s, b) => s + (b.json ? b.json.length : 0), 0);
+  while (result.length > 1 && totalSize > LIMITS.autoBackupBytes) {
+    const removed = result.shift();
+    totalSize -= (removed.json ? removed.json.length : 0);
+  }
+  return result;
+}
+
+function tryAutoBackup(trigger, label) {
+  try {
+    let list = loadAutoBackups().slice();
+    if (trigger === 'daily') {
+      const todayStr = today();
+      if (list.some(b => b.trigger === 'daily' && typeof b.savedAt === 'string' && b.savedAt.startsWith(todayStr))) {
+        return false;
+      }
+    }
+    const json = JSON.stringify(appState);
+    if (json.length > LIMITS.autoBackupBytes) {
+      console.warn('tryAutoBackup: state too large for auto-backup', json.length);
+      return false;
+    }
+    const entry = {
+      id: 'ab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      savedAt: new Date().toISOString(),
+      trigger: trigger || 'manual',
+      label: label || (trigger === 'daily' ? '매일 자동 백업' : '주요 변경'),
+      assetCount: appState.assets.length,
+      total: calcTotal(appState.assets),
+      json,
+    };
+    list.push(entry);
+    list = _pruneAutoBackups(list);
+    _saveAutoBackups(list);
+    EventBus.emit('autoBackupChanged');
+    return true;
+  } catch (e) {
+    console.warn('tryAutoBackup failed:', e);
+    return false;
+  }
+}
+
+function deleteAutoBackup(id) {
+  const list = loadAutoBackups().filter(b => b.id !== id);
+  _saveAutoBackups(list);
+  EventBus.emit('autoBackupChanged');
+}
+
+function clearAutoBackups() {
+  _saveAutoBackups([]);
+  EventBus.emit('autoBackupChanged');
+}
+
+function restoreAutoBackup(id) {
+  const list = loadAutoBackups();
+  const entry = list.find(b => b.id === id);
+  if (!entry) {
+    showToast('백업을 찾을 수 없습니다', 'error');
+    return false;
+  }
+  try {
+    tryAutoBackup('major', '복원 직전 자동 저장');
+    const data = JSON.parse(entry.json);
+    appState = { ...defaultState(), ...data };
+    if (!Array.isArray(appState.assets)) appState.assets = [];
+    if (!Array.isArray(appState.history)) appState.history = [];
+    if (!Array.isArray(appState.income)) appState.income = [];
+    if (!Array.isArray(appState.categoryOrder)) appState.categoryOrder = [...CAT_IDS];
+    appState.assets = appState.assets.slice(0, LIMITS.assets).map(sanitizeAsset);
+    invalidateCalcCache();
+    saveDataNow();
+    EventBus.emit('dataImported');
+    return true;
+  } catch (e) {
+    console.error('restoreAutoBackup failed:', e);
+    showToast('복원 실패: 백업 데이터 손상', 'error');
     return false;
   }
 }
@@ -196,6 +318,7 @@ function loadData() {
   invalidateCalcCache();
   makeSnapshot();
   EventBus.emit('dataLoaded');
+  tryAutoBackup('daily');
 }
 
 // ── Snapshots ──
@@ -237,6 +360,7 @@ function addAsset(asset) {
     showToast(`자산 최대 ${LIMITS.assets}개까지 추가 가능`, 'error');
     return null;
   }
+  tryAutoBackup('major', `자산 추가 직전: ${stripHtml(asset && asset.name || '', 30) || '(이름없음)'}`);
   const a = sanitizeAsset({ ...asset, id: uid() });
   appState.assets.push(a);
   invalidateCalcCache();
@@ -279,6 +403,7 @@ function deleteAsset(id) {
   const idx = appState.assets.findIndex(a => a.id === id);
   if (idx < 0) return null;
   const asset = appState.assets[idx];
+  tryAutoBackup('major', `자산 삭제 직전: ${asset.name}`);
   appState.assets.splice(idx, 1);
   invalidateCalcCache();
   makeSnapshot();
@@ -295,6 +420,63 @@ function deleteAsset(id) {
 
 function getAsset(id) {
   return appState.assets.find(a => a.id === id) || null;
+}
+
+// ── USDT Change History (v5.17.0) ──
+function _buildUsdtHistoryEntry(asset) {
+  return {
+    at: new Date().toISOString(),
+    usdtQty: safeNum(asset.usdtQty),
+    usdtDetails: Array.isArray(asset.usdtDetails)
+      ? asset.usdtDetails.map(d => ({ name: String(d.name || ''), qty: safeNum(d.qty) }))
+      : [],
+    amount: safeNum(asset.amount),
+  };
+}
+
+function appendUsdtHistory(asset, prevSnapshot) {
+  const existing = Array.isArray(asset.usdtHistory) ? asset.usdtHistory : [];
+  const next = [...existing, prevSnapshot];
+  return next.slice(-LIMITS.usdtHistory);
+}
+
+function restoreUsdtHistoryEntry(assetId, historyIdx) {
+  const idx = appState.assets.findIndex(a => a.id === assetId);
+  if (idx < 0) return false;
+  const asset = appState.assets[idx];
+  if (!asset.isUsdt || !Array.isArray(asset.usdtHistory)) return false;
+  const entry = asset.usdtHistory[historyIdx];
+  if (!entry) return false;
+  const currentSnap = _buildUsdtHistoryEntry(asset);
+  const newHistory = asset.usdtHistory
+    .filter((_, i) => i !== historyIdx)
+    .concat([currentSnap])
+    .slice(-LIMITS.usdtHistory);
+  appState.assets[idx] = sanitizeAsset({
+    ...asset,
+    usdtQty: safeNum(entry.usdtQty),
+    usdtDetails: Array.isArray(entry.usdtDetails) ? entry.usdtDetails : [],
+    amount: safeNum(entry.amount),
+    usdtHistory: newHistory,
+  });
+  invalidateCalcCache();
+  makeSnapshot();
+  saveData();
+  EventBus.emit('assetChanged', { type: 'restoreUsdtHistory', assetId });
+  return true;
+}
+
+function deleteUsdtHistoryEntry(assetId, historyIdx) {
+  const idx = appState.assets.findIndex(a => a.id === assetId);
+  if (idx < 0) return false;
+  const asset = appState.assets[idx];
+  if (!Array.isArray(asset.usdtHistory)) return false;
+  if (historyIdx < 0 || historyIdx >= asset.usdtHistory.length) return false;
+  const newHistory = asset.usdtHistory.filter((_, i) => i !== historyIdx);
+  appState.assets[idx] = sanitizeAsset({ ...asset, usdtHistory: newHistory });
+  saveData();
+  EventBus.emit('assetChanged', { type: 'deleteUsdtHistory', assetId });
+  return true;
 }
 
 // ── Transactions ──

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.16.0 — History & Export UI
+   My Portfolio v5.17.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -29,6 +29,9 @@ function renderHistory() {
         </button>
         <button class="btn-action" data-action="restore-json" aria-label="백업 파일 복원">
           <span class="btn-action-icon" aria-hidden="true">📂</span><span>백업 복원</span>
+        </button>
+        <button class="btn-action" data-action="open-auto-backup-manager" aria-label="자동 백업 관리">
+          <span class="btn-action-icon" aria-hidden="true">🗂</span><span>자동 백업</span>
         </button>
         <button class="btn-action" data-action="export-csv" data-type="assets" aria-label="자산 CSV 내보내기">
           <span class="btn-action-icon" aria-hidden="true">📊</span><span>자산 CSV</span>
@@ -256,6 +259,7 @@ function _setupHistoryDelegation(container) {
     const action = target.dataset.action;
     if (action === 'backup-json') doBackupJSON();
     else if (action === 'restore-json') doRestoreJSON();
+    else if (action === 'open-auto-backup-manager') openAutoBackupManager();
     else if (action === 'export-csv') doExportCSV(target.dataset.type);
     else if (action === 'export-pdf') doExportPDF();
     else if (action === 'reset-all') doResetAll();

@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.16.0 — Configuration
+   My Portfolio v5.17.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.16.0';
+const APP_VERSION = '5.17.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -75,6 +75,7 @@ const WALLET_KEY = 'wl_addr';
 const CUSTOM_PROXY_KEY = 'mp_custom_proxy';
 const DASH_PREFS_KEY = 'mp_dash_prefs';
 const PRESETS_KEY = 'mp_presets';
+const AUTO_BACKUP_KEY = 'mp_autobackup';
 
 // Limits
 const LIMITS = Object.freeze({
@@ -85,6 +86,9 @@ const LIMITS = Object.freeze({
   storage: 4_500_000,
   upload: 10_485_760,
   logs: 200,
+  autoBackup: 30,
+  autoBackupBytes: 2_000_000,
+  usdtHistory: 10,
 });
 
 // Fallback values
