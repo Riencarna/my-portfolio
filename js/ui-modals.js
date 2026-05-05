@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.18.0 — Modals UI
+   My Portfolio v5.19.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -506,7 +506,7 @@ function openAssetDetail(id) {
   _setupModalMainDelegation(container);
 }
 
-// ── USDT 변경 이력 섹션 (v5.18.0) ──
+// ── USDT 변경 이력 섹션 (v5.19.0) ──
 function _renderUsdtHistorySection(asset) {
   const list = asset.usdtHistory || [];
   const items = list.slice().reverse().map((h, revIdx) => {
@@ -576,7 +576,7 @@ function doDeleteUsdtHistory(assetId, idxStr) {
   });
 }
 
-// ── Auto Backup Manager (v5.18.0) ──
+// ── Auto Backup Manager (v5.19.0) ──
 function openAutoBackupManager() {
   _modalCleanup.removeAll();
   const container = $('#modalMain');
@@ -1202,7 +1202,6 @@ function _usdtRow(location, qty) {
 function _usdtRecalcTotal() {
   const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
   let total = 0;
-  // Section subtotals
   for (const section of $$('#modalMain .usdt-section')) {
     let secTotal = 0;
     for (const input of section.querySelectorAll('.usdt-qty-input')) {
@@ -1212,16 +1211,51 @@ function _usdtRecalcTotal() {
     if (sub) sub.textContent = `${fmtNum(secTotal, 2)} USDT`;
     total += secTotal;
   }
-  const totalEl = $('#usdtTotal');
-  const krwEl = $('#usdtTotalKrw');
-  if (totalEl) totalEl.textContent = fmtNum(total, 2);
-  if (krwEl) krwEl.textContent = fmtKRW(Math.round(total * rate));
+
+  const initial = _usdtInitialTotal;
+  const delta = total - initial;
+  const initialKrw = Math.round(initial * rate);
+  const totalKrw = Math.round(total * rate);
+  const deltaKrw = totalKrw - initialKrw;
+  const changed = Math.abs(delta) >= 0.000001;
+
+  const usdtRow = $('#usdtTotalRow');
+  const krwRow = $('#usdtTotalKrwRow');
+
+  if (usdtRow) {
+    if (!changed) {
+      usdtRow.innerHTML = `<strong>${fmtNum(total, 2)}</strong> USDT`;
+    } else {
+      const sign = delta > 0 ? '+' : '';
+      const cls = delta > 0 ? 'pos' : 'neg';
+      usdtRow.innerHTML = `<span class="usdt-prev">${fmtNum(initial, 2)}</span> → <strong>${fmtNum(total, 2)}</strong> USDT <span class="usdt-delta ${cls}">(${sign}${fmtNum(delta, 2)})</span>`;
+    }
+  }
+
+  if (krwRow) {
+    if (!changed) {
+      krwRow.textContent = fmtKRW(totalKrw);
+    } else {
+      const sign = deltaKrw > 0 ? '+' : '';
+      const cls = deltaKrw > 0 ? 'pos' : 'neg';
+      krwRow.innerHTML = `<span class="usdt-prev">${escHtml(fmtKRW(initialKrw))}</span> → <strong>${escHtml(fmtKRW(totalKrw))}</strong> <span class="usdt-delta ${cls}">(${sign}${escHtml(fmtKRW(deltaKrw))})</span>`;
+    }
+  }
 }
+
+let _usdtInitialTotal = 0;
 
 function openUsdtManager() {
   _modalCleanup.removeAll();
   const existingMap = _getExistingUsdtMap();
   const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+
+  _usdtInitialTotal = 0;
+  for (const key of Object.keys(USDT_LOCATIONS)) {
+    for (const item of USDT_LOCATIONS[key].items) {
+      _usdtInitialTotal += safeNum(existingMap[item]?.usdtQty);
+    }
+  }
 
   const buildSection = (key) => {
     const sec = USDT_LOCATIONS[key];
@@ -1243,8 +1277,8 @@ function openUsdtManager() {
     ${buildSection('wallet')}
     ${buildSection('domestic')}
     <div class="usdt-summary">
-      <div class="usdt-summary-row"><span>합계</span><span><strong id="usdtTotal">0</strong> USDT</span></div>
-      <div class="usdt-summary-row"><span>원화 환산</span><span id="usdtTotalKrw">${escHtml(fmtKRW(0))}</span></div>
+      <div class="usdt-summary-row"><span>합계</span><span class="usdt-summary-val" id="usdtTotalRow"></span></div>
+      <div class="usdt-summary-row"><span>원화 환산</span><span class="usdt-summary-val" id="usdtTotalKrwRow"></span></div>
     </div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-save-usdt">저장</button></div>
   </div></div>`;
