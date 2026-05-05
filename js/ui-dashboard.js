@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.19.0 — Dashboard UI
+   My Portfolio v5.20.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -590,7 +590,9 @@ async function startAutoUpdate() {
     if (progressWrap) progressWrap.setAttribute('aria-valuenow', String(pct));
   });
 
-  if (summary && summary.total > 0) {
+  if (summary && summary.skipped) {
+    // 백그라운드 업데이트와 충돌 — autoUpdateAll이 이미 안내 토스트를 띄움
+  } else if (summary && summary.total > 0) {
     const extras = [];
     if (summary.failed > 0) extras.push(`실패 ${summary.failed}건`);
     if (summary.stale > 0) extras.push(`⚠️ 값 미변화 의심 ${summary.stale}건`);

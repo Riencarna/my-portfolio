@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.19.0 — API Integration
+   My Portfolio v5.20.0 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
-   v5.19.0: stale 가격 감지 (사일런트 실패 방지)
+   v5.20.0: stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -377,10 +377,11 @@ async function fetchBenchmarkReturns() {
 // ── Auto Update All ──
 let _updatePromise = null;
 
-async function autoUpdateAll(onProgress) {
+async function autoUpdateAll(onProgress, options = {}) {
+  const { silent = false } = options;
   if (_updatePromise) {
-    showToast('업데이트가 이미 진행 중입니다', 'info');
-    return { success: 0, failed: 0, total: 0 };
+    if (!silent) showToast('업데이트가 이미 진행 중입니다', 'info');
+    return { success: 0, failed: 0, total: 0, skipped: true };
   }
   _updatePromise = _doAutoUpdate(onProgress);
   try { return await _updatePromise; } finally { _updatePromise = null; }
@@ -408,7 +409,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.19.0
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.20.0
   const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
   const isStale = (asset, newPrice) => {
     if (newPrice == null || !isFinite(newPrice)) return false;

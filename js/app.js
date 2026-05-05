@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.19.0 — App Entry Point
+   My Portfolio v5.20.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     EventBus.on('dataImported', () => render());
     EventBus.on('dataReset', () => render());
+
+    autoUpdateOnLoad();
   } catch (e) {
     console.error('App initialization failed:', e);
     const splash = document.getElementById('splash');
@@ -53,6 +55,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
+
+// ── Background auto-update on app load ──
+const AUTO_UPDATE_DEDUP_MS = 5 * 60 * 1000;
+
+async function autoUpdateOnLoad() {
+  try {
+    const lastMs = Number(localStorage.getItem('lastAutoUpdateMs')) || 0;
+    if (lastMs && (Date.now() - lastMs) < AUTO_UPDATE_DEDUP_MS) return;
+
+    const summary = await autoUpdateAll(null, { silent: true });
+    if (!summary || summary.skipped || summary.total === 0) return;
+
+    localStorage.setItem('lastAutoUpdateMs', String(Date.now()));
+    render();
+    if (summary.stale > 0) {
+      showToast(`⚠️ 값 미변화 의심 ${summary.stale}건`, 'info');
+    }
+  } catch (e) {
+    console.warn('Background auto-update failed:', e.message);
+  }
+}
 
 // ── Service Worker with Update Banner ──
 let _waitingSW = null;
