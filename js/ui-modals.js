@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.0 — Modals UI
+   My Portfolio v5.20.1 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -275,10 +275,10 @@ function openAddAsset() {
       <div class="usdt-add-total" id="usdtAddTotalBar">합계: <strong id="usdtAddTotal">0</strong> USDT <span class="amount-hint" id="usdtAddTotalHint"></span></div>
     </div>
     <div class="form-group"><label for="assetNote">메모</label><input type="text" id="assetNote" placeholder="선택사항" maxlength="500"></div>
-    <div class="form-group hidden" id="valueField"><label for="assetValue">금액</label><input type="number" id="assetValue" placeholder="예: 1000000" min="0" step="any"><div class="amount-hint" id="valueHint"></div></div>
+    <div class="form-group hidden" id="valueField"><label for="assetValue">금액</label><input type="number" inputmode="decimal" id="assetValue" placeholder="예: 1000000" min="0" step="any"><div class="amount-hint" id="valueHint"></div></div>
     <div id="txnSection"><hr><h4>첫 거래 입력</h4>
     <div class="form-group hidden" id="coinCurrencyField"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button type="button" class="btn-sm active" data-action="set-add-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button type="button" class="btn-sm" data-action="set-add-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="addTxCurrency" value="KRW"></div>
-    <div class="form-row"><div class="form-group"><label for="txPrice" id="addTxPriceLabel">단가</label><input type="number" id="txPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txPriceHint"></div></div><div class="form-group"><label for="txQty">수량</label><input type="number" id="txQty" placeholder="0" min="0" step="any"></div></div>
+    <div class="form-row"><div class="form-group"><label for="txPrice" id="addTxPriceLabel">단가</label><input type="number" inputmode="decimal" id="txPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txPriceHint"></div></div><div class="form-group"><label for="txQty">수량</label><input type="number" inputmode="decimal" id="txQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총 투자금: <span id="addTxTotal">₩0</span></div>
     <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50" list="txAccountPresets">${_renderPresetDatalist('txAccountPresets', 'accounts')}</div></div></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-add-asset">추가</button></div></div></div>`;
@@ -386,7 +386,7 @@ function openEditAsset(id) {
       <button type="button" class="btn-sm" data-action="add-usdt-row" style="margin-top:6px">+ 추가 입력</button>
       <div class="usdt-add-total" id="usdtAddTotalBar">합계: <strong id="usdtAddTotal">0</strong> USDT <span class="amount-hint" id="usdtAddTotalHint"></span></div>
     </div>
-    <div class="form-group ${asset.isUsdt ? 'hidden' : ''}"><label for="editPrice" id="editPriceLabel">${INVESTMENT_CATS.includes(asset.category) ? '현재 단가' : '금액'}</label><input type="number" id="editPrice" value="${safeNum(asset.amount)}" min="0" step="any"><div class="amount-hint" id="editPriceHint"></div></div>
+    <div class="form-group ${asset.isUsdt ? 'hidden' : ''}"><label for="editPrice" id="editPriceLabel">${INVESTMENT_CATS.includes(asset.category) ? '현재 단가' : '금액'}</label><input type="number" inputmode="decimal" id="editPrice" value="${safeNum(asset.amount)}" min="0" step="any"><div class="amount-hint" id="editPriceHint"></div></div>
     <div class="form-group"><label for="editNote">메모</label><input type="text" id="editNote" value="${escAttr(asset.note || '')}" maxlength="500"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-edit-asset" data-id="${id}">저장</button></div></div></div>`;
   openModal('modalMain');
@@ -506,7 +506,7 @@ function openAssetDetail(id) {
   _setupModalMainDelegation(container);
 }
 
-// ── USDT 변경 이력 섹션 (v5.20.0) ──
+// ── USDT 변경 이력 섹션 (v5.20.1) ──
 function _renderUsdtHistorySection(asset) {
   const list = asset.usdtHistory || [];
   const items = list.slice().reverse().map((h, revIdx) => {
@@ -576,7 +576,7 @@ function doDeleteUsdtHistory(assetId, idxStr) {
   });
 }
 
-// ── Auto Backup Manager (v5.20.0) ──
+// ── Auto Backup Manager (v5.20.1) ──
 function openAutoBackupManager() {
   _modalCleanup.removeAll();
   const container = $('#modalMain');
@@ -667,7 +667,7 @@ function openTransaction(assetId, type = 'buy') {
   const container = $('#modalSub');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>${escHtml(asset.name)} — ${type === 'buy' ? '매수' : '매도'}</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body">
     ${showCurrency ? `<div class="form-group"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button class="btn-sm active" data-action="set-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button class="btn-sm" data-action="set-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="txCurrency" value="KRW"></div>` : ''}
-    <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${showCurrency ? '(<span id="txCurrLabel">KRW</span>)' : ''}</label><input type="number" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" id="txnQty" placeholder="0" min="0" step="any"></div></div>
+    <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${showCurrency ? '(<span id="txCurrLabel">KRW</span>)' : ''}</label><input type="number" inputmode="decimal" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" inputmode="decimal" id="txnQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총액: <span id="txnTotal">₩0</span></div>
     <div class="form-row"><div class="form-group"><label for="txnDate">날짜</label><input type="date" id="txnDate" value="${today()}"></div><div class="form-group"><label for="txnAccount">계좌</label><input type="text" id="txnAccount" placeholder="선택사항" maxlength="50" list="txnAccountPresets">${_renderPresetDatalist('txnAccountPresets', 'accounts')}</div></div>
     <div class="form-group"><label for="txnMemo">메모</label><input type="text" id="txnMemo" placeholder="선택사항" maxlength="200"></div>
@@ -758,7 +758,7 @@ function openEditTransaction(assetId, txnId) {
   const container = $('#modalSub');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>거래 수정</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body">
     <div class="form-group"><label>유형</label><div class="btn-group" role="radiogroup" aria-label="거래 유형"><button type="button" class="btn-sm ${txn.type === 'buy' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="buy" role="radio" aria-checked="${txn.type === 'buy'}">매수</button><button type="button" class="btn-sm ${txn.type === 'sell' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="sell" role="radio" aria-checked="${txn.type === 'sell'}">매도</button></div><input type="hidden" id="editTxnType" value="${txn.type}"></div>
-    <div class="form-row"><div class="form-group"><label for="editTxnPrice">단가</label><input type="number" id="editTxnPrice" value="${safeNum(txn.price)}" min="0" step="any"><div class="amount-hint" id="editTxnPriceHint"></div></div><div class="form-group"><label for="editTxnQty">수량</label><input type="number" id="editTxnQty" value="${safeNum(txn.qty)}" min="0" step="any"></div></div>
+    <div class="form-row"><div class="form-group"><label for="editTxnPrice">단가</label><input type="number" inputmode="decimal" id="editTxnPrice" value="${safeNum(txn.price)}" min="0" step="any"><div class="amount-hint" id="editTxnPriceHint"></div></div><div class="form-group"><label for="editTxnQty">수량</label><input type="number" inputmode="decimal" id="editTxnQty" value="${safeNum(txn.qty)}" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총액: <span id="editTxnTotal">${escHtml(fmtKRW(txn.price * txn.qty))}</span></div>
     <div class="form-row"><div class="form-group"><label for="editTxnDate">날짜</label><input type="date" id="editTxnDate" value="${txn.date || today()}"></div><div class="form-group"><label for="editTxnAccount">계좌</label><input type="text" id="editTxnAccount" value="${escAttr(txn.account || '')}" placeholder="선택사항" maxlength="50" list="editTxnAccountPresets">${_renderPresetDatalist('editTxnAccountPresets', 'accounts')}</div></div>
     <div class="form-group"><label for="editTxnMemo">메모</label><input type="text" id="editTxnMemo" value="${escAttr(txn.memo || '')}" placeholder="선택사항" maxlength="200"></div>
@@ -991,14 +991,14 @@ function doImportWallet() {
 // ── Amount Hints ──
 function _buildUsdtDefaultRows(count) {
   return Array.from({ length: count }, () =>
-    `<div class="usdt-add-row"><input type="text" class="usdt-loc-input" placeholder="거래소/지갑명" maxlength="50"><input type="number" class="usdt-qty-input" placeholder="USDT" min="0" step="any"><button type="button" class="btn-icon btn-danger usdt-row-del" data-action="remove-usdt-row" aria-label="삭제">✕</button></div>`
+    `<div class="usdt-add-row"><input type="text" class="usdt-loc-input" placeholder="거래소/지갑명" maxlength="50"><input type="number" inputmode="decimal" class="usdt-qty-input" placeholder="USDT" min="0" step="any"><button type="button" class="btn-icon btn-danger usdt-row-del" data-action="remove-usdt-row" aria-label="삭제">✕</button></div>`
   ).join('');
 }
 
 function _buildUsdtRowsFromDetails(details) {
   if (!Array.isArray(details) || details.length === 0) return _buildUsdtDefaultRows(5);
   return details.map(d =>
-    `<div class="usdt-add-row"><input type="text" class="usdt-loc-input" value="${escAttr(d.name)}" placeholder="거래소/지갑명" maxlength="50"><input type="number" class="usdt-qty-input" value="${d.qty || ''}" placeholder="USDT" min="0" step="any"><button type="button" class="btn-icon btn-danger usdt-row-del" data-action="remove-usdt-row" aria-label="삭제">✕</button></div>`
+    `<div class="usdt-add-row"><input type="text" class="usdt-loc-input" value="${escAttr(d.name)}" placeholder="거래소/지갑명" maxlength="50"><input type="number" inputmode="decimal" class="usdt-qty-input" value="${d.qty || ''}" placeholder="USDT" min="0" step="any"><button type="button" class="btn-icon btn-danger usdt-row-del" data-action="remove-usdt-row" aria-label="삭제">✕</button></div>`
   ).join('');
 }
 
@@ -1193,7 +1193,7 @@ function _usdtRow(location, qty) {
   return `<div class="usdt-row" data-location="${escAttr(location)}">
     <span class="usdt-loc">${escHtml(location)}</span>
     <div class="usdt-input-wrap">
-      <input type="number" class="usdt-qty-input" value="${qty || ''}" placeholder="0" min="0" step="any">
+      <input type="number" inputmode="decimal" class="usdt-qty-input" value="${qty || ''}" placeholder="0" min="0" step="any">
       <span class="usdt-unit">USDT</span>
     </div>
   </div>`;

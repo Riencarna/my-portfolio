@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.0 — Income UI
+   My Portfolio v5.20.1 — Income UI
    Cycle C compatible
    Soft Neutral palette + dash-charts 재사용
    ============================================= */
@@ -252,7 +252,7 @@ function openAddIncome() {
         <div class="form-row">
           <div class="form-group">
             <label for="incAmount">금액 *</label>
-            <input type="number" id="incAmount" placeholder="0" min="0" required>
+            <input type="number" inputmode="decimal" id="incAmount" placeholder="0" min="0" required>
             <div class="amount-hint" id="incAmountHint"></div>
           </div>
           <div class="form-group">
@@ -338,7 +338,7 @@ function openEditIncome(id) {
         <div class="form-row">
           <div class="form-group">
             <label for="editIncAmount">금액 *</label>
-            <input type="number" id="editIncAmount" value="${safeNum(item.amount)}" min="0" required>
+            <input type="number" inputmode="decimal" id="editIncAmount" value="${safeNum(item.amount)}" min="0" required>
             <div class="amount-hint" id="editIncAmountHint"></div>
           </div>
           <div class="form-group">

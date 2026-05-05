@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.0 — Analysis UI
+   My Portfolio v5.20.1 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -95,7 +95,7 @@ function renderGoalSection(total) {
         <div class="goal-form">
           <label class="goal-field">
             <span class="goal-label">목표 금액</span>
-            <input type="number" id="goalAmount" placeholder="예: 100000000" min="0" value="${escAttr(prefill.amount)}" aria-label="목표 금액">
+            <input type="number" inputmode="decimal" id="goalAmount" placeholder="예: 100000000" min="0" value="${escAttr(prefill.amount)}" aria-label="목표 금액">
             <div class="amount-hint" id="goalAmountHint"></div>
           </label>
           <label class="goal-field">
@@ -104,16 +104,16 @@ function renderGoalSection(total) {
           </label>
           <label class="goal-field">
             <span class="goal-label">월 저축액</span>
-            <input type="number" id="goalMonthlySaving" placeholder="예: 1000000" min="0" value="${escAttr(prefill.monthlySaving)}" aria-label="월 저축액">
+            <input type="number" inputmode="decimal" id="goalMonthlySaving" placeholder="예: 1000000" min="0" value="${escAttr(prefill.monthlySaving)}" aria-label="월 저축액">
             <div class="amount-hint" id="goalMonthlySavingHint"></div>
           </label>
           <label class="goal-field">
             <span class="goal-label">연 기대 수익률 (%)</span>
-            <input type="number" id="goalExpectedReturn" value="${escAttr(prefill.expectedReturn)}" step="0.1" aria-label="연 기대 수익률">
+            <input type="number" inputmode="decimal" id="goalExpectedReturn" value="${escAttr(prefill.expectedReturn)}" step="0.1" aria-label="연 기대 수익률">
           </label>
           <label class="goal-field">
             <span class="goal-label">월 생활비 <span class="text-muted">(FIRE용, 선택)</span></span>
-            <input type="number" id="goalMonthlyExpense" placeholder="예: 3000000" min="0" value="${escAttr(prefill.monthlyExpense)}" aria-label="월 생활비">
+            <input type="number" inputmode="decimal" id="goalMonthlyExpense" placeholder="예: 3000000" min="0" value="${escAttr(prefill.monthlyExpense)}" aria-label="월 생활비">
             <div class="amount-hint" id="goalMonthlyExpenseHint"></div>
           </label>
           <button class="btn-p goal-submit" data-action="set-goal">${editing ? '저장' : '설정'}</button>
@@ -251,7 +251,7 @@ function _renderAllocationEditor(alloc, editing) {
     <label class="alloc-cat-field">
       <span class="alloc-cat-label"><span class="alloc-cat-icon" aria-hidden="true">${c.icon}</span>${escHtml(c.label)}</span>
       <span class="alloc-pct-wrap">
-        <input type="number" class="alloc-cat-input" data-alloc-cat="${escAttr(c.id)}"
+        <input type="number" inputmode="decimal" class="alloc-cat-input" data-alloc-cat="${escAttr(c.id)}"
           value="${escAttr(safeNum(cats[c.id]))}" min="0" max="100" step="0.1"
           aria-label="${escAttr(c.label)} 목표 비율">
         <span class="alloc-pct-suffix">%</span>
@@ -289,7 +289,7 @@ function _renderAllocationEditor(alloc, editing) {
 
         <label class="alloc-field">
           <span class="alloc-label">편차 경고 임계값 (%)</span>
-          <input type="number" id="allocThreshold" value="${escAttr(threshold)}" min="0" max="50" step="0.5"
+          <input type="number" inputmode="decimal" id="allocThreshold" value="${escAttr(threshold)}" min="0" max="50" step="0.5"
             aria-label="편차 경고 임계값">
           <div class="text-muted" style="font-size:12px">이 값 이상 벗어나면 🚨 경고를 표시합니다.</div>
         </label>
@@ -322,7 +322,7 @@ function _renderAssetTargetList(assetTargets) {
         <label class="alloc-asset-row">
           <span class="alloc-asset-name">${escHtml(a.name)}</span>
           <span class="alloc-pct-wrap">
-            <input type="number" class="alloc-asset-input" data-alloc-asset="${escAttr(String(a.id))}"
+            <input type="number" inputmode="decimal" class="alloc-asset-input" data-alloc-asset="${escAttr(String(a.id))}"
               value="${hasTarget ? escAttr(v) : ''}" placeholder="미설정" min="0" max="100" step="0.1"
               aria-label="${escAttr(a.name)} 목표 비율">
             <span class="alloc-pct-suffix">%</span>
