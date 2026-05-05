@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.1 — Stylesheet
+   My Portfolio v5.20.2 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -456,7 +456,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 .btn-icon{
   width:38px;height:38px;min-width:38px;display:inline-flex;align-items:center;justify-content:center;
   border-radius:var(--radius-md);font-size:16px;transition:all var(--t-base);color:var(--t2)}
-@media(hover:none){.btn-icon{width:44px;height:44px;min-width:44px}.btn-sm{min-height:44px;padding:12px 16px}}
 .btn-icon:hover{background:var(--surface-alt);color:var(--t1)}
 .btn-danger{color:var(--danger)}
 .btn-accent{background:var(--accent);color:#fff}
@@ -733,6 +732,16 @@ input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px;vertic
   margin-top:20px;padding-top:16px;border-top:1px solid var(--bd)}
 .modal.closing{pointer-events:none}
 .modal.closing .modal-box{animation:modalOut .2s ease forwards}
+
+/* Mobile/touch: 44px 터치 타겟 보장 (iOS HIG) */
+@media(hover:none),(max-width:768px){
+  .btn-icon{width:44px;height:44px;min-width:44px}
+  .btn-sm{min-height:44px;padding:12px 16px}
+  .btn-p,.btn-s{min-height:44px;min-width:88px}
+  .modal-close{width:44px;height:44px}
+  .cat-btn{min-height:44px;padding:10px 16px}
+}
+
 hr{border:none;border-top:1px solid var(--bd);margin:20px 0}
 h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spacing:-0.1px}
 
@@ -770,7 +779,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   margin:-4px 0 12px;line-height:1.5}
 .form-hint-info strong{color:var(--primary);font-weight:700}
 
-/* ── USDT 변경 이력 (v5.20.1) ── */
+/* ── USDT 변경 이력 (v5.20.2) ── */
 .usdt-hist-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--bd)}
 .usdt-hist-section h4{margin-bottom:12px;font-size:14px;color:var(--t1)}
 .usdt-hist-list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
@@ -784,7 +793,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .usdt-hist-details-empty{font-size:11px;color:var(--t4);font-style:italic}
 .usdt-hist-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:4px}
 
-/* ── 자동 백업 관리 (v5.20.1) ── */
+/* ── 자동 백업 관리 (v5.20.2) ── */
 .auto-bk-summary{display:flex;gap:18px;padding:12px 14px;background:var(--surface-alt);border-radius:var(--radius-md);border:1px solid var(--bd);font-size:13px;color:var(--t2);margin-bottom:10px}
 .auto-bk-summary strong{color:var(--t1)}
 .auto-bk-info{font-size:12px;color:var(--t4);margin-bottom:14px;padding:8px 12px;border-left:3px solid var(--primary);background:var(--surface-alt);border-radius:var(--radius-sm);line-height:1.5}
