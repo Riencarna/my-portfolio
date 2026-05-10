@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.24.0 — API Integration
+   My Portfolio v5.24.1 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
-   v5.24.0: stale 가격 감지 (사일런트 실패 방지)
+   v5.24.1: stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -49,6 +49,34 @@ function formatRateAge(time) {
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `${diffH}시간 전`;
   return `${Math.floor(diffH / 24)}일 전`;
+}
+
+// 동기 USDT 환율 조회 — UI 입력 폼에서 즉시 환산값 표시용.
+// 폴백: 라이브 캐시 → 마지막 USDT → 마지막 환율 → 1350원.
+// `1350원이 silently 박히는 것`을 방지하기 위해 source/age도 같이 반환.
+function getUsdtRateSync() {
+  if (cachedUsdt && Number.isFinite(cachedUsdt.rate) && cachedUsdt.rate > 0) {
+    return { rate: cachedUsdt.rate, source: cachedUsdt.source || 'live', time: cachedUsdt.time, fallback: false };
+  }
+  const lastUsdt = getLastRate('usdt');
+  if (lastUsdt) {
+    return { rate: lastUsdt.rate, source: lastUsdt.source || 'last-known', time: lastUsdt.time, fallback: 'last-usdt' };
+  }
+  const lastUsdkrw = getLastRate('usdkrw');
+  if (lastUsdkrw) {
+    return { rate: lastUsdkrw.rate, source: lastUsdkrw.source || 'last-known', time: lastUsdkrw.time, fallback: 'last-rate' };
+  }
+  return { rate: FALLBACK_USD_KRW, source: 'default', time: null, fallback: 'hardcoded' };
+}
+
+// 환율 출처를 한국어 라벨로 — UI hint 표시용
+function describeRateSource(info) {
+  if (!info) return '';
+  if (info.fallback === false) return '현재 시세';
+  if (info.fallback === 'last-usdt') return `마지막 저장 (${formatRateAge(info.time)})`;
+  if (info.fallback === 'last-rate') return `마지막 환율 (${formatRateAge(info.time)})`;
+  if (info.fallback === 'hardcoded') return '⚠️ 기본값 (시세 없음)';
+  return '';
 }
 
 // ── Fetch with Timeout ──
@@ -409,7 +437,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.24.0
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.24.1
   const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
   const isStale = (asset, newPrice) => {
     if (newPrice == null || !isFinite(newPrice)) return false;

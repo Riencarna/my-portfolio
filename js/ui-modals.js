@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.0 — Modals UI
+   My Portfolio v5.24.1 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -303,7 +303,7 @@ function doAddAsset() {
     const qty = safeNum($('#txQty')?.value);
     const addCurrency = $('#addTxCurrency')?.value;
     if (cat === '코인' && addCurrency === 'USD' && price > 0) {
-      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      const rate = getUsdtRateSync().rate;
       price = Math.round(price * rate);
     }
     amount = price;
@@ -316,7 +316,7 @@ function doAddAsset() {
     const collected = _collectUsdtRows();
     usdtDetails = collected.details;
     usdtQty = collected.total;
-    const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+    const rate = getUsdtRateSync().rate;
     amount = Math.round(usdtQty * rate);
     txns = amount > 0 ? [{ type: 'buy', price: amount, qty: 1, date: today(), account: null, memo: null }] : [];
   } else {
@@ -406,7 +406,7 @@ function doEditAsset(id) {
     const collected = _collectUsdtRows();
     usdtDetails = collected.details;
     usdtQty = collected.total;
-    const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+    const rate = getUsdtRateSync().rate;
     newAmount = Math.round(usdtQty * rate);
   } else {
     newAmount = safeNum($('#editPrice')?.value);
@@ -506,7 +506,7 @@ function openAssetDetail(id) {
   _setupModalMainDelegation(container);
 }
 
-// ── USDT 변경 이력 섹션 (v5.24.0) ──
+// ── USDT 변경 이력 섹션 (v5.24.1) ──
 function _renderUsdtHistorySection(asset) {
   const list = asset.usdtHistory || [];
   const items = list.slice().reverse().map((h, revIdx) => {
@@ -576,7 +576,7 @@ function doDeleteUsdtHistory(assetId, idxStr) {
   });
 }
 
-// ── Auto Backup Manager (v5.24.0) ──
+// ── Auto Backup Manager (v5.24.1) ──
 function openAutoBackupManager() {
   _modalCleanup.removeAll();
   const container = $('#modalMain');
@@ -1021,8 +1021,13 @@ function _recalcUsdtAddTotal() {
   if (el) el.textContent = fmtNum(total, 2);
   const hint = $('#usdtAddTotalHint');
   if (hint) {
-    const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
-    hint.textContent = total > 0 ? `≈ ${fmtKRW(Math.round(total * rate))}` : '';
+    const info = getUsdtRateSync();
+    if (total > 0) {
+      const src = describeRateSource(info);
+      hint.innerHTML = `≈ ${escHtml(fmtKRW(Math.round(total * info.rate)))} <span class="rate-src ${info.fallback ? 'rate-src-warn' : ''}">${escHtml(src)}</span>`;
+    } else {
+      hint.textContent = '';
+    }
   }
 }
 
@@ -1095,7 +1100,7 @@ function _setupAmountHints(pairs) {
     const update = () => {
       const usdtCb = $('#isUsdt');
       if (usdtCb?.checked && (inputId === 'assetValue' || inputId === 'editPrice')) {
-        const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+        const rate = getUsdtRateSync().rate;
         const val = safeNum(input.value);
         hint.textContent = val > 0 ? `≈ ${fmtKRW(Math.round(val * rate))}` : '';
       } else {
@@ -1117,7 +1122,7 @@ function _setupAddTxTotal() {
     if (!el) return;
     const curr = $('#addTxCurrency')?.value;
     if (curr === 'USD') {
-      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      const rate = getUsdtRateSync().rate;
       el.textContent = `$${fmtNum(p * q, 2)} (≈ ${fmtKRW(Math.round(p * q * rate))})`;
     } else {
       el.textContent = fmtKRW(p * q);
@@ -1144,7 +1149,7 @@ function _setAddTxCurrency(btn, currency) {
   const el = $('#addTxTotal');
   if (el) {
     if (currency === 'USD') {
-      const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+      const rate = getUsdtRateSync().rate;
       el.textContent = `$${fmtNum(p * q, 2)} (≈ ${fmtKRW(Math.round(p * q * rate))})`;
     } else {
       el.textContent = fmtKRW(p * q);
@@ -1200,7 +1205,7 @@ function _usdtRow(location, qty) {
 }
 
 function _usdtRecalcTotal() {
-  const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+  const rate = getUsdtRateSync().rate;
   let total = 0;
   for (const section of $$('#modalMain .usdt-section')) {
     let secTotal = 0;
@@ -1248,7 +1253,8 @@ let _usdtInitialTotal = 0;
 function openUsdtManager() {
   _modalCleanup.removeAll();
   const existingMap = _getExistingUsdtMap();
-  const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+  const rateInfo = getUsdtRateSync();
+  const rate = rateInfo.rate;
 
   _usdtInitialTotal = 0;
   for (const key of Object.keys(USDT_LOCATIONS)) {
@@ -1272,7 +1278,7 @@ function openUsdtManager() {
 
   const container = $('#modalMain');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box modal-large"><div class="modal-header"><h3>USDT 일괄 관리</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body usdt-manager">
-    <div class="usdt-rate-bar">현재 USDT 환율: <strong>${escHtml(fmtNum(rate, 0))}원</strong><span class="usdt-rate-src">${cachedUsdt?.source || ''}</span></div>
+    <div class="usdt-rate-bar ${rateInfo.fallback ? 'usdt-rate-fallback' : ''}">현재 USDT 환율: <strong>${escHtml(fmtNum(rate, 0))}원</strong><span class="usdt-rate-src">${escHtml(describeRateSource(rateInfo))}</span></div>
     ${buildSection('overseas')}
     ${buildSection('wallet')}
     ${buildSection('domestic')}
@@ -1295,7 +1301,7 @@ function openUsdtManager() {
 
 function doSaveUsdtBatch() {
   const existingMap = _getExistingUsdtMap();
-  const rate = cachedUsdt?.rate || FALLBACK_USD_KRW;
+  const rate = getUsdtRateSync().rate;
   const rows = $$('#modalMain .usdt-row');
   let addCount = 0, updateCount = 0;
 
