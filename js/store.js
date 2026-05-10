@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.2 — State Management
+   My Portfolio v5.25.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -63,7 +63,7 @@ function _doSave() {
   }
 }
 
-// ── Auto Backup (v5.24.2) ──
+// ── Auto Backup (v5.25.0) ──
 let _autoBackupCache = null;
 
 function loadAutoBackups() {
@@ -422,7 +422,7 @@ function getAsset(id) {
   return appState.assets.find(a => a.id === id) || null;
 }
 
-// ── USDT Change History (v5.24.2) ──
+// ── USDT Change History (v5.25.0) ──
 function _buildUsdtHistoryEntry(asset) {
   return {
     at: new Date().toISOString(),

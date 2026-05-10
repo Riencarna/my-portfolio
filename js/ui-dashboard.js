@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.2 — Dashboard UI
+   My Portfolio v5.25.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -50,6 +50,7 @@ function renderDashboard() {
   container.innerHTML = `
     ${_renderDashToolbar(editMode)}
     ${renderBackupReminder()}
+    ${renderMonthlyReportCard()}
     <div class="dash-cards ${editMode ? 'dash-edit-mode' : ''}">${cardsHtml}</div>
   `;
 
@@ -404,6 +405,8 @@ function _handleDashAction(target, e) {
   else if (action === 'dash-move-up') { if (e) e.stopPropagation(); moveDashCard(target.dataset.card, -1); }
   else if (action === 'dash-move-down') { if (e) e.stopPropagation(); moveDashCard(target.dataset.card, 1); }
   else if (action === 'reset-dash-prefs') doResetDashPrefs();
+  else if (action === 'open-monthly-report') openMonthlyReport(target.dataset.month || null);
+  else if (action === 'dismiss-monthly-report') dismissMonthlyReportCard(target.dataset.month);
 }
 
 function _handleTrendClick(days, btn) {

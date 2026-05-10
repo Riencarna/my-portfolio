@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.2 — Stylesheet
+   My Portfolio v5.25.0 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -781,7 +781,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   margin:-4px 0 12px;line-height:1.5}
 .form-hint-info strong{color:var(--primary);font-weight:700}
 
-/* ── USDT 변경 이력 (v5.24.2) ── */
+/* ── USDT 변경 이력 (v5.25.0) ── */
 .usdt-hist-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--bd)}
 .usdt-hist-section h4{margin-bottom:12px;font-size:14px;color:var(--t1)}
 .usdt-hist-list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
@@ -795,7 +795,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .usdt-hist-details-empty{font-size:11px;color:var(--t4);font-style:italic}
 .usdt-hist-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:4px}
 
-/* ── 자동 백업 관리 (v5.24.2) ── */
+/* ── 자동 백업 관리 (v5.25.0) ── */
 .auto-bk-summary{display:flex;gap:18px;padding:12px 14px;background:var(--surface-alt);border-radius:var(--radius-md);border:1px solid var(--bd);font-size:13px;color:var(--t2);margin-bottom:10px}
 .auto-bk-summary strong{color:var(--t1)}
 .auto-bk-info{font-size:12px;color:var(--t4);margin-bottom:14px;padding:8px 12px;border-left:3px solid var(--primary);background:var(--surface-alt);border-radius:var(--radius-sm);line-height:1.5}
@@ -1350,4 +1350,56 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .dash-toolbar{flex-direction:column;align-items:stretch;gap:8px}
   .dash-toolbar-actions{justify-content:flex-end}
   .dash-edit-controls{flex-wrap:wrap}
+}
+
+/* ── Monthly Report ── */
+.modal-box-wide{max-width:720px}
+.card-report-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--primary-soft);border-color:var(--primary);padding:14px 16px;margin-bottom:12px;flex-wrap:wrap}
+.report-notice-text{flex:1;min-width:0}
+.report-notice-title{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.report-notice-sub{font-size:13px;font-weight:600}
+.report-notice-sub.positive{color:var(--success)}
+.report-notice-sub.negative{color:var(--danger)}
+.report-notice-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.report-section{margin:18px 0}
+.report-section-title{font-size:13px;font-weight:700;color:var(--t2);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.report-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.report-summary-card{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px}
+.report-summary-card.report-summary-change.positive{border-color:var(--success);background:color-mix(in srgb, var(--success) 8%, transparent)}
+.report-summary-card.report-summary-change.negative{border-color:var(--danger);background:color-mix(in srgb, var(--danger) 8%, transparent)}
+.report-summary-label{font-size:11px;color:var(--t4);margin-bottom:4px}
+.report-summary-value{font-size:15px;font-weight:700;color:var(--t1);word-break:break-all}
+.report-summary-pct{font-size:12px;color:var(--t3);margin-top:2px;font-weight:500}
+.report-summary-card.positive .report-summary-value{color:var(--success)}
+.report-summary-card.negative .report-summary-value{color:var(--danger)}
+.report-cat-list{display:flex;flex-direction:column;gap:6px}
+.report-cat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-2);border-radius:8px}
+.report-cat-name{font-size:13px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:6px}
+.report-cat-vals{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.report-cat-end{font-size:13px;color:var(--t2);font-weight:600}
+.report-cat-change{font-size:12px;font-weight:600}
+.report-cat-change.positive{color:var(--success)}
+.report-cat-change.negative{color:var(--danger)}
+.report-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.report-top-card{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px}
+.report-top-title{font-size:12px;font-weight:700;color:var(--t2);margin-bottom:8px}
+.report-top-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.report-top-row:last-child{border-bottom:none}
+.report-top-name{font-size:13px;color:var(--t1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+.report-top-val{font-size:12px;font-weight:700}
+.report-top-val.positive{color:var(--success)}
+.report-top-val.negative{color:var(--danger)}
+.report-top-empty{font-size:12px;color:var(--t4);text-align:center;padding:8px 0}
+.report-flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.report-flow-card{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.report-flow-label{font-size:11px;color:var(--t4);margin-bottom:4px}
+.report-flow-value{font-size:14px;font-weight:700;color:var(--t1)}
+.report-flow-value.positive{color:var(--success)}
+.report-flow-sub{font-size:11px;color:var(--t4);margin-top:2px}
+@media (max-width:600px){
+  .report-summary-grid{grid-template-columns:1fr}
+  .report-top-grid{grid-template-columns:1fr}
+  .report-flow-grid{grid-template-columns:repeat(3,1fr)}
+  .card-report-notice{flex-direction:column;align-items:stretch}
+  .report-notice-actions{justify-content:flex-end}
 }

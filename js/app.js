@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.2 — App Entry Point
+   My Portfolio v5.25.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -270,6 +270,9 @@ function renderSidebar() {
     </nav>
 
     <div class="sidebar-footer">
+      <div class="sidebar-action" data-action="open-monthly-report" role="button" tabindex="0" aria-label="월간 리포트">
+        <span class="sidebar-action-icon">📊</span><span>월간 리포트</span>
+      </div>
       <div class="sidebar-action" data-action="open-wallet-scan" role="button" tabindex="0" aria-label="EVM 지갑 스캔">
         <span class="sidebar-action-icon">🔗</span><span>지갑 스캔</span>
       </div>
@@ -294,6 +297,7 @@ function renderSidebar() {
     const action = target.dataset.action;
     if (action === 'go-tab') goTab(target.dataset.tab);
     else if (action === 'open-portfolio-manager') openPortfolioManager();
+    else if (action === 'open-monthly-report') openMonthlyReport();
     else if (action === 'open-wallet-scan') openWalletScan();
     else if (action === 'open-auto-backup-manager') openAutoBackupManager();
     else if (action === 'toggle-theme') toggleTheme();

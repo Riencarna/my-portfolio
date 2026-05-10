@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.24.2
+/* Service Worker - My Portfolio v5.25.0
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.24.2";
+var CACHE_NAME = "myportfolio-v5.25.0";
 
 var STATIC_ASSETS = [
   "./",
@@ -24,6 +24,7 @@ var STATIC_ASSETS = [
   "./js/ui-history.js",
   "./js/ui-income.js",
   "./js/ui-ai.js",
+  "./js/ui-report.js",
   "./js/app.js"
 ];
 
