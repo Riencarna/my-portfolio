@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.2 — Utilities
+   My Portfolio v5.23.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -564,3 +564,11 @@ const Cleanup = (() => {
     },
   };
 })();
+
+// ── Idle scheduling: 무거운 렌더(차트 등)를 idle frame으로 미뤄 첫 페인트를 방해하지 않도록 ──
+function runWhenIdle(fn, timeout = 200) {
+  if (typeof window.requestIdleCallback === 'function') {
+    return window.requestIdleCallback(fn, { timeout });
+  }
+  return setTimeout(fn, 1);
+}

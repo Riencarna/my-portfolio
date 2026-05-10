@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.2 — App Entry Point
+   My Portfolio v5.23.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -121,26 +121,59 @@ function applyUpdate() {
 }
 
 // ── Theme ──
+// 저장된 사용자 토글이 있으면 그 값, 없으면 OS의 prefers-color-scheme 사용
+function getSystemTheme() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 function loadTheme() {
-  const theme = localStorage.getItem(THEME_KEY) || 'light';
+  const stored = localStorage.getItem(THEME_KEY);
+  const theme = stored || getSystemTheme();
   document.body.dataset.theme = theme;
   updateThemeMeta(theme);
+  setupSystemThemeWatcher();
+}
+
+// 사용자가 수동 토글한 적 없을 때만 OS 변경에 반응
+function setupSystemThemeWatcher() {
+  if (!window.matchMedia) return;
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const handler = (e) => {
+    if (localStorage.getItem(THEME_KEY)) return;
+    applyTheme(e.matches ? 'dark' : 'light');
+  };
+  if (mq.addEventListener) mq.addEventListener('change', handler);
+  else if (mq.addListener) mq.addListener(handler);
+}
+
+// 테마를 실제로 화면에 적용 + 차트/사이드바/헤더 재렌더
+function applyTheme(theme) {
+  document.body.dataset.theme = theme;
+  updateThemeMeta(theme);
+  destroyAllCharts();
+  if (typeof _dashRenderKey !== 'undefined') _dashRenderKey = '';
+  updateSidebarThemeBtn(theme);
+  renderPageHeader();
+  requestAnimationFrame(() => {
+    renderTabContent();
+  });
 }
 
 function toggleTheme() {
   const current = document.body.dataset.theme || 'light';
   const next = current === 'dark' ? 'light' : 'dark';
-  document.body.dataset.theme = next;
   localStorage.setItem(THEME_KEY, next);
-  updateThemeMeta(next);
-  destroyAllCharts();
-  // Force dashboard re-render so charts pick up new theme colors
-  if (typeof _dashRenderKey !== 'undefined') _dashRenderKey = '';
-  updateSidebarThemeBtn(next);
-  renderPageHeader();
-  requestAnimationFrame(() => {
-    renderTabContent();
-  });
+  applyTheme(next);
+}
+
+// "OS 자동"으로 되돌리기: localStorage 키 삭제 후 현재 OS 테마 적용
+function setThemeAuto() {
+  localStorage.removeItem(THEME_KEY);
+  applyTheme(getSystemTheme());
+}
+
+function isThemeAuto() {
+  return localStorage.getItem(THEME_KEY) == null;
 }
 
 function updateSidebarThemeBtn(theme) {
@@ -148,6 +181,12 @@ function updateSidebarThemeBtn(theme) {
   if (btn) {
     btn.querySelector('.sidebar-action-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
     btn.querySelector('span:not(.sidebar-action-icon)').textContent = theme === 'dark' ? '라이트 모드' : '다크 모드';
+  }
+  const autoBtn = $('#sidebarThemeAutoBtn');
+  if (autoBtn) {
+    const auto = isThemeAuto();
+    autoBtn.classList.toggle('active', auto);
+    autoBtn.setAttribute('aria-pressed', auto ? 'true' : 'false');
   }
 }
 
@@ -241,6 +280,11 @@ function renderSidebar() {
         aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}">
         <span class="sidebar-action-icon">${isDark ? '☀️' : '🌙'}</span><span>${isDark ? '라이트 모드' : '다크 모드'}</span>
       </div>
+      <div class="sidebar-action ${isThemeAuto() ? 'active' : ''}" id="sidebarThemeAutoBtn" data-action="theme-auto"
+        role="button" tabindex="0" aria-pressed="${isThemeAuto() ? 'true' : 'false'}"
+        aria-label="OS 자동 테마 ${isThemeAuto() ? '사용 중' : '사용'}">
+        <span class="sidebar-action-icon">🖥️</span><span>OS 자동</span>
+      </div>
     </div>
   `;
 
@@ -253,6 +297,7 @@ function renderSidebar() {
     else if (action === 'open-wallet-scan') openWalletScan();
     else if (action === 'open-auto-backup-manager') openAutoBackupManager();
     else if (action === 'toggle-theme') toggleTheme();
+    else if (action === 'theme-auto') setThemeAuto();
   };
 
   sidebar.onkeydown = (e) => {

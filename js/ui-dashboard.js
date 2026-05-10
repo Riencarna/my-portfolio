@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.2 — Dashboard UI
+   My Portfolio v5.23.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -53,9 +53,9 @@ function renderDashboard() {
     <div class="dash-cards ${editMode ? 'dash-edit-mode' : ''}">${cardsHtml}</div>
   `;
 
-  requestAnimationFrame(() => {
-    destroyChart('pie');
-    destroyChart('trend');
+  destroyChart('pie');
+  destroyChart('trend');
+  runWhenIdle(() => {
     if (!hiddenSet.has('pie') || editMode) renderPortfolioPie();
     if (!hiddenSet.has('trend') || editMode) renderTrendChart(UIState.dashboardTrendDays);
   });

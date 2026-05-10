@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.20.2 — Income UI
+   My Portfolio v5.23.0 — Income UI
    Cycle C compatible
    Soft Neutral palette + dash-charts 재사용
    ============================================= */
@@ -69,7 +69,7 @@ function renderIncome() {
     </div>
   `;
 
-  requestAnimationFrame(() => renderIncomeCharts(items, year, month));
+  runWhenIdle(() => renderIncomeCharts(items, year, month));
 
   _setupIncomeDelegation(container);
 }
