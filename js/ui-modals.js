@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.1 — Modals UI
+   My Portfolio v5.24.2 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -260,6 +260,7 @@ function updateFormFields(cat) {
 // ── Add Asset ──
 function openAddAsset() {
   _modalCleanup.removeAll();
+  _usdtFormInitialTotal = 0;
   const container = $('#modalMain');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 추가</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
     <div class="form-group"><label id="catSelectLabel">카테고리</label>${renderCategorySelector('국내주식', 'catSelect')}</div>
@@ -372,6 +373,7 @@ function openEditAsset(id) {
   const isCoin = asset.category === '코인';
   const isCash = asset.category === '현금';
   _modalCleanup.removeAll();
+  _usdtFormInitialTotal = asset.isUsdt ? safeNum(asset.usdtQty) : 0;
   const container = $('#modalMain');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 수정</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
     <div class="form-group"><label id="editCatSelectLabel">카테고리</label>${renderCategorySelector(asset.category, 'editCatSelect')}</div>
@@ -506,7 +508,7 @@ function openAssetDetail(id) {
   _setupModalMainDelegation(container);
 }
 
-// ── USDT 변경 이력 섹션 (v5.24.1) ──
+// ── USDT 변경 이력 섹션 (v5.24.2) ──
 function _renderUsdtHistorySection(asset) {
   const list = asset.usdtHistory || [];
   const items = list.slice().reverse().map((h, revIdx) => {
@@ -576,7 +578,7 @@ function doDeleteUsdtHistory(assetId, idxStr) {
   });
 }
 
-// ── Auto Backup Manager (v5.24.1) ──
+// ── Auto Backup Manager (v5.24.2) ──
 function openAutoBackupManager() {
   _modalCleanup.removeAll();
   const container = $('#modalMain');
@@ -1015,19 +1017,36 @@ function _collectUsdtRows() {
   return { details, total };
 }
 
+let _usdtFormInitialTotal = 0;
+
 function _recalcUsdtAddTotal() {
   const { total } = _collectUsdtRows();
   const el = $('#usdtAddTotal');
-  if (el) el.textContent = fmtNum(total, 2);
   const hint = $('#usdtAddTotalHint');
-  if (hint) {
-    const info = getUsdtRateSync();
-    if (total > 0) {
-      const src = describeRateSource(info);
-      hint.innerHTML = `≈ ${escHtml(fmtKRW(Math.round(total * info.rate)))} <span class="rate-src ${info.fallback ? 'rate-src-warn' : ''}">${escHtml(src)}</span>`;
-    } else {
-      hint.textContent = '';
-    }
+  if (!el || !hint) return;
+
+  const info = getUsdtRateSync();
+  const totalKrw = Math.round(total * info.rate);
+  const initial = _usdtFormInitialTotal;
+  const initialKrw = Math.round(initial * info.rate);
+  const delta = total - initial;
+  const deltaKrw = totalKrw - initialKrw;
+  const hasInitial = initial > 0;
+  const changed = hasInitial && Math.abs(delta) >= 0.000001;
+  const srcHtml = `<span class="rate-src ${info.fallback ? 'rate-src-warn' : ''}">${escHtml(describeRateSource(info))}</span>`;
+
+  if (changed && total > 0) {
+    const sign = delta > 0 ? '+' : '';
+    const cls = delta > 0 ? 'pos' : 'neg';
+    const krwSign = deltaKrw > 0 ? '+' : '';
+    el.innerHTML = `<span class="usdt-prev">${fmtNum(initial, 2)}</span> → ${fmtNum(total, 2)} <span class="usdt-delta ${cls}">(${sign}${fmtNum(delta, 2)})</span>`;
+    hint.innerHTML = `≈ ${escHtml(fmtKRW(totalKrw))} <span class="usdt-delta ${cls}">(${krwSign}${escHtml(fmtKRW(deltaKrw))})</span> ${srcHtml}`;
+  } else if (hasInitial && total === 0) {
+    el.innerHTML = `<span class="usdt-prev">${fmtNum(initial, 2)}</span> → 0`;
+    hint.innerHTML = `<span class="usdt-delta neg">(전부 제거)</span> ${srcHtml}`;
+  } else {
+    el.textContent = fmtNum(total, 2);
+    hint.innerHTML = total > 0 ? `≈ ${escHtml(fmtKRW(totalKrw))} ${srcHtml}` : '';
   }
 }
 

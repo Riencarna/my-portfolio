@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.24.1 — Dashboard UI
+   My Portfolio v5.24.2 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
