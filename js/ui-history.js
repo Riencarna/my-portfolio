@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.23.1 — History & Export UI
+   My Portfolio v5.24.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -38,6 +38,9 @@ function renderHistory() {
         </button>
         <button class="btn-action" data-action="export-csv" data-type="txns" aria-label="거래 CSV 내보내기">
           <span class="btn-action-icon" aria-hidden="true">📋</span><span>거래 CSV</span>
+        </button>
+        <button class="btn-action" data-action="import-csv" aria-label="거래 CSV 가져오기">
+          <span class="btn-action-icon" aria-hidden="true">📥</span><span>거래 CSV 가져오기</span>
         </button>
         <button class="btn-action" data-action="export-pdf" aria-label="PDF 리포트 생성">
           <span class="btn-action-icon" aria-hidden="true">📄</span><span>PDF 리포트</span>
@@ -261,6 +264,7 @@ function _setupHistoryDelegation(container) {
     else if (action === 'restore-json') doRestoreJSON();
     else if (action === 'open-auto-backup-manager') openAutoBackupManager();
     else if (action === 'export-csv') doExportCSV(target.dataset.type);
+    else if (action === 'import-csv') doImportCSV();
     else if (action === 'export-pdf') doExportPDF();
     else if (action === 'reset-all') doResetAll();
     else if (action === 'history-filter') setHistoryFilter(Number(target.dataset.days));
@@ -527,6 +531,335 @@ function generateTxnCSV() {
     }
   }
   return [headers.join(','), ...rows].join('\n');
+}
+
+// ── CSV Import ──
+let _csvImportState = null;
+
+function doImportCSV() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,text/csv';
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > LIMITS.upload) {
+      showToast(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB, 최대 10MB)`, 'error');
+      return;
+    }
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      if (rows.length < 2) {
+        showToast('CSV 파일에 데이터가 없습니다', 'error');
+        return;
+      }
+      const headers = rows[0].map(h => String(h || '').trim());
+      const mapping = detectColumnMapping(headers);
+      if (mapping.date < 0 || mapping.name < 0 || mapping.price < 0 || mapping.qty < 0) {
+        showToast('필수 컬럼(날짜/자산명/단가/수량) 자동 매핑 실패. 헤더를 확인해주세요.', 'error');
+        return;
+      }
+      const parsed = _buildImportRows(rows.slice(1), mapping);
+      if (parsed.length === 0) {
+        showToast('가져올 거래 행이 없습니다', 'info');
+        return;
+      }
+      _openImportPreview(parsed);
+    } catch (err) {
+      console.error('CSV import failed:', err);
+      showToast('CSV 파일을 읽을 수 없습니다', 'error');
+    }
+  };
+  input.click();
+}
+
+// Parse CSV — handles quoted fields, escaped quotes (""), CRLF, BOM
+function parseCSV(text) {
+  const out = [];
+  if (!text) return out;
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\r') { /* handled in \n */ }
+      else if (c === '\n') {
+        row.push(field);
+        field = '';
+        if (row.length > 1 || (row.length === 1 && row[0] !== '')) out.push(row);
+        row = [];
+      } else {
+        field += c;
+      }
+    }
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    if (row.length > 1 || (row.length === 1 && row[0] !== '')) out.push(row);
+  }
+  return out;
+}
+
+function detectColumnMapping(headers) {
+  const m = { date: -1, name: -1, category: -1, type: -1, price: -1, qty: -1, account: -1, memo: -1 };
+  headers.forEach((h, i) => {
+    const k = h.replace(/\s+/g, '').toLowerCase();
+    if (m.date < 0 && /(날짜|일자|date|거래일|체결일)/i.test(k)) m.date = i;
+    else if (m.name < 0 && /(자산명|종목명|name|종목)/i.test(k)) m.name = i;
+    else if (m.category < 0 && /(카테고리|category|종류|구분)/i.test(k)) m.category = i;
+    else if (m.type < 0 && /(유형|type|매매|매수매도)/i.test(k)) m.type = i;
+    else if (m.price < 0 && /(단가|체결가|price|가격|매수가|매도가)/i.test(k)) m.price = i;
+    else if (m.qty < 0 && /(수량|qty|quantity|주식수|주수)/i.test(k)) m.qty = i;
+    else if (m.account < 0 && /(계좌|account)/i.test(k)) m.account = i;
+    else if (m.memo < 0 && /(메모|적요|memo|note|비고)/i.test(k)) m.memo = i;
+  });
+  return m;
+}
+
+function _normalizeImportDate(s) {
+  if (!s) return '';
+  const t = s.replace(/[./]/g, '-').trim();
+  const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  const m2 = s.replace(/\s+/g, '').match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
+  return '';
+}
+
+function _buildImportRows(dataRows, mapping) {
+  const rows = [];
+  for (const r of dataRows) {
+    if (r.every(c => !c || !String(c).trim())) continue;
+    const dateRaw = String(r[mapping.date] || '').trim();
+    const name = String(r[mapping.name] || '').trim();
+    const priceStr = String(r[mapping.price] || '').replace(/[,₩$\s]/g, '');
+    const qtyStr = String(r[mapping.qty] || '').replace(/[,\s]/g, '');
+    const typeRaw = mapping.type >= 0 ? String(r[mapping.type] || '').trim() : '매수';
+    const cat = mapping.category >= 0 ? String(r[mapping.category] || '').trim() : '';
+    const account = mapping.account >= 0 ? String(r[mapping.account] || '').trim() : '';
+    const memo = mapping.memo >= 0 ? String(r[mapping.memo] || '').trim() : '';
+    const date = _normalizeImportDate(dateRaw);
+    const type = /sell|매도/i.test(typeRaw) ? 'sell' : 'buy';
+    const price = Number(priceStr);
+    const qty = Number(qtyStr);
+    const valid = !!(name && date && price > 0 && qty > 0 && Number.isFinite(price) && Number.isFinite(qty));
+    rows.push({ valid, name, date, price: valid ? price : 0, qty: valid ? qty : 0, type, account, memo, cat });
+  }
+  return rows;
+}
+
+function _findExistingAsset(name) {
+  const n = name.trim().toLowerCase();
+  return appState.assets.find(a => a.name.trim().toLowerCase() === n) || null;
+}
+
+function _isDuplicateImportTxn(asset, row) {
+  if (!asset || !asset.txns) return false;
+  return asset.txns.some(t =>
+    t.date === row.date &&
+    t.type === row.type &&
+    Math.abs(safeNum(t.price) - row.price) < 0.01 &&
+    Math.abs(safeNum(t.qty) - row.qty) < 0.000001
+  );
+}
+
+function _openImportPreview(rows) {
+  const groups = new Map();
+  for (const r of rows) {
+    const k = r.name || '';
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  const assetDecisions = {};
+  for (const [name, list] of groups) {
+    const existing = _findExistingAsset(name);
+    if (existing) {
+      assetDecisions[name] = { mode: 'existing', assetId: existing.id };
+    } else {
+      const firstWithCat = list.find(r => CAT_IDS.includes(r.cat));
+      assetDecisions[name] = { mode: 'skip', newCat: firstWithCat ? firstWithCat.cat : '기타' };
+    }
+  }
+  _csvImportState = { rows, groups, assetDecisions, importDuplicates: false };
+  _renderImportPreview();
+}
+
+function _renderImportPreview() {
+  const { rows, groups, assetDecisions, importDuplicates } = _csvImportState;
+  let dupCount = 0, invalidCount = 0, skipCount = 0;
+  let willImport = 0, willCreateAssets = 0;
+  for (const r of rows) {
+    if (!r.valid) { invalidCount++; continue; }
+    const dec = assetDecisions[r.name];
+    if (!dec || dec.mode === 'skip') { skipCount++; continue; }
+    let target = null;
+    if (dec.mode === 'existing') target = appState.assets.find(a => a.id === dec.assetId);
+    if (target && _isDuplicateImportTxn(target, r)) {
+      dupCount++;
+      if (importDuplicates) willImport++;
+      continue;
+    }
+    willImport++;
+  }
+  for (const dec of Object.values(assetDecisions)) {
+    if (dec.mode === 'create') willCreateAssets++;
+  }
+
+  const container = $('#modalMain');
+  if (!container) return;
+  _modalCleanup.removeForElement(container);
+
+  const groupRows = [...groups.entries()].map(([name, rs]) => {
+    const dec = assetDecisions[name];
+    const existing = _findExistingAsset(name);
+    const sample = rs.find(r => r.valid) || rs[0];
+    const sampleSummary = sample ? `${sample.date} ${sample.type === 'sell' ? '매도' : '매수'} ${fmtNum(sample.price, 0)}×${fmtNum(sample.qty, 4)}` : '';
+    const dispName = name || '(이름없음)';
+    let selectedVal = 'skip';
+    if (dec.mode === 'existing') selectedVal = existing && dec.assetId === existing.id ? 'existing' : `map:${dec.assetId}`;
+    else if (dec.mode === 'create') selectedVal = 'create';
+    return `<tr>
+      <td><strong>${escHtml(dispName)}</strong><div class="hint-text">${rs.length}건 · 예: ${escHtml(sampleSummary)}</div></td>
+      <td>
+        <select class="csv-select" data-action="csv-asset-decision" data-name="${escAttr(name)}" aria-label="${escAttr(dispName)} 처리 방식">
+          <option value="skip" ${selectedVal === 'skip' ? 'selected' : ''}>건너뛰기</option>
+          ${existing ? `<option value="existing" ${selectedVal === 'existing' ? 'selected' : ''}>기존 자산에 추가 (${escHtml(existing.category)})</option>` : ''}
+          ${appState.assets.filter(a => !existing || a.id !== existing.id).map(a => `<option value="map:${escAttr(a.id)}" ${selectedVal === `map:${a.id}` ? 'selected' : ''}>매칭: ${escHtml(a.name)} (${escHtml(a.category)})</option>`).join('')}
+          <option value="create" ${selectedVal === 'create' ? 'selected' : ''}>새 자산 생성</option>
+        </select>
+        ${dec.mode === 'create' ? `
+          <select class="csv-select csv-cat-select" data-action="csv-asset-cat" data-name="${escAttr(name)}" aria-label="${escAttr(dispName)} 카테고리">
+            ${CAT_IDS.map(c => `<option value="${escAttr(c)}" ${dec.newCat === c ? 'selected' : ''}>${CAT_MAP[c].icon} ${escHtml(c)}</option>`).join('')}
+          </select>
+        ` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `<div class="modal-backdrop"></div>
+    <div class="modal-box modal-large" role="dialog" aria-label="CSV 가져오기 미리보기">
+      <div class="modal-header"><h3>📋 CSV 가져오기 미리보기</h3>
+        <button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div>
+      <div class="modal-body">
+        <div class="csv-import-summary">
+          <div>총 <strong>${rows.length}</strong>행 · 가져올 거래 <strong>${willImport}</strong>건${willCreateAssets > 0 ? ` · 자산 생성 <strong>${willCreateAssets}</strong>개` : ''}</div>
+          <div class="hint-text">중복 ${dupCount}건 · 건너뜀 ${skipCount}건 · 오류 ${invalidCount}건</div>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="csvImportDups" ${importDuplicates ? 'checked' : ''} data-action="csv-toggle-dups"> 중복도 함께 가져오기</label>
+          <div class="hint-text">기본은 같은 날짜·단가·수량·유형 거래 제외</div>
+        </div>
+        <div class="csv-import-table-wrap">
+          <table class="csv-import-table">
+            <thead><tr><th>자산명 (CSV)</th><th>처리 방식</th></tr></thead>
+            <tbody>${groupRows || '<tr><td colspan="2" class="hint-text">가져올 행이 없습니다</td></tr>'}</tbody>
+          </table>
+        </div>
+        ${invalidCount > 0 ? `<div class="hint-text" style="color:var(--danger);margin-top:8px">⚠️ 필수값(날짜/단가/수량) 누락된 ${invalidCount}건은 자동 제외됩니다</div>` : ''}
+        <div class="modal-actions">
+          <button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button>
+          <button class="btn-p" data-action="csv-import-confirm" ${willImport === 0 && willCreateAssets === 0 ? 'disabled' : ''}>가져오기 (${willImport}건)</button>
+        </div>
+      </div>
+    </div>`;
+  openModal('modalMain');
+
+  const clickHandler = (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const a = target.dataset.action;
+    if (a === 'close-modal') {
+      closeModal(target.dataset.modal || 'modalMain');
+      _csvImportState = null;
+    } else if (a === 'csv-import-confirm') {
+      _executeCSVImport();
+    }
+  };
+  const changeHandler = (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target || !_csvImportState) return;
+    const a = target.dataset.action;
+    if (a === 'csv-toggle-dups') {
+      _csvImportState.importDuplicates = !!target.checked;
+      _renderImportPreview();
+    } else if (a === 'csv-asset-decision') {
+      const name = target.dataset.name;
+      const v = target.value;
+      const dec = _csvImportState.assetDecisions[name];
+      if (v === 'skip') dec.mode = 'skip';
+      else if (v === 'existing') {
+        const existing = _findExistingAsset(name);
+        if (existing) { dec.mode = 'existing'; dec.assetId = existing.id; }
+      } else if (v === 'create') {
+        dec.mode = 'create';
+      } else if (v.startsWith('map:')) {
+        dec.mode = 'existing';
+        dec.assetId = v.slice(4);
+      }
+      _renderImportPreview();
+    } else if (a === 'csv-asset-cat') {
+      _csvImportState.assetDecisions[target.dataset.name].newCat = target.value;
+    }
+  };
+  _modalCleanup.add(container, 'click', clickHandler);
+  _modalCleanup.add(container, 'change', changeHandler);
+}
+
+function _executeCSVImport() {
+  const { rows, assetDecisions, importDuplicates } = _csvImportState;
+  let imported = 0, created = 0, skipped = 0, dupSkipped = 0, errors = 0;
+
+  const newAssetIds = {};
+  for (const [name, dec] of Object.entries(assetDecisions)) {
+    if (dec.mode !== 'create') continue;
+    const newAsset = addAsset({ name, category: dec.newCat || '기타' });
+    if (newAsset) { newAssetIds[name] = newAsset.id; created++; }
+  }
+
+  for (const r of rows) {
+    if (!r.valid) { errors++; continue; }
+    const dec = assetDecisions[r.name];
+    if (!dec || dec.mode === 'skip') { skipped++; continue; }
+    let assetId = null;
+    if (dec.mode === 'existing') assetId = dec.assetId;
+    else if (dec.mode === 'create') assetId = newAssetIds[r.name];
+    if (!assetId) { skipped++; continue; }
+    const asset = appState.assets.find(a => a.id === assetId);
+    if (!asset) { skipped++; continue; }
+    if (_isDuplicateImportTxn(asset, r) && !importDuplicates) { dupSkipped++; continue; }
+    const ok = addTransaction(assetId, {
+      type: r.type,
+      price: r.price,
+      qty: r.qty,
+      date: r.date,
+      account: r.account || null,
+      memo: r.memo || null,
+    });
+    if (ok) imported++; else errors++;
+  }
+
+  closeModal('modalMain');
+  _csvImportState = null;
+
+  const parts = [`📋 CSV 가져오기 완료 · 거래 ${imported}건 추가`];
+  if (created > 0) parts.push(`자산 ${created}개 생성`);
+  if (dupSkipped > 0) parts.push(`중복 ${dupSkipped}건 제외`);
+  if (skipped > 0) parts.push(`건너뜀 ${skipped}건`);
+  if (errors > 0) parts.push(`오류 ${errors}건`);
+  showToast(parts.join(' · '), imported > 0 || created > 0 ? 'success' : 'info');
+  render();
 }
 
 // ── PDF Export ──
