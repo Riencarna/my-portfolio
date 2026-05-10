@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.23.0 — App Entry Point
+   My Portfolio v5.23.1 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -347,9 +347,9 @@ function renderPageHeader() {
       ${currentTab === 'pgInc' ? `
         <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 수입 추가</button>
       ` : ''}
-      <button class="btn-icon" data-action="toggle-theme"
-        aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}"
-        title="${isDark ? '라이트 모드' : '다크 모드'}">${isDark ? '☀️' : '🌙'}</button>
+      <button class="btn-icon header-theme-btn" id="headerThemeBtn" data-action="toggle-theme"
+        aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'} · 길게 누르면 OS 자동"
+        title="탭: 테마 토글 / 길게: OS 자동">${isDark ? '☀️' : '🌙'}</button>
     </div>
   `;
 
@@ -362,6 +362,44 @@ function renderPageHeader() {
     else if (action === 'open-add-income') openAddIncome();
     else if (action === 'toggle-theme') toggleTheme();
   };
+
+  setupThemeLongPress($('#headerThemeBtn'));
+}
+
+// 헤더 테마 버튼: 짧게 탭 → 토글, 길게(600ms) → OS 자동
+function setupThemeLongPress(btn) {
+  if (!btn) return;
+  const LONG_MS = 600;
+  let timer = null;
+  let triggered = false;
+
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+  btn.addEventListener('pointerdown', (e) => {
+    triggered = false;
+    cancel();
+    timer = setTimeout(() => {
+      triggered = true;
+      timer = null;
+      setThemeAuto();
+      if (typeof showToast === 'function') showToast('🖥️ OS 자동 테마로 전환', 'info');
+    }, LONG_MS);
+  });
+  btn.addEventListener('pointerup', cancel);
+  btn.addEventListener('pointercancel', cancel);
+  btn.addEventListener('pointerleave', cancel);
+
+  // long press가 발동했으면 그 후의 click(toggle)을 무시
+  btn.addEventListener('click', (e) => {
+    if (triggered) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      triggered = false;
+    }
+  }, true);
+
+  // iOS Safari 길게 누르기 시 컨텍스트 메뉴/텍스트 선택 방지
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 // ── Tab Content (Directional Slide) ──
