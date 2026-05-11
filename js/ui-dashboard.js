@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.2 — Dashboard UI
+   My Portfolio v5.25.3 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -165,10 +165,9 @@ function _renderDashToolbar(editMode) {
       </div>
     `;
   }
+  // 비편집 모드: 점선 toolbar 래퍼 없이 버튼만 — 버튼은 .dash-edit-toggle의 absolute positioning으로 #pgDash 우측 상단에 떠 있음
   return `
-    <div class="dash-toolbar" role="toolbar" aria-label="대시보드 도구">
-      <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
-    </div>
+    <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
   `;
 }
 
