@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.3 — Stylesheet
+   My Portfolio v5.25.4 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -781,7 +781,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   margin:-4px 0 12px;line-height:1.5}
 .form-hint-info strong{color:var(--primary);font-weight:700}
 
-/* ── USDT 변경 이력 (v5.25.3) ── */
+/* ── USDT 변경 이력 (v5.25.4) ── */
 .usdt-hist-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--bd)}
 .usdt-hist-section h4{margin-bottom:12px;font-size:14px;color:var(--t1)}
 .usdt-hist-list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
@@ -795,7 +795,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .usdt-hist-details-empty{font-size:11px;color:var(--t4);font-style:italic}
 .usdt-hist-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:4px}
 
-/* ── 자동 백업 관리 (v5.25.3) ── */
+/* ── 자동 백업 관리 (v5.25.4) ── */
 .auto-bk-summary{display:flex;gap:18px;padding:12px 14px;background:var(--surface-alt);border-radius:var(--radius-md);border:1px solid var(--bd);font-size:13px;color:var(--t2);margin-bottom:10px}
 .auto-bk-summary strong{color:var(--t1)}
 .auto-bk-info{font-size:12px;color:var(--t4);margin-bottom:14px;padding:8px 12px;border-left:3px solid var(--primary);background:var(--surface-alt);border-radius:var(--radius-sm);line-height:1.5}
@@ -948,7 +948,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .alloc-cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
 .alloc-cat-field{display:flex;align-items:center;justify-content:space-between;gap:8px;
   padding:8px 10px;background:var(--surface-alt);border:1px solid var(--bd);border-radius:var(--radius-md)}
-.alloc-cat-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--t2)}
+.alloc-cat-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--t2);white-space:nowrap}
 .alloc-cat-icon{font-size:14px}
 .alloc-cat-input,.alloc-asset-input{width:64px;text-align:right;padding:4px 6px;font-size:13px}
 .alloc-pct-wrap{display:inline-flex;align-items:center;gap:2px}

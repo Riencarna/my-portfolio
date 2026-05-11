@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.3 — Modals UI
+   My Portfolio v5.25.4 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -508,7 +508,7 @@ function openAssetDetail(id) {
   _setupModalMainDelegation(container);
 }
 
-// ── USDT 변경 이력 섹션 (v5.25.3) ──
+// ── USDT 변경 이력 섹션 (v5.25.4) ──
 function _renderUsdtHistorySection(asset) {
   const list = asset.usdtHistory || [];
   const items = list.slice().reverse().map((h, revIdx) => {
@@ -578,7 +578,7 @@ function doDeleteUsdtHistory(assetId, idxStr) {
   });
 }
 
-// ── Auto Backup Manager (v5.25.3) ──
+// ── Auto Backup Manager (v5.25.4) ──
 function openAutoBackupManager() {
   _modalCleanup.removeAll();
   const container = $('#modalMain');

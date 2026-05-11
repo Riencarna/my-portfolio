@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.3 — History & Export UI
+   My Portfolio v5.25.4 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
