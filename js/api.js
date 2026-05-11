@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.25.0 — API Integration
+   My Portfolio v5.25.2 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
-   v5.25.0: stale 가격 감지 (사일런트 실패 방지)
+   v5.25.2: stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -140,9 +140,35 @@ async function corsFetch(url, timeout = API_TIMEOUT) {
 }
 
 // ── Exchange Rate (USD -> KRW) ──
+// 우선순위: Yahoo KRW=X → Daum FRX.KRWUSD → open.er-api → floatrates.
+// 앞 두 곳은 실시간 외환시세, 뒤 두 곳은 하루 1~2회 갱신되는 reference rate라 폴백 전용.
+// Upbit USDC/USDT는 김치프리미엄이 끼어 환율 지표로 부적합 → 제외.
 async function fetchExchangeRate(force = false) {
   if (!force && cachedRate && Date.now() - cachedRate.time < CACHE_TTL_RATE) {
     return cachedRate.rate;
+  }
+  try {
+    const r = await corsFetch(`${API.yahoo}/v8/finance/chart/KRW=X?interval=1m&range=1d`, 5000);
+    const d = await r.json();
+    const price = d.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if (Number.isFinite(price) && price > 0) {
+      cachedRate = { rate: price, time: Date.now(), source: 'yahoo' };
+      saveLastRate('usdkrw', cachedRate.rate, 'yahoo');
+      return cachedRate.rate;
+    }
+  } catch (e) {
+    console.warn('fetchExchangeRate yahoo failed:', e.message);
+  }
+  try {
+    const r = await corsFetch(`${API.daum}/FRX.KRWUSD`, 5000);
+    const d = await r.json();
+    if (Number.isFinite(d.basePrice) && d.basePrice > 0) {
+      cachedRate = { rate: d.basePrice, time: Date.now(), source: 'daum' };
+      saveLastRate('usdkrw', cachedRate.rate, 'daum');
+      return cachedRate.rate;
+    }
+  } catch (e) {
+    console.warn('fetchExchangeRate daum failed:', e.message);
   }
   try {
     const r = await fetchWithTimeout(API.openER, 5000);
@@ -437,7 +463,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.25.0
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.25.2
   const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
   const isStale = (asset, newPrice) => {
     if (newPrice == null || !isFinite(newPrice)) return false;

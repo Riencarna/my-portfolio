@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.0 — App Entry Point
+   My Portfolio v5.25.2 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */

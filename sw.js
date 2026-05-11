@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.25.0
+/* Service Worker - My Portfolio v5.25.2
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.25.0";
+var CACHE_NAME = "myportfolio-v5.25.2";
 
 var STATIC_ASSETS = [
   "./",
@@ -37,7 +37,7 @@ var API_HOSTS = [
   "asset-manage-alpaca.wnsduf0306.workers.dev",
   "stooq.com",
   "open.er-api.com", "www.floatrates.com",
-  "api.upbit.com", "api.bithumb.com",
+  "api.upbit.com", "api.bithumb.com", "finance.daum.net",
   "ethereum-rpc.publicnode.com", "bsc-dataseed.binance.org",
   "polygon-rpc.com", "arb1.arbitrum.io",
   "mainnet.optimism.io", "api.avax.network"
