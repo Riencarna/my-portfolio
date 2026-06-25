@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.26.0 — History & Export UI
+   My Portfolio v5.27.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -12,6 +12,10 @@ function renderHistory() {
   const usagePct = ((usage / LIMITS.storage) * 100).toFixed(1);
   const usageNum = Math.min(Number(usagePct), 100);
   const usageBarClass = usageNum > 80 ? 'progress-fill-danger' : 'progress-fill';
+  const storageBackend = getStorageBackendInfo();
+  const migratedAt = storageBackend.migratedAt
+    ? `${storageBackend.migratedAt.slice(0, 10)} ${storageBackend.migratedAt.slice(11, 16)}`
+    : '';
 
   container.innerHTML = `
     <div class="card stagger-item" style="--i:0" role="region" aria-label="데이터 관리">
@@ -21,7 +25,11 @@ function renderHistory() {
           aria-label="저장소 사용량 ${usagePct}%">
           <div class="${usageBarClass}" style="width:${usageNum}%"></div>
         </div>
-        <span>저장소: ${(usage / 1024).toFixed(0)}KB / ${(LIMITS.storage / 1024 / 1024).toFixed(0)}MB (${usagePct}%)</span>
+        <span>localStorage: ${(usage / 1024).toFixed(0)}KB / ${(LIMITS.storage / 1024 / 1024).toFixed(0)}MB (${usagePct}%)</span>
+        <div class="storage-meta">
+          <span class="storage-pill ${storageBackend.usingIndexedDB ? 'storage-pill-ok' : ''}">저장 방식: ${escHtml(storageBackend.label)}</span>
+          ${migratedAt ? `<span class="storage-pill">이전: ${escHtml(migratedAt)}</span>` : ''}
+        </div>
       </div>
       <div class="action-grid" role="group" aria-label="데이터 관리 버튼">
         <button class="btn-action" data-action="backup-json" aria-label="JSON 백업 다운로드">
@@ -32,6 +40,12 @@ function renderHistory() {
         </button>
         <button class="btn-action" data-action="open-auto-backup-manager" aria-label="자동 백업 관리">
           <span class="btn-action-icon" aria-hidden="true">🗂</span><span>자동 백업</span>
+        </button>
+        <button class="btn-action" data-action="compact-auto-backups" aria-label="오래된 자동 백업 정리">
+          <span class="btn-action-icon" aria-hidden="true">🧹</span><span>백업 정리</span>
+        </button>
+        <button class="btn-action" data-action="migrate-idb" aria-label="IndexedDB 저장소 이전">
+          <span class="btn-action-icon" aria-hidden="true">🧱</span><span>${storageBackend.usingIndexedDB ? 'IndexedDB 점검' : 'IndexedDB 이전'}</span>
         </button>
         <button class="btn-action" data-action="export-csv" data-type="assets" aria-label="자산 CSV 내보내기">
           <span class="btn-action-icon" aria-hidden="true">📊</span><span>자산 CSV</span>
@@ -263,6 +277,8 @@ function _setupHistoryDelegation(container) {
     if (action === 'backup-json') doBackupJSON();
     else if (action === 'restore-json') doRestoreJSON();
     else if (action === 'open-auto-backup-manager') openAutoBackupManager();
+    else if (action === 'compact-auto-backups') doCompactAutoBackups(1);
+    else if (action === 'migrate-idb') doMigrateIndexedDB();
     else if (action === 'export-csv') doExportCSV(target.dataset.type);
     else if (action === 'import-csv') doImportCSV();
     else if (action === 'export-pdf') doExportPDF();
@@ -485,6 +501,27 @@ function doRestoreJSON() {
     }
   };
   input.click();
+}
+
+function doMigrateIndexedDB() {
+  const backend = getStorageBackendInfo();
+  const msg = backend.usingIndexedDB
+    ? 'IndexedDB 저장소를 다시 점검하고 localStorage에 남은 큰 데이터가 있으면 정리할까요?'
+    : '현재 포트폴리오 데이터와 자동 백업을 IndexedDB로 이전할까요?\n복사 성공 후 localStorage의 큰 데이터만 정리됩니다.';
+  openConfirmModal(msg, async () => {
+    try {
+      saveDataNow();
+      const result = await migrateStorageToIndexedDB({ force: true, cleanup: true, includeMemory: true });
+      renderHistory();
+      const freed = result.bytesFreed >= 1024 * 1024
+        ? `${(result.bytesFreed / 1024 / 1024).toFixed(1)}MB`
+        : `${(result.bytesFreed / 1024).toFixed(0)}KB`;
+      showToast(`IndexedDB 이전 완료 · localStorage 약 ${freed} 정리`, 'success');
+    } catch (e) {
+      console.error('IndexedDB migration failed:', e);
+      showToast(`IndexedDB 이전 실패: ${e.message || e}`, 'error');
+    }
+  });
 }
 
 // ── CSV Export ──
@@ -907,8 +944,9 @@ function doResetAll() {
   openConfirmModal(
     '모든 데이터가 영구 삭제됩니다. 백업을 먼저 하시는 것을 권장합니다. 정말 초기화하시겠습니까?',
     () => {
-      openConfirmModal('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', () => {
-        resetAllData();
+      openConfirmModal('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', async () => {
+        resetAllData({ skipSave: true });
+        await clearIndexedDBStorage();
         localStorage.clear();
         sessionStorage.clear();
         if ('serviceWorker' in navigator) {

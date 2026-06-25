@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.26.0 — Modals UI
+   My Portfolio v5.27.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -187,6 +187,8 @@ function _setupModalMainDelegation(container) {
     else if (action === 'delete-usdt-history') { e.stopPropagation(); doDeleteUsdtHistory(target.dataset.id, target.dataset.idx); }
     else if (action === 'restore-auto-backup') { doRestoreAutoBackup(target.dataset.id); }
     else if (action === 'delete-auto-backup') { e.stopPropagation(); doDeleteAutoBackup(target.dataset.id); }
+    else if (action === 'compact-auto-backups') { e.stopPropagation(); doCompactAutoBackups(Number(target.dataset.keep || 1)); }
+    else if (action === 'clear-auto-backups') { e.stopPropagation(); doClearAutoBackups(); }
     else if (action === 'open-auto-backup-manager') openAutoBackupManager();
     else if (action === 'create-portfolio') doCreatePortfolio();
     else if (action === 'wallet-scan') doWalletScan();
@@ -622,8 +624,12 @@ function openAutoBackupManager() {
         <div>보관 중: <strong>${list.length}/${LIMITS.autoBackup}건</strong></div>
         <div>차지 용량: <strong>${(totalBytes / 1024).toFixed(0)}KB</strong></div>
       </div>
+      <div class="auto-bk-toolbar" role="group" aria-label="자동 백업 정리">
+        <button class="btn-sm" data-action="compact-auto-backups" data-keep="1" ${list.length <= 1 ? 'disabled' : ''}>최신 1개만 남기기</button>
+        <button class="btn-sm btn-danger" data-action="clear-auto-backups" ${list.length === 0 ? 'disabled' : ''}>전체 삭제</button>
+      </div>
       <div class="auto-bk-info">
-        매일 자동 + 자산 추가/삭제/수정 시 자동 저장됩니다. 최대 ${LIMITS.autoBackup}건까지 보관.
+        매일 자동 + 자산 추가/삭제/수정 시 자동 저장됩니다. 저장소가 부족하면 먼저 오래된 자동 백업을 정리하세요.
       </div>
       <div class="auto-bk-list" role="list">${items}</div>
     </div>
@@ -656,6 +662,45 @@ function doDeleteAutoBackup(id) {
     deleteAutoBackup(id);
     showToast('백업 삭제됨', 'success');
     openAutoBackupManager();
+    if (currentTab === 'pgHist') renderHistory();
+  });
+}
+
+function _autoBackupFreedLabel(bytes) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
+    : `${(bytes / 1024).toFixed(0)}KB`;
+}
+
+function doCompactAutoBackups(keep = 1) {
+  const list = loadAutoBackups();
+  if (list.length <= keep) {
+    showToast('정리할 오래된 자동 백업이 없습니다', 'info');
+    return;
+  }
+  openConfirmModal(
+    `자동 백업을 최신 ${keep}개만 남기고 정리하시겠습니까?\nJSON 백업을 이미 받아두었다면 저장소 용량을 빠르게 줄일 수 있습니다.`,
+    () => {
+      const result = compactAutoBackups(keep);
+      showToast(`자동 백업 ${result.removed}건 정리됨 · 약 ${_autoBackupFreedLabel(result.freedBytes)} 확보`, 'success');
+      openAutoBackupManager();
+      if (currentTab === 'pgHist') renderHistory();
+    }
+  );
+}
+
+function doClearAutoBackups() {
+  const list = loadAutoBackups();
+  if (list.length === 0) {
+    showToast('삭제할 자동 백업이 없습니다', 'info');
+    return;
+  }
+  const message = '자동 백업 ' + list.length + '건을 모두 삭제하시겠습니까?\nJSON 백업 파일을 따로 보관한 경우에만 진행하세요.';
+  openConfirmModal(message, () => {
+    const result = clearAutoBackups();
+    showToast('자동 백업 전체 삭제됨 · 약 ' + _autoBackupFreedLabel(result.freedBytes) + ' 확보', 'success');
+    openAutoBackupManager();
+    if (currentTab === 'pgHist') renderHistory();
   });
 }
 
@@ -868,7 +913,7 @@ function openPortfolioManager() {
 async function doSwitchPortfolio(pid) {
   if (pid === activePortfolioId) return;
   UIState.reset();
-  switchPortfolio(pid);
+  await switchPortfolio(pid);
   await closeAllModals();
   render();
   showToast('포트폴리오 변경됨', 'success');
@@ -877,10 +922,10 @@ async function doSwitchPortfolio(pid) {
 async function doCreatePortfolio() {
   const name = $('#newPfName')?.value.trim();
   if (!name) { showToast('이름을 입력하세요', 'error'); return; }
-  const id = createPortfolio(name);
+  const id = await createPortfolio(name);
   if (id) {
     UIState.reset();
-    switchPortfolio(id);
+    await switchPortfolio(id);
     await closeAllModals();
     render();
     showToast(`"${name}" 생성됨`, 'success');
@@ -906,8 +951,8 @@ function doDeletePortfolio(pid, name) {
     openConfirmModal(
       `정말로 삭제하시겠습니까?\n"${name}" 안의 모든 자산 데이터가 영구 삭제되며 복구할 수 없습니다.`,
       async () => {
-        deletePortfolio(pid);
-        loadData();
+        await deletePortfolio(pid);
+        await loadData();
         await closeAllModals();
         render();
         showToast('포트폴리오 삭제됨');

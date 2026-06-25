@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.26.0 — Configuration
+   My Portfolio v5.27.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.26.0';
+const APP_VERSION = '5.27.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -77,6 +77,11 @@ const DASH_PREFS_KEY = 'mp_dash_prefs';
 const PRESETS_KEY = 'mp_presets';
 const AUTO_BACKUP_KEY = 'mp_autobackup';
 const GEMINI_API_KEY_KEY = 'mp_gemini_api_key';
+const IDB_DB_NAME = 'myportfolio_db';
+const IDB_DB_VERSION = 1;
+const IDB_STORE_NAME = 'kv';
+const IDB_DATA_MODE_KEY = 'mp_storage_backend';
+const IDB_MIGRATED_AT_KEY = 'mp_idb_migrated_at';
 
 // Limits
 const LIMITS = Object.freeze({

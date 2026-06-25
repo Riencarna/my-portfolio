@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.26.0 — App Entry Point
+   My Portfolio v5.27.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -24,7 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     loadTheme();
     initPortfolio();
-    loadData();
+    await initStorageBackend();
+    await loadData();
     restoreLastTab();
     render();
     removeSplash();

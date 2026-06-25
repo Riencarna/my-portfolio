@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.26.0 — State Management
+   My Portfolio v5.27.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -20,6 +20,8 @@ function defaultState() {
 // ── Global State ──
 let appState = defaultState();
 let activePortfolioId = 'default';
+let _idbPromise = null;
+let _idbAvailable = false;
 
 // ── Debounced Save ──
 let _saveTimer = null;
@@ -39,10 +41,234 @@ function saveData() {
   return true;
 }
 
+// ── IndexedDB Storage Backend ──
+function _canUseIndexedDB() {
+  return _idbAvailable && localStorage.getItem(IDB_DATA_MODE_KEY) === 'indexeddb';
+}
+
+function isIndexedDBMode() {
+  return localStorage.getItem(IDB_DATA_MODE_KEY) === 'indexeddb';
+}
+
+function getStorageBackendInfo() {
+  const usingIndexedDB = _canUseIndexedDB();
+  return {
+    usingIndexedDB,
+    available: _idbAvailable,
+    label: usingIndexedDB ? 'IndexedDB' : 'localStorage',
+    migratedAt: localStorage.getItem(IDB_MIGRATED_AT_KEY) || '',
+  };
+}
+
+function _openAppDb() {
+  if (typeof indexedDB === 'undefined') {
+    return Promise.reject(new Error('IndexedDB를 사용할 수 없습니다'));
+  }
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        db.createObjectStore(IDB_STORE_NAME, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => {
+      _idbPromise = null;
+      reject(req.error || new Error('IndexedDB 열기 실패'));
+    };
+    req.onblocked = () => console.warn('IndexedDB migration is blocked by another open tab.');
+  });
+  return _idbPromise;
+}
+
+async function _idbGet(key) {
+  const db = await _openAppDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE_NAME, 'readonly');
+    const req = tx.objectStore(IDB_STORE_NAME).get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.value : null);
+    req.onerror = () => reject(req.error || new Error('IndexedDB 읽기 실패'));
+  });
+}
+
+async function _idbSet(key, value) {
+  const db = await _openAppDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB 저장 실패'));
+    tx.objectStore(IDB_STORE_NAME).put({ key, value, updatedAt: new Date().toISOString() });
+  });
+}
+
+async function _idbRemove(key) {
+  const db = await _openAppDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB 삭제 실패'));
+    tx.objectStore(IDB_STORE_NAME).delete(key);
+  });
+}
+
+async function clearIndexedDBStorage() {
+  if (typeof indexedDB === 'undefined') return false;
+  try {
+    if (_idbPromise) {
+      const db = await _idbPromise.catch(() => null);
+      if (db) db.close();
+      _idbPromise = null;
+    }
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(IDB_DB_NAME);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error || new Error('IndexedDB 초기화 실패'));
+      req.onblocked = () => resolve(false);
+    });
+    _idbAvailable = false;
+    _autoBackupCache = null;
+    return true;
+  } catch (e) {
+    console.warn('clearIndexedDBStorage failed:', e);
+    return false;
+  }
+}
+
+function _parseAutoBackupRaw(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter(b => b && b.id && typeof b.json === 'string')
+      : [];
+  } catch (e) {
+    console.warn('_parseAutoBackupRaw failed:', e);
+    return [];
+  }
+}
+
+async function _preloadAutoBackupsFromIDB() {
+  if (!_canUseIndexedDB()) return false;
+  const raw = await _idbGet(AUTO_BACKUP_KEY);
+  _autoBackupCache = _parseAutoBackupRaw(raw);
+  return true;
+}
+
+function _portfolioStorageKeys() {
+  const keys = new Set([STORAGE_KEY]);
+  const meta = loadPortfolioMeta();
+  for (const pf of meta.list || []) {
+    if (pf && pf.id) keys.add(getStorageKey(pf.id));
+  }
+  return [...keys];
+}
+
+async function migrateStorageToIndexedDB(options = {}) {
+  const opts = {
+    cleanup: true,
+    force: false,
+    includeMemory: false,
+    ...options,
+  };
+  if (typeof indexedDB === 'undefined') {
+    throw new Error('이 브라우저에서는 IndexedDB를 사용할 수 없습니다');
+  }
+
+  _idbAvailable = true;
+  if (_canUseIndexedDB() && !opts.force) {
+    await _preloadAutoBackupsFromIDB();
+    return { migrated: false, already: true, copied: 0, bytesFreed: 0 };
+  }
+
+  const beforeUsage = getStorageUsage();
+  const keys = _portfolioStorageKeys();
+  let copied = 0;
+  let copiedBytes = 0;
+
+  for (const key of keys) {
+    const raw = localStorage.getItem(key);
+    if (raw == null) continue;
+    await _idbSet(key, raw);
+    copied += 1;
+    copiedBytes += raw.length * 2;
+  }
+
+  const rawBackups = localStorage.getItem(AUTO_BACKUP_KEY);
+  if (rawBackups != null) {
+    await _idbSet(AUTO_BACKUP_KEY, rawBackups);
+    copied += 1;
+    copiedBytes += rawBackups.length * 2;
+  }
+
+  if (opts.includeMemory) {
+    const memoryJson = JSON.stringify(appState);
+    await _idbSet(getStorageKey(activePortfolioId), memoryJson);
+    copied += 1;
+    copiedBytes += memoryJson.length * 2;
+  }
+
+  localStorage.setItem(IDB_DATA_MODE_KEY, 'indexeddb');
+  localStorage.setItem(IDB_MIGRATED_AT_KEY, new Date().toISOString());
+
+  if (opts.cleanup) {
+    for (const key of keys) {
+      try { localStorage.removeItem(key); } catch (e) { console.warn('localStorage cleanup failed:', key, e); }
+    }
+    try { localStorage.removeItem(AUTO_BACKUP_KEY); } catch (e) { console.warn('auto backup cleanup failed:', e); }
+  }
+
+  _invalidateStorageCache();
+  await _preloadAutoBackupsFromIDB();
+  return {
+    migrated: true,
+    already: false,
+    copied,
+    copiedBytes,
+    bytesFreed: Math.max(0, beforeUsage - getStorageUsage()),
+  };
+}
+
+async function initStorageBackend() {
+  if (typeof indexedDB === 'undefined') {
+    _idbAvailable = false;
+    return false;
+  }
+  try {
+    _idbAvailable = true;
+    if (!isIndexedDBMode()) {
+      await migrateStorageToIndexedDB({ cleanup: true, includeMemory: false });
+    } else {
+      await _preloadAutoBackupsFromIDB();
+    }
+    return true;
+  } catch (e) {
+    _idbAvailable = false;
+    console.warn('initStorageBackend failed, falling back to localStorage:', e);
+    return false;
+  }
+}
+
 function _doSave() {
   try {
     appState.saved = new Date().toISOString();
     const json = JSON.stringify(appState);
+    if (_canUseIndexedDB()) {
+      const key = getStorageKey(activePortfolioId);
+      _idbSet(key, json)
+        .then(() => {
+          try { localStorage.removeItem(key); } catch (e) { console.warn('localStorage cleanup failed:', e); }
+          _invalidateStorageCache();
+        })
+        .catch(e => {
+          console.error('Failed to save data to IndexedDB:', e);
+          showToast('IndexedDB 저장 실패. JSON 백업을 확인해주세요.', 'error');
+        });
+      EventBus.emit('dataSaved');
+      tryAutoBackup('daily');
+      return true;
+    }
     if (json.length > LIMITS.storage) {
       showToast(`저장 공간 부족! (${(json.length / 1024).toFixed(0)}KB / ${(LIMITS.storage / 1024).toFixed(0)}KB)`, 'error');
       return false;
@@ -70,12 +296,10 @@ function loadAutoBackups() {
   if (_autoBackupCache) return _autoBackupCache;
   try {
     const raw = localStorage.getItem(AUTO_BACKUP_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        _autoBackupCache = parsed.filter(b => b && b.id && typeof b.json === 'string');
-        return _autoBackupCache;
-      }
+    const parsed = _parseAutoBackupRaw(raw);
+    if (parsed.length > 0) {
+      _autoBackupCache = parsed;
+      return _autoBackupCache;
     }
   } catch (e) {
     console.warn('loadAutoBackups failed:', e);
@@ -86,6 +310,18 @@ function loadAutoBackups() {
 
 function _saveAutoBackups(list) {
   _autoBackupCache = list;
+  if (_canUseIndexedDB()) {
+    _idbSet(AUTO_BACKUP_KEY, JSON.stringify(list))
+      .then(() => {
+        try { localStorage.removeItem(AUTO_BACKUP_KEY); } catch (e) { console.warn('auto backup cleanup failed:', e); }
+        _invalidateStorageCache();
+      })
+      .catch(e => {
+        console.warn('_saveAutoBackups IndexedDB failed:', e);
+        showToast('자동 백업 저장 실패. JSON 백업을 확인해주세요.', 'error');
+      });
+    return true;
+  }
   try {
     localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(list));
     _invalidateStorageCache();
@@ -153,8 +389,26 @@ function deleteAutoBackup(id) {
 }
 
 function clearAutoBackups() {
+  const before = loadAutoBackups();
+  const freedBytes = before.reduce((s, b) => s + (b.json ? b.json.length : 0), 0);
   _saveAutoBackups([]);
   EventBus.emit('autoBackupChanged');
+  return { removed: before.length, freedBytes };
+}
+
+function compactAutoBackups(keep = 1) {
+  const keepCount = Math.max(0, Math.min(LIMITS.autoBackup, Number(keep) || 0));
+  const list = loadAutoBackups();
+  const beforeBytes = list.reduce((s, b) => s + (b.json ? b.json.length : 0), 0);
+  const kept = keepCount > 0 ? list.slice(-keepCount) : [];
+  const afterBytes = kept.reduce((s, b) => s + (b.json ? b.json.length : 0), 0);
+  _saveAutoBackups(kept);
+  EventBus.emit('autoBackupChanged');
+  return {
+    removed: Math.max(0, list.length - kept.length),
+    kept: kept.length,
+    freedBytes: Math.max(0, beforeBytes - afterBytes),
+  };
 }
 
 function restoreAutoBackup(id) {
@@ -221,19 +475,19 @@ function initPortfolio() {
   }
 }
 
-function switchPortfolio(pid) {
+async function switchPortfolio(pid) {
   const meta = loadPortfolioMeta();
   if (!meta.list.find(p => p.id === pid)) return false;
   saveDataNow();
   activePortfolioId = pid;
   meta.active = pid;
   savePortfolioMeta(meta);
-  loadData();
+  await loadData();
   EventBus.emit('portfolioChanged', pid);
   return true;
 }
 
-function createPortfolio(name) {
+async function createPortfolio(name) {
   const meta = loadPortfolioMeta();
   if (meta.list.length >= LIMITS.portfolios) {
     showToast(`포트폴리오는 최대 ${LIMITS.portfolios}개까지`, 'error');
@@ -245,7 +499,14 @@ function createPortfolio(name) {
   meta.list.push({ id, name: cleanName });
   savePortfolioMeta(meta);
   try {
-    localStorage.setItem(getStorageKey(id), JSON.stringify(defaultState()));
+    const key = getStorageKey(id);
+    const json = JSON.stringify(defaultState());
+    if (_canUseIndexedDB()) {
+      await _idbSet(key, json);
+      try { localStorage.removeItem(key); } catch (e) { console.warn('createPortfolio cleanup failed:', e); }
+    } else {
+      localStorage.setItem(key, json);
+    }
   } catch (e) {
     console.error('Failed to create portfolio:', e);
     showToast('포트폴리오 생성 실패', 'error');
@@ -264,11 +525,15 @@ function renamePortfolio(pid, name) {
   savePortfolioMeta(meta);
 }
 
-function deletePortfolio(pid) {
+async function deletePortfolio(pid) {
   if (pid === 'default') { showToast('기본 포트폴리오는 삭제 불가', 'error'); return false; }
   const meta = loadPortfolioMeta();
   meta.list = meta.list.filter(p => p.id !== pid);
-  try { localStorage.removeItem(getStorageKey(pid)); } catch (e) {
+  const key = getStorageKey(pid);
+  if (_canUseIndexedDB()) {
+    try { await _idbRemove(key); } catch (e) { console.warn('deletePortfolio: failed to remove IndexedDB key', e); }
+  }
+  try { localStorage.removeItem(key); } catch (e) {
     console.warn('deletePortfolio: failed to remove storage key', e);
   }
   if (meta.active === pid) {
@@ -289,24 +554,31 @@ function _migrateOldFormat(d) {
   return d;
 }
 
+function _applyLoadedState(raw) {
+  const parsed = _migrateOldFormat(JSON.parse(raw));
+  appState = { ...defaultState(), ...parsed };
+  if (!Array.isArray(appState.assets)) appState.assets = [];
+  if (!Array.isArray(appState.history)) appState.history = [];
+  if (!Array.isArray(appState.income)) appState.income = [];
+  if (!Array.isArray(appState.categoryOrder)) appState.categoryOrder = [...CAT_IDS];
+  for (const cid of CAT_IDS) {
+    if (!appState.categoryOrder.includes(cid)) appState.categoryOrder.push(cid);
+  }
+  appState.categoryOrder = appState.categoryOrder.filter(c => CAT_IDS.includes(c));
+  appState.assets = appState.assets.slice(0, LIMITS.assets).map(sanitizeAsset);
+  appState.history = appState.history.slice(-LIMITS.history);
+  appState.income = appState.income.map(sanitizeIncome);
+}
+
 // ── Data Persistence ──
-function loadData() {
+async function loadData() {
   try {
-    const raw = localStorage.getItem(getStorageKey(activePortfolioId));
+    const key = getStorageKey(activePortfolioId);
+    let raw = null;
+    if (_canUseIndexedDB()) raw = await _idbGet(key);
+    if (!raw) raw = localStorage.getItem(key);
     if (raw) {
-      const parsed = _migrateOldFormat(JSON.parse(raw));
-      appState = { ...defaultState(), ...parsed };
-      if (!Array.isArray(appState.assets)) appState.assets = [];
-      if (!Array.isArray(appState.history)) appState.history = [];
-      if (!Array.isArray(appState.income)) appState.income = [];
-      if (!Array.isArray(appState.categoryOrder)) appState.categoryOrder = [...CAT_IDS];
-      for (const cid of CAT_IDS) {
-        if (!appState.categoryOrder.includes(cid)) appState.categoryOrder.push(cid);
-      }
-      appState.categoryOrder = appState.categoryOrder.filter(c => CAT_IDS.includes(c));
-      appState.assets = appState.assets.slice(0, LIMITS.assets).map(sanitizeAsset);
-      appState.history = appState.history.slice(-LIMITS.history);
-      appState.income = appState.income.map(sanitizeIncome);
+      _applyLoadedState(raw);
     } else {
       appState = defaultState();
     }
@@ -818,9 +1090,9 @@ function importData(json) {
   }
 }
 
-function resetAllData() {
+function resetAllData(options = {}) {
   appState = defaultState();
   invalidateCalcCache();
-  saveDataNow();
+  if (!options.skipSave) saveDataNow();
   EventBus.emit('dataReset');
 }
