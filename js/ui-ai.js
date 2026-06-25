@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.4 — Analysis UI
+   My Portfolio v5.26.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -14,10 +14,12 @@ function renderAnalysis() {
   const sections = [
     renderGoalSection(total),
     renderAllocationSection(total, catTotals),
+    renderStockSectorAnalysisSection(),
     renderDiversificationSection(catTotals, total),
     renderRiskSection(catTotals, total),
     renderPeriodReturnsSection(),
     renderBenchmarkSection(),
+    renderGeminiSection(total, catTotals),
     renderStrategySection(catTotals, total),
   ].filter(Boolean);
 
@@ -29,6 +31,7 @@ function renderAnalysis() {
   _setupAnalysisDelegation(container);
   _setupGoalAmountHint();
   _setupAllocationLiveSum();
+  setTimeout(applyDynamicColors, DYNAMIC_COLOR_DELAY_MS);
 }
 
 function _setupGoalAmountHint() {
@@ -59,7 +62,11 @@ function _setupAnalysisDelegation(container) {
     else if (action === 'cancel-alloc-edit') doCancelAllocEdit();
     else if (action === 'clear-allocation') doClearAllocation();
     else if (action === 'toggle-alloc-override') doToggleAllocOverride();
+    else if (action === 'toggle-allocation-panel') doToggleAllocationPanel();
     else if (action === 'load-benchmark') loadBenchmark();
+    else if (action === 'save-gemini-key') doSaveGeminiKey();
+    else if (action === 'clear-gemini-key') doClearGeminiKey();
+    else if (action === 'run-gemini-analysis') doRunGeminiAnalysis();
   }
   container.onclick = (e) => {
     const target = e.target.closest('[data-action]');
@@ -239,7 +246,8 @@ function renderAllocationSection(total, catTotals) {
 }
 
 function _renderAllocationEditor(alloc, editing) {
-  const enabled = editing ? !!(alloc && alloc.enabled) : true;
+  const enabled = alloc ? !!alloc.enabled : true;
+  const panelVisible = isDashCardVisible('allocation');
   const assetOverride = !!(alloc && alloc.assetOverride);
   const cats = (alloc && alloc.categories) || DEFAULT_ALLOCATION_CATEGORIES;
   const assetTargets = (alloc && alloc.assets) || {};
@@ -271,6 +279,11 @@ function _renderAllocationEditor(alloc, editing) {
         <label class="alloc-toggle-row">
           <input type="checkbox" id="allocEnabled" ${enabled ? 'checked' : ''} aria-label="배분 목표 사용">
           <span class="alloc-toggle-label">배분 목표 사용</span>
+        </label>
+
+        <label class="alloc-toggle-row">
+          <input type="checkbox" id="allocPanelVisible" ${panelVisible ? 'checked' : ''} aria-label="대시보드 배분 편차 패널 표시">
+          <span class="alloc-toggle-label">대시보드 배분 편차 패널 표시</span>
         </label>
 
         <div class="alloc-section-title">카테고리별 목표 비율</div>
@@ -349,12 +362,14 @@ function _renderAllocationView(alloc, total, catTotals) {
   const driftRows = calcAllocationDrift(appState.assets, alloc, total, catTotals);
   const threshold = safeNum(alloc.driftThreshold != null ? alloc.driftThreshold : ALLOC_DRIFT_THRESHOLD_DEFAULT);
   const suggestions = getRebalancingSuggestions(driftRows, threshold);
+  const panelVisible = isDashCardVisible('allocation');
 
   return `
     <div class="card" role="region" aria-label="자산 배분 목표 및 편차">
       <div class="card-title">
         자산 배분 목표
         <div class="card-title-actions">
+          <button class="btn-sm" data-action="toggle-allocation-panel" aria-label="대시보드 배분 편차 패널 ${panelVisible ? '숨기기' : '표시'}">${panelVisible ? '패널 끄기' : '패널 켜기'}</button>
           <button class="btn-sm" data-action="edit-allocation" aria-label="배분 목표 수정">수정</button>
           <button class="btn-sm" data-action="clear-allocation" aria-label="배분 목표 초기화">초기화</button>
         </div>
@@ -426,6 +441,7 @@ function _renderAllocSuggestions(suggestions, threshold) {
 
 function _readAllocationForm() {
   const enabled = !!$('#allocEnabled')?.checked;
+  const panelVisible = $('#allocPanelVisible') ? !!$('#allocPanelVisible')?.checked : isDashCardVisible('allocation');
   const assetOverride = !!$('#allocOverride')?.checked;
   const threshold = safeNum($('#allocThreshold')?.value);
   const categories = {};
@@ -441,13 +457,18 @@ function _readAllocationForm() {
       assets[el.dataset.allocAsset] = n;
     });
   }
-  return { enabled, assetOverride, categories, assets, driftThreshold: threshold };
+  return { enabled, panelVisible, assetOverride, categories, assets, driftThreshold: threshold };
 }
 
 function doSetAllocation() {
   const opts = _readAllocationForm();
+  setDashCardVisible('allocation', opts.panelVisible);
   if (!opts.enabled) {
-    showToast('먼저 "배분 목표 사용"을 켜주세요', 'error');
+    setAllocation(opts);
+    UIState.allocationEditMode = false;
+    renderAnalysis();
+    renderDashboard();
+    showToast('배분 목표가 비활성화되었습니다', 'info');
     return;
   }
   setAllocation(opts);
@@ -460,6 +481,14 @@ function doSetAllocation() {
   } else {
     showToast('배분 목표 저장 완료', 'success');
   }
+}
+
+function doToggleAllocationPanel() {
+  const next = !isDashCardVisible('allocation');
+  setDashCardVisible('allocation', next);
+  renderAnalysis();
+  renderDashboard();
+  showToast(next ? '배분 편차 패널을 표시합니다' : '배분 편차 패널을 숨겼습니다', 'success');
 }
 
 function doEditAllocation() {
@@ -515,6 +544,17 @@ function _setupAllocationLiveSum() {
   document.querySelectorAll('.alloc-cat-input').forEach(el => {
     el.addEventListener('input', update);
   });
+}
+
+function renderStockSectorAnalysisSection() {
+  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false });
+  if (!sectorHtml) return '';
+  return `
+    <div class="card" role="region" aria-label="주식 섹터 분포">
+      <div class="card-title">주식 섹터 분포</div>
+      ${sectorHtml}
+    </div>
+  `;
 }
 
 // ── Diversification ──
@@ -669,6 +709,142 @@ async function loadBenchmark() {
   }
 
   if (btn) { btn.disabled = false; btn.textContent = '새로고침'; }
+}
+
+// ── Gemini Analysis ──
+function renderGeminiSection(total, catTotals) {
+  const hasKey = !!getGeminiApiKey();
+  const sector = calcStockSectorTotals(appState.assets);
+  return `
+    <div class="card" role="region" aria-label="Gemini AI 포트폴리오 분석">
+      <div class="card-title">
+        Gemini AI 분석
+        <span class="gemini-key-state ${hasKey ? 'ok' : 'warn'}">${hasKey ? '키 저장됨' : '키 필요'}</span>
+      </div>
+      <div class="gemini-panel">
+        <label class="gemini-key-row">
+          <span class="gemini-label">API 키</span>
+          <input type="password" id="geminiApiKey" placeholder="${hasKey ? '새 키로 바꾸려면 입력' : 'Google AI Studio API 키'}" autocomplete="off" aria-label="Gemini API 키">
+        </label>
+        <div class="gemini-actions">
+          <button class="btn-sm" data-action="save-gemini-key">키 저장</button>
+          ${hasKey ? '<button class="btn-sm" data-action="clear-gemini-key">키 삭제</button>' : ''}
+          <button class="btn-p" id="btnGeminiAnalysis" data-action="run-gemini-analysis" ${total > 0 ? '' : 'disabled'}>AI 분석 생성</button>
+        </div>
+        <div class="gemini-privacy text-muted">분석 생성 시 총액, 카테고리, 상위 자산, 섹터 요약이 Gemini API로 전송됩니다.</div>
+        <div class="gemini-snapshot" aria-label="AI 분석 입력 요약">
+          <span>총 자산 ${escHtml(fmtKRW(total))}</span>
+          <span>주식 섹터 ${sector.rows.length}개</span>
+          <span>자산 ${appState.assets.length}개</span>
+        </div>
+        <div id="geminiResult" class="gemini-result" aria-live="polite">
+          <p class="text-muted">API 키를 저장한 뒤 AI 분석을 생성할 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _buildGeminiPortfolioPrompt() {
+  const total = calcTotal(appState.assets);
+  const catTotals = calcCategoryTotals(appState.assets);
+  const sector = calcStockSectorTotals(appState.assets);
+  const categoryRows = appState.categoryOrder
+    .filter(c => safeNum(catTotals[c]) > 0)
+    .map(c => ({
+      category: c,
+      amountKRW: Math.round(safeNum(catTotals[c])),
+      pct: total > 0 ? Number(((safeNum(catTotals[c]) / total) * 100).toFixed(2)) : 0,
+    }));
+  const sectorRows = sector.rows.map(s => ({
+    sector: s.label,
+    amountKRW: Math.round(s.value),
+    pctOfStocks: sector.total > 0 ? Number(((s.value / sector.total) * 100).toFixed(2)) : 0,
+    sampleAssets: s.assets.slice(0, 5).map(item => item.asset.name),
+  }));
+  const topAssets = appState.assets
+    .map(a => {
+      const v = calcAssetValue(a);
+      const inferred = inferStockSector(a);
+      return {
+        name: a.name,
+        category: a.category,
+        sector: inferred ? inferred.label : '',
+        valueKRW: Math.round(v.value),
+        profitPct: Number(safeNum(v.profitPct).toFixed(2)),
+      };
+    })
+    .filter(a => a.valueKRW > 0)
+    .sort((a, b) => b.valueKRW - a.valueKRW)
+    .slice(0, 20);
+  const allocation = appState.allocation && appState.allocation.enabled ? {
+    categories: appState.allocation.categories,
+    driftThreshold: appState.allocation.driftThreshold,
+  } : null;
+
+  return [
+    '아래 포트폴리오 데이터를 분석해 주세요.',
+    '출력 형식: 1) 핵심 요약 3줄 2) 집중 리스크 3) 섹터/자산배분 코멘트 4) 다음 점검 질문.',
+    '매수/매도 지시는 하지 말고, 데이터에서 보이는 위험과 확인 포인트를 한국어로 짧게 정리해 주세요.',
+    JSON.stringify({
+      totalKRW: Math.round(total),
+      categories: categoryRows,
+      stockSectors: sectorRows,
+      topAssets,
+      allocationTarget: allocation,
+      historyDays: appState.history.length,
+    }, null, 2),
+  ].join('\n\n');
+}
+
+function _renderGeminiText(text) {
+  const safe = escHtml(text || '').replace(/\n/g, '<br>');
+  return `<div class="gemini-answer">${safe}</div>`;
+}
+
+function doSaveGeminiKey() {
+  const input = $('#geminiApiKey');
+  const key = input?.value || '';
+  if (!key.trim()) {
+    showToast('저장할 API 키를 입력하세요', 'error');
+    return;
+  }
+  saveGeminiApiKey(key);
+  if (input) input.value = '';
+  renderAnalysis();
+  showToast('Gemini API 키 저장 완료', 'success');
+}
+
+function doClearGeminiKey() {
+  clearGeminiApiKey();
+  renderAnalysis();
+  showToast('Gemini API 키 삭제 완료', 'success');
+}
+
+async function doRunGeminiAnalysis() {
+  const input = $('#geminiApiKey');
+  if (input?.value.trim()) saveGeminiApiKey(input.value);
+  if (!getGeminiApiKey()) {
+    showToast('Gemini API 키를 먼저 저장하세요', 'error');
+    return;
+  }
+  const result = $('#geminiResult');
+  const btn = $('#btnGeminiAnalysis');
+  if (btn) { btn.disabled = true; btn.textContent = '분석 중...'; }
+  if (result) result.innerHTML = '<div class="gemini-loading">Gemini가 포트폴리오를 읽는 중입니다...</div>';
+
+  try {
+    const text = await generateGeminiPortfolioAnalysis(_buildGeminiPortfolioPrompt());
+    if (result) result.innerHTML = _renderGeminiText(text);
+  } catch (e) {
+    console.error('Gemini analysis failed:', e);
+    if (result) {
+      result.innerHTML = `<div class="gemini-error">Gemini 호출 실패: ${escHtml(e.message || String(e))}</div>`;
+    }
+    showToast('Gemini 분석 생성 실패', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'AI 분석 생성'; }
+  }
 }
 
 // ── Strategies ──

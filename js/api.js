@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.25.4 — API Integration
+   My Portfolio v5.26.0 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
-   v5.25.4: stale 가격 감지 (사일런트 실패 방지)
+   stale 가격 감지 (사일런트 실패 방지)
    ============================================= */
 
 // ── Cache ──
@@ -69,6 +69,36 @@ function getUsdtRateSync() {
   return { rate: FALLBACK_USD_KRW, source: 'default', time: null, fallback: 'hardcoded' };
 }
 
+function getRateDisplayInfo(kind) {
+  const live = kind === 'usdkrw' ? cachedRate : cachedUsdt;
+  if (live && Number.isFinite(live.rate) && live.rate > 0) {
+    return { rate: live.rate, source: live.source || 'live', time: live.time, fallback: false };
+  }
+  const last = getLastRate(kind);
+  if (last) {
+    return { rate: last.rate, source: last.source || 'last-known', time: last.time, fallback: true };
+  }
+  return null;
+}
+
+function getKimchiPremiumInfo() {
+  const usd = getRateDisplayInfo('usdkrw');
+  const usdt = getRateDisplayInfo('usdt');
+  if (!usd || !usdt || usd.rate <= 0 || usdt.rate <= 0) {
+    return null;
+  }
+  const premium = ((usdt.rate / usd.rate) - 1) * 100;
+  return {
+    premium,
+    usdRate: usd.rate,
+    usdtRate: usdt.rate,
+    usdSource: usd.source,
+    usdtSource: usdt.source,
+    fallback: !!(usd.fallback || usdt.fallback),
+    time: Math.max(safeNum(usd.time), safeNum(usdt.time)),
+  };
+}
+
 // 환율 출처를 한국어 라벨로 — UI hint 표시용
 function describeRateSource(info) {
   if (!info) return '';
@@ -84,6 +114,120 @@ function fetchWithTimeout(url, ms = API_TIMEOUT, options = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
+// ── Gemini API ──
+function getGeminiApiKey() {
+  try { return localStorage.getItem(GEMINI_API_KEY_KEY) || ''; } catch (_) { return ''; }
+}
+
+function saveGeminiApiKey(key) {
+  const clean = stripHtml(key, 200).trim();
+  if (!clean) return false;
+  localStorage.setItem(GEMINI_API_KEY_KEY, clean);
+  return true;
+}
+
+function clearGeminiApiKey() {
+  try { localStorage.removeItem(GEMINI_API_KEY_KEY); } catch (_) {}
+}
+
+async function _readGeminiError(resp) {
+  try {
+    const data = await resp.json();
+    return data?.error?.message || data?.message || `${resp.status} ${resp.statusText}`;
+  } catch (_) {
+    try { return await resp.text(); } catch (e) { return `${resp.status} ${resp.statusText}`; }
+  }
+}
+
+function _extractGeminiText(data) {
+  if (!data) return '';
+  if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text.trim();
+  const oldText = data.candidates?.[0]?.content?.parts
+    ?.map(p => p.text || '')
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  if (oldText) return oldText;
+  const outputs = data.output || data.outputs;
+  if (Array.isArray(outputs)) {
+    const text = outputs.map(o => o.text || o.output_text || '').filter(Boolean).join('\n').trim();
+    if (text) return text;
+  }
+  if (Array.isArray(data.steps)) {
+    const chunks = [];
+    const walk = (node) => {
+      if (!node || chunks.length > 40) return;
+      if (typeof node === 'string') return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (typeof node === 'object') {
+        if (typeof node.text === 'string') chunks.push(node.text);
+        if (typeof node.output_text === 'string') chunks.push(node.output_text);
+        Object.entries(node).forEach(([key, val]) => {
+          if (!['input', 'prompt', 'system_instruction'].includes(key)) walk(val);
+        });
+      }
+    };
+    walk(data.steps);
+    const text = chunks.filter(Boolean).join('\n').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+async function generateGeminiPortfolioAnalysis(prompt) {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) throw new Error('Gemini API 키가 없습니다.');
+
+  const system = [
+    '당신은 한국어로 답하는 개인 포트폴리오 분석 도우미입니다.',
+    '사용자의 입력 데이터 안에서만 판단하고, 확실하지 않은 내용은 추정이라고 표시하세요.',
+    '투자 매수/매도 지시가 아니라 리스크, 분산, 점검 포인트 중심으로 간결하게 답하세요.',
+  ].join(' ');
+
+  const interactionsPayload = {
+    model: GEMINI_MODEL,
+    system_instruction: system,
+    input: prompt,
+    generation_config: { temperature: 0.35, thinking_level: 'low' },
+  };
+
+  try {
+    const resp = await fetchWithTimeout(`${API.gemini}/interactions`, 30000, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(interactionsPayload),
+    });
+    if (!resp.ok) throw new Error(await _readGeminiError(resp));
+    const data = await resp.json();
+    const text = _extractGeminiText(data);
+    if (text) return text;
+    throw new Error('Gemini 응답에서 텍스트를 찾지 못했습니다.');
+  } catch (primaryErr) {
+    console.warn('Gemini Interactions API failed, trying generateContent:', primaryErr.message);
+    const fallbackPayload = {
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.35 },
+    };
+    const resp = await fetchWithTimeout(`${API.gemini}/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`, 30000, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(fallbackPayload),
+    });
+    if (!resp.ok) throw new Error(await _readGeminiError(resp));
+    const data = await resp.json();
+    const text = _extractGeminiText(data);
+    if (!text) throw new Error('Gemini 응답에서 텍스트를 찾지 못했습니다.');
+    return text;
+  }
 }
 
 // ── CORS Proxy Fetch (Promise.any parallel race) ──
@@ -463,7 +607,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.total = updatable.length + (coinAssets.length > 0 ? 1 : 0);
   autoUpdateProgress.done = 0;
 
-  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지) — v5.25.4
+  // 직전 상태 스냅샷. stale 판정(사일런트 실패 방지)
   const prevMap = new Map(assets.map(a => [a.id, { amount: a.amount, lpu: a.lpu }]));
   const isStale = (asset, newPrice) => {
     if (newPrice == null || !isFinite(newPrice)) return false;

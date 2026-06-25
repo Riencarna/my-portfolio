@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.25.4 — Configuration
+   My Portfolio v5.26.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.25.4';
+const APP_VERSION = '5.26.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -76,6 +76,7 @@ const CUSTOM_PROXY_KEY = 'mp_custom_proxy';
 const DASH_PREFS_KEY = 'mp_dash_prefs';
 const PRESETS_KEY = 'mp_presets';
 const AUTO_BACKUP_KEY = 'mp_autobackup';
+const GEMINI_API_KEY_KEY = 'mp_gemini_api_key';
 
 // Limits
 const LIMITS = Object.freeze({
@@ -107,6 +108,7 @@ const CATEGORIES = Object.freeze([
 const CAT_MAP = Object.freeze(Object.fromEntries(CATEGORIES.map(c => [c.id, c])));
 const CAT_IDS = Object.freeze(CATEGORIES.map(c => c.id));
 const INVESTMENT_CATS = Object.freeze(['국내주식', '해외주식', '코인']);
+const STOCK_CATS = Object.freeze(['국내주식', '해외주식']);
 
 // 자산별 일일 델타 배지 활성 카테고리. 데이터는 항상 수집(store.js byAsset)되므로
 // 나중에 현금/예적금/부동산 등을 표시하려면 이 배열에 카테고리명만 추가하면 됨.
@@ -169,6 +171,82 @@ const COIN_SYM = Object.freeze(
 const ETF_PREFIXES = Object.freeze([
   'KODEX','TIGER','KBSTAR','SOL','ARIRANG','HANARO','KOSEF','ACE','TIMEFOLIO','PLUS'
 ]);
+
+// Stock sector inference rules. Order matters: more specific thematic ETFs should
+// match before broad ETF/index rules.
+const STOCK_SECTOR_RULES = Object.freeze([
+  {
+    id: 'semiconductor', label: '반도체', color: '#7C6FF0',
+    tickers: ['NVDA','AMD','TSM','ASML','AVGO','MU','QCOM','AMAT','LRCX','KLAC','INTC','ARM','ON','SOXX','SMH','005930','000660','058470','036930','039030','084370','042700'],
+    keywords: ['반도체','소부장','hbm','chip','칩','파운드리','삼성전자','하이닉스','nvidia','엔비디아','마이크론','퀄컴'],
+  },
+  {
+    id: 'shipbuilding_defense', label: '조선/방산', color: '#6B9DC7',
+    tickers: ['LMT','RTX','NOC','GD','HII','BA','009540','010140','042660','329180','064350','012450','047810','079550'],
+    keywords: ['조선','방산','방위','항공우주','우주항공','한화오션','한국조선','현대중공업','현대로템','kai','aerospace','defense','shipbuilding'],
+  },
+  {
+    id: 'auto_mobility', label: '자동차/모빌리티', color: '#E8889E',
+    tickers: ['TSLA','GM','F','TM','RIVN','LCID','005380','000270','012330','011210'],
+    keywords: ['자동차','모빌리티','전기차','tesla','테슬라','현대차','기아','rivian','lucid'],
+  },
+  {
+    id: 'battery_ev', label: '2차전지/소재', color: '#E8B474',
+    tickers: ['373220','051910','006400','096770','247540','066970','086520','003670','361610','278280'],
+    keywords: ['2차전지','배터리','양극재','음극재','전해액','리튬','에코프로','포스코퓨처엠','lg에너지솔루션','battery','lithium'],
+  },
+  {
+    id: 'software_ai', label: 'AI/소프트웨어', color: '#A395F5',
+    tickers: ['MSFT','GOOGL','GOOG','META','AMZN','PLTR','CRM','NOW','ADBE','ORCL','SNOW','DDOG','NET'],
+    keywords: ['ai','인공지능','소프트웨어','클라우드','saas','플랫폼','데이터센터','마이크로소프트','구글','메타','아마존','팔란티어'],
+  },
+  {
+    id: 'bio_health', label: '바이오/헬스케어', color: '#6BBF8A',
+    tickers: ['JNJ','LLY','NVO','PFE','MRK','UNH','ABBV','TMO','ISRG','207940','068270','128940','145020'],
+    keywords: ['바이오','헬스','제약','의료','셀트리온','삼성바이오','유한양행','health','pharma','biotech'],
+  },
+  {
+    id: 'finance', label: '금융', color: '#86A7E8',
+    tickers: ['JPM','BAC','WFC','GS','MS','V','MA','AXP','BRK.B','BRK-B','105560','055550','086790','316140','024110'],
+    keywords: ['금융','은행','증권','보험','카드','kb금융','신한지주','하나금융','bank','visa','mastercard'],
+  },
+  {
+    id: 'internet_content', label: '인터넷/콘텐츠', color: '#E8788A',
+    tickers: ['NFLX','DIS','SPOT','RBLX','EA','035420','035720','251270','259960','352820','041510'],
+    keywords: ['인터넷','콘텐츠','엔터','게임','웹툰','네이버','카카오','하이브','크래프톤','netflix','disney','gaming'],
+  },
+  {
+    id: 'energy_chem', label: '에너지/화학', color: '#B5ADA0',
+    tickers: ['XOM','CVX','COP','BP','SHEL','OXY','010950','009830','078930','011170'],
+    keywords: ['에너지','정유','화학','석유','가스','태양광','수소','energy','oil','gas','chemical'],
+  },
+  {
+    id: 'consumer', label: '소비재/브랜드', color: '#C69C72',
+    tickers: ['AAPL','COST','MCD','SBUX','KO','PEP','NKE','PG','LVMUY','UL','005930','051900','090430'],
+    keywords: ['소비재','브랜드','리테일','음식료','화장품','애플','코카콜라','나이키','costco','starbucks','consumer'],
+  },
+  {
+    id: 'industrial', label: '산업재/인프라', color: '#67A9A5',
+    tickers: ['GE','CAT','DE','HON','MMM','UNP','000720','028260','034020','010120'],
+    keywords: ['산업재','건설','인프라','기계','중공업','물류','건설기계','infrastructure','industrial'],
+  },
+  {
+    id: 'telecom', label: '통신', color: '#8FA3B8',
+    tickers: ['T','VZ','TMUS','017670','030200','032640'],
+    keywords: ['통신','텔레콤','5g','sk텔레콤','kt','lg유플러스','telecom'],
+  },
+  {
+    id: 'broad_etf', label: 'ETF/지수', color: '#9A8F80',
+    tickers: ['SPY','VOO','IVV','VTI','QQQ','DIA','IWM','SCHD','JEPI','TQQQ','SQQQ'],
+    keywords: ['s&p','sp500','나스닥','nasdaq','다우','dow','지수','인덱스','etf','kodex','tiger','kbstar','arirang','hanaro','kosef','ace','timefolio','plus'],
+  },
+  {
+    id: 'other_stock', label: '기타 주식', color: '#A8A29A',
+    tickers: [],
+    keywords: [],
+  },
+]);
+const STOCK_SECTOR_MAP = Object.freeze(Object.fromEntries(STOCK_SECTOR_RULES.map(s => [s.id, s])));
 
 // EVM chains
 const EVM_CHAINS = Object.freeze([
@@ -237,7 +315,9 @@ const API = Object.freeze({
   upbit:         'https://api.upbit.com/v1/ticker',
   bithumb:       'https://api.bithumb.com/public/ticker',
   daum:          'https://finance.daum.net/api/exchanges',
+  gemini:        'https://generativelanguage.googleapis.com/v1beta',
 });
+const GEMINI_MODEL = 'gemini-3.5-flash';
 
 // Benchmark indices
 const BENCHMARKS = Object.freeze({ kospi: '^KS11', sp500: '^GSPC' });

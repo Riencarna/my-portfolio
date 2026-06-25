@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.4 — Utilities
+   My Portfolio v5.26.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -255,6 +255,75 @@ function sumAllocationCategoryPct(categories) {
   let s = 0;
   for (const cid of CAT_IDS) s += safeNum(categories[cid]);
   return s;
+}
+
+// ── Stock Sector Inference ──
+function normalizeTicker(code) {
+  return String(code || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/\.(KS|KQ|O|N|L)$/i, '');
+}
+
+function isStockAsset(asset) {
+  return !!asset && STOCK_CATS.includes(asset.category);
+}
+
+function inferStockSector(asset) {
+  if (!isStockAsset(asset)) return null;
+  const code = normalizeTicker(asset.stockCode);
+  const rawCode = String(asset.stockCode || '').trim().toUpperCase();
+  const text = `${asset.name || ''} ${asset.note || ''} ${rawCode}`.toLowerCase();
+  const rules = STOCK_SECTOR_RULES.filter(r => r.id !== 'other_stock');
+
+  for (const rule of rules) {
+    const tickers = new Set((rule.tickers || []).map(normalizeTicker));
+    if (code && tickers.has(code)) return rule;
+    if (rawCode && (rule.tickers || []).some(t => String(t).toUpperCase() === rawCode)) return rule;
+    if ((rule.keywords || []).some(k => text.includes(String(k).toLowerCase()))) return rule;
+  }
+
+  const nameUpper = String(asset.name || '').toUpperCase();
+  if (ETF_PREFIXES.some(prefix => nameUpper.startsWith(prefix))) {
+    return STOCK_SECTOR_MAP.broad_etf;
+  }
+  return STOCK_SECTOR_MAP.other_stock;
+}
+
+function calcStockSectorTotals(assets) {
+  const totals = {};
+  const sectorAssets = {};
+  let stockTotal = 0;
+  for (const rule of STOCK_SECTOR_RULES) {
+    totals[rule.id] = 0;
+    sectorAssets[rule.id] = [];
+  }
+
+  for (const asset of assets || []) {
+    if (!isStockAsset(asset)) continue;
+    const value = safeNum(calcAssetValue(asset).value);
+    if (value <= 0) continue;
+    const sector = inferStockSector(asset) || STOCK_SECTOR_MAP.other_stock;
+    totals[sector.id] = safeNum(totals[sector.id]) + value;
+    stockTotal += value;
+    sectorAssets[sector.id].push({ asset, value });
+  }
+
+  const rows = STOCK_SECTOR_RULES
+    .map(rule => ({
+      ...rule,
+      value: safeNum(totals[rule.id]),
+      assets: sectorAssets[rule.id] || [],
+    }))
+    .filter(row => row.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  return {
+    total: safeNum(stockTotal),
+    rows,
+    unclassified: (sectorAssets.other_stock || []).map(item => item.asset),
+  };
 }
 
 // ── Calculations (NaN-safe, cached per render cycle) ──

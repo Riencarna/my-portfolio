@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.4 — App Entry Point
+   My Portfolio v5.26.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -30,9 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     removeSplash();
     registerSW();
 
-    fetchExchangeRate().catch(e => {
-      console.warn('Initial exchange rate fetch failed:', e.message);
-    });
+    fetchMarketRatesOnLoad();
     setupSwipe();
 
     EventBus.on('dataImported', () => render());
@@ -74,6 +72,16 @@ async function autoUpdateOnLoad() {
     }
   } catch (e) {
     console.warn('Background auto-update failed:', e.message);
+  }
+}
+
+async function fetchMarketRatesOnLoad() {
+  try {
+    await Promise.allSettled([fetchExchangeRate(), fetchUsdtRate()]);
+    if (currentTab === 'pgDash') renderDashboard();
+    renderPageHeader();
+  } catch (e) {
+    console.warn('Initial market rate fetch failed:', e.message);
   }
 }
 
@@ -126,9 +134,34 @@ function getSystemTheme() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function loadTheme() {
+function getThemeMode() {
   const stored = localStorage.getItem(THEME_KEY);
-  const theme = stored || getSystemTheme();
+  return stored === 'dark' || stored === 'light' ? stored : 'auto';
+}
+
+function getEffectiveTheme(mode = getThemeMode()) {
+  return mode === 'auto' ? getSystemTheme() : mode;
+}
+
+function getThemeModeMeta(mode = getThemeMode()) {
+  const effective = getEffectiveTheme(mode);
+  if (mode === 'auto') {
+    return {
+      mode,
+      effective,
+      icon: '🖥️',
+      label: `OS 자동 (${effective === 'dark' ? '다크' : '라이트'})`,
+      next: '라이트 모드',
+    };
+  }
+  if (mode === 'light') {
+    return { mode, effective, icon: '☀️', label: '라이트 모드', next: '다크 모드' };
+  }
+  return { mode, effective, icon: '🌙', label: '다크 모드', next: 'OS 자동' };
+}
+
+function loadTheme() {
+  const theme = getEffectiveTheme();
   document.body.dataset.theme = theme;
   updateThemeMeta(theme);
   setupSystemThemeWatcher();
@@ -152,7 +185,7 @@ function applyTheme(theme) {
   updateThemeMeta(theme);
   destroyAllCharts();
   if (typeof _dashRenderKey !== 'undefined') _dashRenderKey = '';
-  updateSidebarThemeBtn(theme);
+  updateThemeModeButtons();
   renderPageHeader();
   requestAnimationFrame(() => {
     renderTabContent();
@@ -162,31 +195,47 @@ function applyTheme(theme) {
 function toggleTheme() {
   const current = document.body.dataset.theme || 'light';
   const next = current === 'dark' ? 'light' : 'dark';
-  localStorage.setItem(THEME_KEY, next);
-  applyTheme(next);
+  setThemeMode(next);
 }
 
 // "OS 자동"으로 되돌리기: localStorage 키 삭제 후 현재 OS 테마 적용
 function setThemeAuto() {
-  localStorage.removeItem(THEME_KEY);
-  applyTheme(getSystemTheme());
+  setThemeMode('auto');
 }
 
 function isThemeAuto() {
-  return localStorage.getItem(THEME_KEY) == null;
+  return getThemeMode() === 'auto';
 }
 
-function updateSidebarThemeBtn(theme) {
-  const btn = $('#sidebarThemeBtn');
-  if (btn) {
-    btn.querySelector('.sidebar-action-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
-    btn.querySelector('span:not(.sidebar-action-icon)').textContent = theme === 'dark' ? '라이트 모드' : '다크 모드';
+function setThemeMode(mode) {
+  if (mode === 'auto') localStorage.removeItem(THEME_KEY);
+  else localStorage.setItem(THEME_KEY, mode === 'dark' ? 'dark' : 'light');
+  applyTheme(getEffectiveTheme(mode));
+}
+
+function cycleThemeMode() {
+  const mode = getThemeMode();
+  const next = mode === 'auto' ? 'light' : (mode === 'light' ? 'dark' : 'auto');
+  setThemeMode(next);
+}
+
+function updateThemeModeButtons() {
+  const meta = getThemeModeMeta();
+  const sidebarBtn = $('#sidebarThemeModeBtn');
+  if (sidebarBtn) {
+    sidebarBtn.classList.toggle('active', meta.mode === 'auto');
+    sidebarBtn.setAttribute('aria-label', `테마: ${meta.label}. 클릭하면 ${meta.next}`);
+    sidebarBtn.setAttribute('aria-pressed', meta.mode === 'auto' ? 'true' : 'false');
+    const icon = sidebarBtn.querySelector('.sidebar-action-icon');
+    const label = sidebarBtn.querySelector('span:not(.sidebar-action-icon)');
+    if (icon) icon.textContent = meta.icon;
+    if (label) label.textContent = meta.label;
   }
-  const autoBtn = $('#sidebarThemeAutoBtn');
-  if (autoBtn) {
-    const auto = isThemeAuto();
-    autoBtn.classList.toggle('active', auto);
-    autoBtn.setAttribute('aria-pressed', auto ? 'true' : 'false');
+  const headerBtn = $('#headerThemeBtn');
+  if (headerBtn) {
+    headerBtn.textContent = meta.icon;
+    headerBtn.setAttribute('aria-label', `테마: ${meta.label}. 클릭하면 ${meta.next}`);
+    headerBtn.setAttribute('title', `테마: ${meta.label} → ${meta.next}`);
   }
 }
 
@@ -236,7 +285,7 @@ function renderSidebar() {
   if (!sidebar) return;
   const meta = loadPortfolioMeta();
   const pf = meta.list.find(p => p.id === activePortfolioId);
-  const isDark = document.body.dataset.theme === 'dark';
+  const themeMeta = getThemeModeMeta();
 
   sidebar.innerHTML = `
     <div class="sidebar-brand">
@@ -279,14 +328,10 @@ function renderSidebar() {
       <div class="sidebar-action" data-action="open-auto-backup-manager" role="button" tabindex="0" aria-label="자동 백업 관리">
         <span class="sidebar-action-icon">🗂</span><span>자동 백업</span>
       </div>
-      <div class="sidebar-action" id="sidebarThemeBtn" data-action="toggle-theme" role="button" tabindex="0"
-        aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}">
-        <span class="sidebar-action-icon">${isDark ? '☀️' : '🌙'}</span><span>${isDark ? '라이트 모드' : '다크 모드'}</span>
-      </div>
-      <div class="sidebar-action ${isThemeAuto() ? 'active' : ''}" id="sidebarThemeAutoBtn" data-action="theme-auto"
-        role="button" tabindex="0" aria-pressed="${isThemeAuto() ? 'true' : 'false'}"
-        aria-label="OS 자동 테마 ${isThemeAuto() ? '사용 중' : '사용'}">
-        <span class="sidebar-action-icon">🖥️</span><span>OS 자동</span>
+      <div class="sidebar-action ${themeMeta.mode === 'auto' ? 'active' : ''}" id="sidebarThemeModeBtn" data-action="cycle-theme"
+        role="button" tabindex="0" aria-pressed="${themeMeta.mode === 'auto' ? 'true' : 'false'}"
+        aria-label="테마: ${escAttr(themeMeta.label)}. 클릭하면 ${escAttr(themeMeta.next)}">
+        <span class="sidebar-action-icon">${themeMeta.icon}</span><span>${escHtml(themeMeta.label)}</span>
       </div>
     </div>
   `;
@@ -300,8 +345,7 @@ function renderSidebar() {
     else if (action === 'open-monthly-report') openMonthlyReport();
     else if (action === 'open-wallet-scan') openWalletScan();
     else if (action === 'open-auto-backup-manager') openAutoBackupManager();
-    else if (action === 'toggle-theme') toggleTheme();
-    else if (action === 'theme-auto') setThemeAuto();
+    else if (action === 'cycle-theme') cycleThemeMode();
   };
 
   sidebar.onkeydown = (e) => {
@@ -330,8 +374,7 @@ function renderPageHeader() {
   const idx = TAB_ORDER.indexOf(currentTab);
   const meta = loadPortfolioMeta();
   const pf = meta.list.find(p => p.id === activePortfolioId);
-
-  const isDark = document.body.dataset.theme === 'dark';
+  const themeMeta = getThemeModeMeta();
 
   header.innerHTML = `
     <div class="page-header-title">
@@ -351,9 +394,9 @@ function renderPageHeader() {
       ${currentTab === 'pgInc' ? `
         <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 수입 추가</button>
       ` : ''}
-      <button class="btn-icon header-theme-btn" id="headerThemeBtn" data-action="toggle-theme"
-        aria-label="${isDark ? '라이트 모드로 전환' : '다크 모드로 전환'} · 길게 누르면 OS 자동"
-        title="탭: 테마 토글 / 길게: OS 자동">${isDark ? '☀️' : '🌙'}</button>
+      <button class="btn-icon header-theme-btn" id="headerThemeBtn" data-action="cycle-theme"
+        aria-label="테마: ${escAttr(themeMeta.label)}. 클릭하면 ${escAttr(themeMeta.next)}"
+        title="테마: ${escAttr(themeMeta.label)} → ${escAttr(themeMeta.next)}">${themeMeta.icon}</button>
     </div>
   `;
 
@@ -364,10 +407,8 @@ function renderPageHeader() {
     if (action === 'auto-update') startAutoUpdate();
     else if (action === 'open-add-asset') openAddAsset();
     else if (action === 'open-add-income') openAddIncome();
-    else if (action === 'toggle-theme') toggleTheme();
+    else if (action === 'cycle-theme') cycleThemeMode();
   };
-
-  setupThemeLongPress($('#headerThemeBtn'));
 }
 
 // 헤더 테마 버튼: 짧게 탭 → 토글, 길게(600ms) → OS 자동
@@ -585,7 +626,7 @@ document.addEventListener('keydown', e => {
 
   if (e.key === 't' && e.altKey && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
-    toggleTheme();
+    cycleThemeMode();
   }
 
   if (e.key === 'Escape') {

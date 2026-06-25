@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.25.4 — Dashboard UI
+   My Portfolio v5.26.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -10,6 +10,7 @@ const DASH_CARD_REGISTRY = Object.freeze([
   { id: 'stats',       label: '요약 지표' },
   { id: 'fire-goal',   label: '재무 목표 & FIRE' },
   { id: 'allocation',  label: '배분 편차' },
+  { id: 'stock-sector', label: '주식 섹터 분포' },
   { id: 'pie',         label: '자산 분포' },
   { id: 'trend',       label: '자산 추이' },
   { id: 'auto-update', label: '가격 업데이트' },
@@ -57,13 +58,13 @@ function renderDashboard() {
   destroyChart('pie');
   destroyChart('trend');
   runWhenIdle(() => {
-    if (!hiddenSet.has('pie') || editMode) renderPortfolioPie();
     if (!hiddenSet.has('trend') || editMode) renderTrendChart(UIState.dashboardTrendDays);
   });
 
   _setupDashboardDelegation(container);
   if (editMode) _setupDashDragAndDrop(container);
   else _dashDragCleanup.removeAll();
+  setTimeout(applyDynamicColors, DYNAMIC_COLOR_DELAY_MS);
 }
 
 function _buildDashContext() {
@@ -126,6 +127,7 @@ function _renderDashCardInner(id, ctx) {
     case 'stats':       return _renderStatsCard(ctx);
     case 'fire-goal':   return _renderFireGoalCard(ctx);
     case 'allocation':  return _renderAllocationCard(ctx);
+    case 'stock-sector': return _renderStockSectorCard();
     case 'pie':         return _renderPieCard(ctx);
     case 'trend':       return _renderTrendCard(ctx);
     case 'auto-update': return renderAutoUpdateSection();
@@ -188,6 +190,7 @@ function _renderHeroCard(ctx) {
 function _renderStatsCard(ctx) {
   const { catTotals } = ctx;
   const assetCount = appState.assets.length;
+  const kimchi = getKimchiPremiumInfo();
   return `
     <section class="dash-stats" role="region" aria-label="요약 지표">
       <div class="stat-card">
@@ -209,6 +212,19 @@ function _renderStatsCard(ctx) {
           <div class="stat-sub">${escHtml(cachedUsdt.source)}</div>
         </div>
       ` : ''}
+      ${kimchi ? `
+        <div class="stat-card stat-kimp">
+          <div class="stat-label">김치 프리미엄</div>
+          <div class="stat-value ${kimchi.premium >= 0 ? 'positive' : 'negative'}">${escHtml(fmtPct(kimchi.premium, 2))}</div>
+          <div class="stat-sub">${escHtml(fmtNum(kimchi.usdtRate, 0))}원 ÷ ${escHtml(fmtNum(kimchi.usdRate, 2))}${kimchi.fallback ? ' · 저장값 포함' : ''}</div>
+        </div>
+      ` : `
+        <div class="stat-card stat-kimp stat-muted">
+          <div class="stat-label">김치 프리미엄</div>
+          <div class="stat-value">대기</div>
+          <div class="stat-sub">USD/KRW와 USDT 시세 필요</div>
+        </div>
+      `}
       ${appState.history.length >= 2 ? `
         <div class="stat-card">
           <div class="stat-label">기록 일수</div>
@@ -343,15 +359,99 @@ function _renderAllocationCard(ctx) {
   `;
 }
 
+function _renderStockSectorCard() {
+  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false });
+  if (!sectorHtml) {
+    return `
+      <div class="card" role="region" aria-label="주식 섹터 분포">
+        <div class="card-title">주식 섹터 분포</div>
+        <p class="text-muted">표시할 주식 자산이 없습니다.</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="card" role="region" aria-label="주식 섹터 분포">
+      <div class="card-title">주식 섹터 분포</div>
+      ${sectorHtml}
+    </div>
+  `;
+}
+
 function _renderPieCard(ctx) {
   return `
     <div class="card" role="region" aria-label="자산 분포 차트">
       <div class="card-title">자산 분포</div>
-      <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 분포 차트">
-        <canvas id="chartPie"></canvas>
-      </div>
-      <div id="chartPieAlt"></div>
+      ${renderDistributionBelt(ctx.catTotals, ctx.total, '자산 분포')}
       ${renderPieLegend(ctx.catTotals, ctx.total)}
+    </div>
+  `;
+}
+
+function renderDistributionBelt(totals, total, label, rowsOverride = null) {
+  const rows = rowsOverride || appState.categoryOrder
+    .filter(c => safeNum(totals[c]) > 0)
+    .map(c => ({
+      id: c,
+      label: CAT_MAP[c].label,
+      value: safeNum(totals[c]),
+      color: CAT_MAP[c].color,
+    }));
+  if (!rows.length || total <= 0) {
+    return '<div class="empty-state">표시할 데이터가 없습니다</div>';
+  }
+  const segments = rows.map(row => {
+    const pct = total > 0 ? (row.value / total) * 100 : 0;
+    return `
+      <div class="belt-segment" style="--seg-pct:${pct.toFixed(4)}%;--seg-color:${escAttr(row.color)}"
+        title="${escAttr(row.label)} ${pct.toFixed(1)}%" aria-label="${escAttr(row.label)} ${pct.toFixed(1)}%"></div>
+    `;
+  }).join('');
+  const top = rows.reduce((best, row) => !best || row.value > best.value ? row : best, null);
+  const topPct = top ? (top.value / total) * 100 : 0;
+  return `
+    <div class="belt-chart-wrap" role="img" aria-label="${escAttr(label)} 띠그래프">
+      <div class="belt-chart">${segments}</div>
+      <div class="belt-summary">
+        <span>${escHtml(label)}</span>
+        <strong>${escHtml(fmtKRW(total))}</strong>
+        ${top ? `<span class="text-muted">최대 ${escHtml(top.label)} ${topPct.toFixed(1)}%</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderStockSectorSection(variant = 'full', options = {}) {
+  const sector = calcStockSectorTotals(appState.assets);
+  if (!sector.rows.length || sector.total <= 0) return '';
+  const bare = !!options.bare;
+  const showTitle = options.showTitle !== false;
+  const rows = sector.rows.map(row => ({
+    id: row.id,
+    label: row.label,
+    value: row.value,
+    color: row.color,
+  }));
+  const compact = variant === 'dash';
+  const list = sector.rows.slice(0, compact ? 5 : sector.rows.length).map(row => {
+    const pct = sector.total > 0 ? (row.value / sector.total) * 100 : 0;
+    return `
+      <div class="sector-row">
+        <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
+        <span class="sector-label">${escHtml(row.label)}</span>
+        <span class="sector-value">${escHtml(fmtKRW(row.value))}</span>
+        <span class="sector-pct">${pct.toFixed(1)}%</span>
+      </div>
+    `;
+  }).join('');
+  const unknown = sector.unclassified.length > 0
+    ? `<div class="sector-note">기타 주식: ${escHtml(sector.unclassified.map(a => a.name).slice(0, 4).join(', '))}${sector.unclassified.length > 4 ? ' 외' : ''}</div>`
+    : '';
+  return `
+    <div class="stock-sector-section ${bare ? 'stock-sector-bare' : ''}">
+      ${showTitle ? '<div class="alloc-view-title">주식 섹터 분포</div>' : ''}
+      ${renderDistributionBelt({}, sector.total, '주식 섹터', rows)}
+      <div class="sector-list">${list}</div>
+      ${unknown}
     </div>
   `;
 }
@@ -447,6 +547,21 @@ function moveDashCard(cardId, delta) {
   order.splice(newIdx, 0, cardId);
   saveDashPrefs({ order, hidden: prefs.hidden || [] });
   renderDashboard();
+}
+
+function isDashCardVisible(cardId) {
+  if (!cardId) return true;
+  const prefs = loadDashPrefs();
+  return !(prefs.hidden || []).includes(cardId);
+}
+
+function setDashCardVisible(cardId, visible) {
+  if (!cardId) return;
+  const prefs = loadDashPrefs();
+  const hidden = new Set(prefs.hidden || []);
+  if (visible) hidden.delete(cardId);
+  else hidden.add(cardId);
+  saveDashPrefs({ order: _getDashOrder(prefs), hidden: [...hidden] });
 }
 
 function doResetDashPrefs() {
