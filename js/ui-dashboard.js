@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.27.0 — Dashboard UI
+   My Portfolio v5.28.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -360,7 +360,7 @@ function _renderAllocationCard(ctx) {
 }
 
 function _renderStockSectorCard() {
-  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false });
+  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'dash' });
   if (!sectorHtml) {
     return `
       <div class="card" role="region" aria-label="주식 섹터 분포">
@@ -425,6 +425,7 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   if (!sector.rows.length || sector.total <= 0) return '';
   const bare = !!options.bare;
   const showTitle = options.showTitle !== false;
+  const scope = String(options.scope || variant || 'sector').replace(/[^\w-]/g, '');
   const rows = sector.rows.map(row => ({
     id: row.id,
     label: row.label,
@@ -434,12 +435,35 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   const compact = variant === 'dash';
   const list = sector.rows.slice(0, compact ? 5 : sector.rows.length).map(row => {
     const pct = sector.total > 0 ? (row.value / sector.total) * 100 : 0;
+    const isOpen = !!UIState.stockSectorOpen[row.id];
+    const panelId = `sectorAssets_${scope}_${row.id}`;
+    const assetList = isOpen ? row.assets
+      .slice()
+      .sort((a, b) => b.value - a.value)
+      .map(item => {
+        const asset = item.asset || {};
+        const code = asset.stockCode ? ` · ${asset.stockCode}` : '';
+        const assetPct = row.value > 0 ? (item.value / row.value) * 100 : 0;
+        return `
+          <button type="button" class="sector-asset-row" data-action="open-asset-detail" data-id="${escAttr(asset.id)}"
+            aria-label="${escAttr(asset.name || '이름 없는 주식')} 상세 보기">
+            <span class="sector-asset-name">${escHtml(asset.name || '이름 없는 주식')}<span class="sector-asset-code">${escHtml(code)}</span></span>
+            <span class="sector-asset-value">${escHtml(fmtKRW(item.value))}</span>
+            <span class="sector-asset-pct">${assetPct.toFixed(1)}%</span>
+          </button>
+        `;
+      }).join('') : '';
     return `
-      <div class="sector-row">
+      <button type="button" class="sector-row sector-row-toggle" data-action="toggle-stock-sector" data-sector="${escAttr(row.id)}"
+        aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}">
         <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
         <span class="sector-label">${escHtml(row.label)}</span>
         <span class="sector-value">${escHtml(fmtKRW(row.value))}</span>
         <span class="sector-pct">${pct.toFixed(1)}%</span>
+        <span class="sector-chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▾</span>
+      </button>
+      <div class="sector-assets ${isOpen ? 'open' : ''}" id="${escAttr(panelId)}" ${isOpen ? '' : 'hidden'}>
+        ${assetList}
       </div>
     `;
   }).join('');
@@ -497,6 +521,7 @@ function _handleDashAction(target, e) {
   if (action === 'trend') _handleTrendClick(Number(target.dataset.days), target);
   else if (action === 'auto-update') startAutoUpdate();
   else if (action === 'toggle-dash-cat') { const catId = target.dataset.cat; if (catId) toggleDashCat(catId); }
+  else if (action === 'toggle-stock-sector') { const sectorId = target.dataset.sector; if (sectorId) toggleStockSector(sectorId); }
   else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   else if (action === 'go-tab') { const tab = target.dataset.tab; if (tab) goTab(tab); }
   else if (action === 'toggle-dash-edit') toggleDashEditMode();
@@ -506,6 +531,12 @@ function _handleDashAction(target, e) {
   else if (action === 'reset-dash-prefs') doResetDashPrefs();
   else if (action === 'open-monthly-report') openMonthlyReport(target.dataset.month || null);
   else if (action === 'dismiss-monthly-report') dismissMonthlyReportCard(target.dataset.month);
+}
+
+function toggleStockSector(sectorId) {
+  UIState.stockSectorOpen[sectorId] = !UIState.stockSectorOpen[sectorId];
+  if (currentTab === 'pgAi') renderAnalysis();
+  else if (currentTab === 'pgDash') renderDashboard();
 }
 
 function _handleTrendClick(days, btn) {

@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.27.0 — Configuration
+   My Portfolio v5.28.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.27.0';
+const APP_VERSION = '5.28.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -186,9 +186,14 @@ const STOCK_SECTOR_RULES = Object.freeze([
     keywords: ['반도체','소부장','hbm','chip','칩','파운드리','삼성전자','하이닉스','nvidia','엔비디아','마이크론','퀄컴'],
   },
   {
-    id: 'shipbuilding_defense', label: '조선/방산', color: '#6B9DC7',
-    tickers: ['LMT','RTX','NOC','GD','HII','BA','009540','010140','042660','329180','064350','012450','047810','079550'],
-    keywords: ['조선','방산','방위','항공우주','우주항공','한화오션','한국조선','현대중공업','현대로템','kai','aerospace','defense','shipbuilding'],
+    id: 'shipbuilding', label: '조선', color: '#6B9DC7',
+    tickers: ['009540','010140','042660','329180','010620','097230','082740'],
+    keywords: ['조선','선박','조선해양','한화오션','한국조선','현대중공업','현대미포','삼성중공업','shipbuilding','shipyard'],
+  },
+  {
+    id: 'defense', label: '방산', color: '#5368D6',
+    tickers: ['LMT','RTX','NOC','GD','HII','BA','064350','012450','047810','079550','272210','003490'],
+    keywords: ['방산','방위','국방','군수','항공우주','우주항공','현대로템','한화에어로스페이스','한국항공우주','한화시스템','lig넥스원','kai','aerospace','defense','missile','미사일','무기'],
   },
   {
     id: 'auto_mobility', label: '자동차/모빌리티', color: '#E8889E',
@@ -353,6 +358,7 @@ const UIState = {
   listCategoryOpen: {},
   listCategoryShown: {},
   dashboardCategoryOpen: {},
+  stockSectorOpen: {},
   dashboardTrendDays: 30,
   dashboardEditMode: false,
   isEditMode: false,
@@ -378,6 +384,7 @@ const UIState = {
     this.listCategoryOpen = {};
     this.listCategoryShown = {};
     this.dashboardCategoryOpen = {};
+    this.stockSectorOpen = {};
     this.dashboardTrendDays = 30;
     this.dashboardEditMode = false;
     this.isEditMode = false;

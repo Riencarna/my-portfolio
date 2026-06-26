@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.27.0 — Analysis UI
+   My Portfolio v5.28.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -67,6 +67,8 @@ function _setupAnalysisDelegation(container) {
     else if (action === 'save-gemini-key') doSaveGeminiKey();
     else if (action === 'clear-gemini-key') doClearGeminiKey();
     else if (action === 'run-gemini-analysis') doRunGeminiAnalysis();
+    else if (action === 'toggle-stock-sector') { const sectorId = target.dataset.sector; if (sectorId) toggleStockSector(sectorId); }
+    else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   }
   container.onclick = (e) => {
     const target = e.target.closest('[data-action]');
@@ -547,7 +549,7 @@ function _setupAllocationLiveSum() {
 }
 
 function renderStockSectorAnalysisSection() {
-  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false });
+  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'ai' });
   if (!sectorHtml) return '';
   return `
     <div class="card" role="region" aria-label="주식 섹터 분포">
