@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.31.0 — Stylesheet
+   My Portfolio v5.32.1 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -682,7 +682,13 @@ input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px;vertic
 .asset-values{text-align:right}
 .asset-value{font-size:14px;font-weight:700;color:var(--t1)}
 .asset-profit{font-size:12px;margin-top:2px;font-weight:500}
-.edit-actions{display:flex;gap:4px;margin-left:6px}
+.list-asset-editing{cursor:default}
+.edit-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-left:6px;flex-wrap:wrap}
+.asset-order-actions{display:flex;align-items:center;gap:2px;padding:2px;background:var(--surface-alt);border:1px solid var(--bd);border-radius:var(--radius-md)}
+.edit-actions .btn-icon{width:32px;height:32px;min-width:32px;font-size:13px}
+.edit-actions .btn-icon:disabled{opacity:.32;cursor:not-allowed;pointer-events:none}
+.order-btn{font-weight:700;color:var(--t3)}
+.order-btn:hover:not(:disabled){color:var(--primary);background:var(--primary-soft)}
 
 /* Show More */
 .show-more-btn{width:100%;margin-top:10px;text-align:center}
@@ -719,6 +725,9 @@ input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px;vertic
 /* Mobile: WCAG 44px hit area */
 @media (max-width: 720px){
   .drag-handle{min-width:44px;min-height:44px;font-size:20px}
+  .list-asset-editing{flex-wrap:wrap;align-items:flex-start}
+  .list-asset-editing .edit-actions{width:100%;margin-left:56px}
+  .edit-actions .btn-icon{width:38px;height:38px;min-width:38px}
 }
 
 /* =============================================

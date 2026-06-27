@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.31.0 — App Entry Point
+   My Portfolio v5.32.1 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -16,8 +16,19 @@ const TAB_LABELS = ['대시보드', '자산', '수입', '기록', '분석'];
 const FAB_ITEMS = [
   { icon: '📋', label: '자산 추가', action: 'fab-add-asset' },
   { icon: '💰', label: '수입 추가', action: 'fab-add-income' },
-  { icon: '🔗', label: '지갑 스캔', action: 'fab-wallet-scan' },
 ];
+
+function getFABItems() {
+  const items = [...FAB_ITEMS];
+  if (currentTab === 'pgList' && UIState.listFilter !== 'sold') {
+    items.push({
+      icon: UIState.isEditMode ? '✓' : '✎',
+      label: UIState.isEditMode ? '편집 완료' : '자산 편집',
+      action: 'fab-toggle-list-edit',
+    });
+  }
+  return items;
+}
 
 // ── Initialization ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -258,6 +269,7 @@ function goTab(tabId) {
   renderTabContent(newIdx > oldIdx ? 'forward' : 'backward');
   syncNav();
   renderPageHeader();
+  renderFAB();
 
   requestAnimationFrame(() => {
     const page = $(`#${currentTab}`);
@@ -527,7 +539,7 @@ function renderBottomNav() {
 function renderFAB() {
   const menu = $('#fabMenu');
   if (!menu) return;
-  menu.innerHTML = FAB_ITEMS.map(item => `
+  menu.innerHTML = getFABItems().map(item => `
     <button class="fab-menu-item" data-action="${item.action}" role="menuitem" aria-label="${item.label}">
       <span aria-hidden="true">${item.icon}</span>
       ${item.label}
@@ -648,6 +660,6 @@ document.addEventListener('click', e => {
     case 'close-fab': closeFAB(); break;
     case 'fab-add-asset': closeFAB(); openAddAsset(); break;
     case 'fab-add-income': closeFAB(); openAddIncome(); break;
-    case 'fab-wallet-scan': closeFAB(); openWalletScan(); break;
+    case 'fab-toggle-list-edit': closeFAB(); if (currentTab === 'pgList') toggleEditMode(); break;
   }
 });

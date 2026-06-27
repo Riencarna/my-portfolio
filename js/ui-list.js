@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.31.0 — Asset List UI
+   My Portfolio v5.32.1 — Asset List UI
    Cycle C: 보유중/매도완료 탭 (C-15)
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1
@@ -11,6 +11,8 @@ let _dragInsertBefore = false;
 let _touchDragEl = null;
 let _touchClone = null;
 let _touchInsertBefore = false;
+let _dragScrollRaf = null;
+let _dragScrollSpeed = 0;
 
 const _listCleanup = Cleanup.scope('list');
 const _dragCleanup = Cleanup.scope('drag');
@@ -37,14 +39,6 @@ function renderList() {
         <input type="text" id="searchInput" placeholder="자산 검색..."
           value="${escAttr(UIState.listSearchQuery)}" aria-label="자산 검색">
         ${UIState.listSearchQuery ? '<button class="search-clear" data-action="clear-search" aria-label="검색 초기화">✕</button>' : ''}
-      </div>
-      <div class="list-actions">
-        ${UIState.listFilter !== 'sold' ? `
-          <button class="btn-sm ${UIState.isEditMode ? 'active' : ''}" data-action="toggle-edit"
-            aria-pressed="${UIState.isEditMode}" aria-label="${UIState.isEditMode ? '편집 완료' : '편집 모드'}">
-            ${UIState.isEditMode ? '✓ 완료' : '✎ 편집'}
-          </button>
-        ` : ''}
       </div>
     </div>
 
@@ -133,6 +127,10 @@ function _handleListAction(target, e) {
     e.stopPropagation();
     const id = target.dataset.id;
     if (id) confirmDeleteAsset(id);
+  } else if (action === 'move-asset-top' || action === 'move-asset-up' || action === 'move-asset-down' || action === 'move-asset-bottom') {
+    e.stopPropagation();
+    const id = target.dataset.id;
+    if (id) moveAssetOrder(id, action.replace('move-asset-', ''));
   }
 }
 
@@ -182,6 +180,7 @@ function setListFilter(filter) {
   // 매도완료 탭으로 전환 시 편집 모드 자동 해제
   if (filter === 'sold' && UIState.isEditMode) UIState.isEditMode = false;
   renderList();
+  renderFAB();
 }
 
 function clearSearch() {
@@ -192,6 +191,7 @@ function clearSearch() {
 function toggleEditMode() {
   UIState.isEditMode = !UIState.isEditMode;
   renderList();
+  renderFAB();
 }
 
 function renderListCategory(catId, assets, staggerIdx = 2, prevAssetValues = null) {
@@ -272,16 +272,46 @@ function showMoreAssets(catId) {
   if (UIState.isEditMode) setupDragAndDrop();
 }
 
+function _assetOrderMeta(asset) {
+  const siblings = appState.assets.filter(a => a.category === asset.category);
+  return {
+    index: siblings.findIndex(a => a.id === asset.id),
+    count: siblings.length,
+  };
+}
+
+function _renderAssetMoveActions(asset) {
+  const meta = _assetOrderMeta(asset);
+  const atTop = meta.index <= 0;
+  const atBottom = meta.index < 0 || meta.index >= meta.count - 1;
+  const disabledAll = meta.count <= 1 || meta.index < 0;
+  const name = escAttr(asset.name);
+  const id = escAttr(asset.id);
+  return `
+    <div class="asset-order-actions" aria-label="${name} 순서 변경">
+      <button class="btn-icon order-btn" data-action="move-asset-top" data-id="${id}" draggable="false"
+        aria-label="${name} 맨 위로 이동" title="맨 위로 이동" ${disabledAll || atTop ? 'disabled' : ''}>⇧</button>
+      <button class="btn-icon order-btn" data-action="move-asset-up" data-id="${id}" draggable="false"
+        aria-label="${name} 한 칸 위로 이동" title="한 칸 위로 이동" ${disabledAll || atTop ? 'disabled' : ''}>↑</button>
+      <button class="btn-icon order-btn" data-action="move-asset-down" data-id="${id}" draggable="false"
+        aria-label="${name} 한 칸 아래로 이동" title="한 칸 아래로 이동" ${disabledAll || atBottom ? 'disabled' : ''}>↓</button>
+      <button class="btn-icon order-btn" data-action="move-asset-bottom" data-id="${id}" draggable="false"
+        aria-label="${name} 맨 아래로 이동" title="맨 아래로 이동" ${disabledAll || atBottom ? 'disabled' : ''}>⇩</button>
+    </div>
+  `;
+}
+
 function renderListAsset(asset, prevAssetValues) {
   const v = calcAssetValue(asset);
   const isInv = INVESTMENT_CATS.includes(asset.category);
   const hasProfit = isInv && v.cost > 0;
   const deltaBadge = _renderAssetDeltaBadge(asset, v.value, prevAssetValues);
+  const assetId = escAttr(asset.id);
 
   return `
-    <div class="list-asset" data-id="${asset.id}" data-cat="${escAttr(asset.category)}"
+    <div class="list-asset ${UIState.isEditMode ? 'list-asset-editing' : ''}" data-id="${assetId}" data-cat="${escAttr(asset.category)}"
       ${UIState.isEditMode ? 'draggable="true"' : ''}
-      ${UIState.isEditMode ? '' : `data-action="open-asset-detail" data-id="${asset.id}"`}
+      ${UIState.isEditMode ? '' : `data-action="open-asset-detail" data-id="${assetId}"`}
       role="listitem" tabindex="0"
       aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
       ${UIState.isEditMode ? '<span class="drag-handle" aria-label="드래그">⠿</span>' : ''}
@@ -301,8 +331,9 @@ function renderListAsset(asset, prevAssetValues) {
       </div>
       ${UIState.isEditMode ? `
         <div class="edit-actions" draggable="false">
-          <button class="btn-icon" data-action="edit-asset" data-id="${asset.id}" draggable="false" aria-label="${escAttr(asset.name)} 수정">✎</button>
-          <button class="btn-icon btn-danger" data-action="delete-asset" data-id="${asset.id}" draggable="false" aria-label="${escAttr(asset.name)} 삭제">🗑</button>
+          ${_renderAssetMoveActions(asset)}
+          <button class="btn-icon" data-action="edit-asset" data-id="${assetId}" draggable="false" aria-label="${escAttr(asset.name)} 수정">✎</button>
+          <button class="btn-icon btn-danger" data-action="delete-asset" data-id="${assetId}" draggable="false" aria-label="${escAttr(asset.name)} 삭제">🗑</button>
         </div>
       ` : ''}
     </div>
@@ -384,6 +415,7 @@ function setupDragAndDrop() {
     _dragCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
       _clearDragOverClasses();
+      _stopDragAutoScroll();
       _dragAssetId = null;
       _dragCatName = null;
       _dragInsertBefore = false;
@@ -394,6 +426,7 @@ function setupDragAndDrop() {
       if (!_dragAssetId || el.dataset.cat !== _dragCatName) return;
       if (el.dataset.id === _dragAssetId) return;
       e.preventDefault();
+      _updateDragAutoScroll(e.clientY);
       e.dataTransfer.dropEffect = 'move';
       const rect = el.getBoundingClientRect();
       const before = (e.clientY - rect.top) < rect.height / 2;
@@ -439,6 +472,7 @@ function setupDragAndDrop() {
     _dragCleanup.add(el, 'dragend', () => {
       el.classList.remove('dragging');
       _clearDragOverClasses();
+      _stopDragAutoScroll();
       _dragCatName = null;
       _dragInsertBefore = false;
       setTimeout(() => { window.__dragInProgress = false; }, 50);
@@ -448,6 +482,7 @@ function setupDragAndDrop() {
       if (_dragAssetId) return; // asset 드래그 중엔 카테고리 하이라이트 금지
       if (!_dragCatName || el.dataset.cat === _dragCatName) return;
       e.preventDefault();
+      _updateDragAutoScroll(e.clientY);
       e.dataTransfer.dropEffect = 'move';
       const rect = el.getBoundingClientRect();
       const before = (e.clientY - rect.top) < rect.height / 2;
@@ -473,6 +508,12 @@ function setupDragAndDrop() {
     });
   });
 
+  _dragCleanup.add(document, 'dragover', e => {
+    if (!_dragAssetId && !_dragCatName) return;
+    _updateDragAutoScroll(e.clientY);
+  });
+  _dragCleanup.add(document, 'drop', _stopDragAutoScroll);
+
   setupTouchDrag();
 }
 
@@ -482,12 +523,46 @@ function _clearDragOverClasses() {
   });
 }
 
+function _updateDragAutoScroll(clientY) {
+  const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+  if (!viewportH) return;
+  const edge = 88;
+  const maxSpeed = 18;
+  let speed = 0;
+  if (clientY < edge) {
+    speed = -Math.ceil(((edge - Math.max(0, clientY)) / edge) * maxSpeed);
+  } else if (viewportH - clientY < edge) {
+    speed = Math.ceil(((edge - Math.max(0, viewportH - clientY)) / edge) * maxSpeed);
+  }
+  _dragScrollSpeed = speed;
+  if (speed && !_dragScrollRaf) _dragScrollRaf = requestAnimationFrame(_runDragAutoScroll);
+  if (!speed && _dragScrollRaf) _stopDragAutoScroll();
+}
+
+function _runDragAutoScroll() {
+  if (!_dragScrollSpeed) {
+    _dragScrollRaf = null;
+    return;
+  }
+  window.scrollBy(0, _dragScrollSpeed);
+  _dragScrollRaf = requestAnimationFrame(_runDragAutoScroll);
+}
+
+function _stopDragAutoScroll() {
+  _dragScrollSpeed = 0;
+  if (_dragScrollRaf) {
+    cancelAnimationFrame(_dragScrollRaf);
+    _dragScrollRaf = null;
+  }
+}
+
 // ── Touch Drag (mobile) ──
 function setupTouchDrag() {
   const touchMoveHandler = e => {
     if (!_touchClone) return;
     e.preventDefault();
     const t = e.touches[0];
+    _updateDragAutoScroll(t.clientY);
     positionGhost(t);
     const elBelow = document.elementFromPoint(t.clientX, t.clientY);
     const target = elBelow?.closest('.list-asset, .list-cat');
@@ -555,6 +630,7 @@ function cleanupTouchDrag() {
   if (_touchDragEl) { _touchDragEl.classList.remove('dragging'); _touchDragEl = null; }
   _touchInsertBefore = false;
   _clearDragOverClasses();
+  _stopDragAutoScroll();
   setTimeout(() => { window.__dragInProgress = false; }, 50);
 }
 
@@ -567,6 +643,59 @@ function positionGhost(touch) {
 function onReorderAsset(fromId, toId, insertBefore) {
   reorderAsset(fromId, toId, insertBefore);
   renderList();
+}
+
+function moveAssetOrder(id, direction) {
+  const asset = getAsset(id);
+  if (!asset) return;
+  const siblings = appState.assets.filter(a => a.category === asset.category);
+  const idx = siblings.findIndex(a => a.id === id);
+  if (idx < 0 || siblings.length <= 1) return;
+
+  let target = null;
+  let insertBefore = true;
+  let nextIndex = idx;
+  if (direction === 'top') {
+    target = siblings[0];
+    insertBefore = true;
+    nextIndex = 0;
+  } else if (direction === 'up') {
+    target = siblings[idx - 1];
+    insertBefore = true;
+    nextIndex = Math.max(0, idx - 1);
+  } else if (direction === 'down') {
+    target = siblings[idx + 1];
+    insertBefore = false;
+    nextIndex = Math.min(siblings.length - 1, idx + 1);
+  } else if (direction === 'bottom') {
+    target = siblings[siblings.length - 1];
+    insertBefore = false;
+    nextIndex = siblings.length - 1;
+  }
+  if (!target || target.id === id) return;
+
+  UIState.listCategoryShown[asset.category] = Math.max(
+    UIState.listCategoryShown[asset.category] || LAZY_RENDER_THRESHOLD,
+    nextIndex + 1
+  );
+  reorderAsset(id, target.id, insertBefore);
+  renderList();
+  _focusMovedAsset(id, direction);
+}
+
+function _focusMovedAsset(id, direction) {
+  requestAnimationFrame(() => {
+    const el = $$('.list-asset').find(node => node.dataset.id === id);
+    if (!el) return;
+    const block = (direction === 'top' || direction === 'bottom') ? 'center' : 'nearest';
+    el.scrollIntoView({ block, behavior: 'smooth' });
+    const focusTarget = el.querySelector('[data-action="move-asset-top"]:not(:disabled)') ||
+      el.querySelector('[data-action="move-asset-up"]:not(:disabled)') ||
+      el;
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      try { focusTarget.focus({ preventScroll: true }); } catch (_) { focusTarget.focus(); }
+    }
+  });
 }
 
 function onReorderCategory(fromCat, toCat, insertBefore) {

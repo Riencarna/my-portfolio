@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.31.0 — Modals UI
+   My Portfolio v5.32.1 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -125,11 +125,28 @@ function openConfirmModal(msg, onConfirm) {
 }
 
 // ── Category Selector ──
-function renderCategorySelector(selectedId, containerId) {
+const STOCK_KIND_DOMESTIC = 'domesticStock';
+const STOCK_KIND_FOREIGN = 'foreignStock';
+const STOCK_KIND_DOMESTIC_FOREIGN_ETF = 'domesticForeignEtf';
+const KOREAN_EXCHANGE_MARKETS = Object.freeze(['KOSPI', 'KOSDAQ']);
+const KOREAN_STOCK_MARKETS = Object.freeze([...KOREAN_EXCHANGE_MARKETS, '']);
+const KOREAN_LISTED_ETF_MARKETS = Object.freeze(['KOSPI']);
+const FOREIGN_STOCK_MARKETS = Object.freeze(['NASDAQ', 'NYSE', '']);
+
+function renderCategorySelector(selectedId, containerId, selectedStockKind = '') {
   return `<div class="cat-select" id="${containerId}" role="radiogroup" aria-labelledby="${containerId}Label">
-    ${CATEGORIES.map(c => `<button class="cat-btn ${c.id === selectedId ? 'active' : ''}"
-      data-cat="${escAttr(c.id)}" data-action="select-cat" role="radio"
-      aria-checked="${c.id === selectedId ? 'true' : 'false'}">${c.icon} ${escHtml(c.label)}</button>`).join('')}</div>`;
+    ${CATEGORIES.map(c => {
+      const stockKind = c.id === '국내주식' ? STOCK_KIND_DOMESTIC : (c.id === '해외주식' ? STOCK_KIND_FOREIGN : '');
+      const isBaseActive = c.id === selectedId && !(c.id === '해외주식' && selectedStockKind === STOCK_KIND_DOMESTIC_FOREIGN_ETF);
+      const base = `<button class="cat-btn ${isBaseActive ? 'active' : ''}"
+        data-cat="${escAttr(c.id)}" data-stock-kind="${escAttr(stockKind)}" data-action="select-cat" role="radio"
+        aria-checked="${isBaseActive ? 'true' : 'false'}">${c.icon} ${escHtml(c.label)}</button>`;
+      if (c.id !== '해외주식') return base;
+      const isEtfActive = selectedId === '해외주식' && selectedStockKind === STOCK_KIND_DOMESTIC_FOREIGN_ETF;
+      return base + `<button class="cat-btn ${isEtfActive ? 'active' : ''}"
+        data-cat="해외주식" data-stock-kind="${STOCK_KIND_DOMESTIC_FOREIGN_ETF}" data-action="select-cat" role="radio"
+        aria-checked="${isEtfActive ? 'true' : 'false'}">🇰🇷🌍 국내상장 해외 ETF</button>`;
+    }).join('')}</div>`;
 }
 
 function selectCat(btn) {
@@ -140,7 +157,7 @@ function selectCat(btn) {
   });
   btn.classList.add('active');
   btn.setAttribute('aria-checked', 'true');
-  updateFormFields(btn.dataset.cat);
+  updateFormFields(btn.dataset.cat, btn.dataset.stockKind || '');
 }
 
 function renderIncomeCatSelector(selectedCat, labelId) {
@@ -229,7 +246,57 @@ const NAME_PLACEHOLDER = {
   '기타': '예: 금, 자동차, 보험',
 };
 
-function updateFormFields(cat) {
+function _stockKindForAsset(asset) {
+  if (!asset) return '';
+  if (asset.category === '국내주식') return STOCK_KIND_DOMESTIC;
+  // Older local test data may have KOSDAQ here; keep recognizing it as this
+  // form choice, but new domestic-listed overseas ETFs are saved as KOSPI.
+  if (asset.category === '해외주식' && KOREAN_EXCHANGE_MARKETS.includes(asset.market || '')) {
+    return STOCK_KIND_DOMESTIC_FOREIGN_ETF;
+  }
+  if (asset.category === '해외주식') return STOCK_KIND_FOREIGN;
+  return '';
+}
+
+function _stockMarketsFor(cat, stockKind) {
+  if (stockKind === STOCK_KIND_DOMESTIC_FOREIGN_ETF) return KOREAN_LISTED_ETF_MARKETS;
+  if (cat === '국내주식') return KOREAN_STOCK_MARKETS;
+  if (cat === '해외주식') return FOREIGN_STOCK_MARKETS;
+  return [''];
+}
+
+function _renderStockMarketOptions(cat, stockKind, selectedMarket = '') {
+  const markets = _stockMarketsFor(cat, stockKind);
+  const selected = markets.includes(selectedMarket) ? selectedMarket : markets[0];
+  return markets.map(m => `<option value="${escAttr(m)}" ${selected === m ? 'selected' : ''}>${m || '기타'}</option>`).join('');
+}
+
+function _syncStockMarketFields(cat, stockKind) {
+  const select = $('#assetMarket');
+  if (!select) return;
+  const markets = _stockMarketsFor(cat, stockKind);
+  const selected = markets.includes(select.value) ? select.value : markets[0];
+  select.innerHTML = _renderStockMarketOptions(cat, stockKind, selected);
+  select.value = selected;
+
+  const marketLabel = document.querySelector('.modal.active label[for="assetMarket"]');
+  if (marketLabel) {
+    marketLabel.textContent = stockKind === STOCK_KIND_DOMESTIC_FOREIGN_ETF ? '국내 거래소' : '시장';
+  }
+
+  const codeInput = $('#assetCode');
+  if (codeInput) {
+    if (stockKind === STOCK_KIND_DOMESTIC_FOREIGN_ETF) codeInput.placeholder = '예: 360750';
+    else if (cat === '국내주식') codeInput.placeholder = '예: 005930';
+    else if (cat === '해외주식') codeInput.placeholder = '예: AAPL, QQQ';
+    else codeInput.placeholder = '';
+  }
+}
+
+function updateFormFields(cat, stockKind = '') {
+  const activeCatBtn = $('.modal.active .cat-btn.active');
+  const effectiveStockKind = stockKind || activeCatBtn?.dataset?.stockKind || '';
+  const isDomesticForeignEtf = cat === '해외주식' && effectiveStockKind === STOCK_KIND_DOMESTIC_FOREIGN_ETF;
   const isStock = ['국내주식', '해외주식'].includes(cat);
   const isCoin = cat === '코인';
   const isCash = cat === '현금';
@@ -239,8 +306,16 @@ function updateFormFields(cat) {
   const priceLabel = $('#editPriceLabel');
   const nameInput = $('#assetName') || $('#editName');
   if (stockF) { stockF.classList.toggle('hidden', !isStock); stockF.classList.toggle('form-row-visible', isStock); }
+  if (isStock) _syncStockMarketFields(cat, effectiveStockKind);
   const stockKrHint = $('#stockKrHint');
-  if (stockKrHint) stockKrHint.classList.toggle('hidden', cat !== '국내주식');
+  if (stockKrHint) {
+    stockKrHint.classList.toggle('hidden', !(cat === '국내주식' || isDomesticForeignEtf));
+    if (isDomesticForeignEtf) {
+      stockKrHint.innerHTML = '국내 거래소에 상장됐지만 <strong>해외주식 자산</strong>으로 저장됩니다. 가격은 국내 종목코드로 업데이트됩니다.';
+    } else if (cat === '국내주식') {
+      stockKrHint.innerHTML = 'TIGER/KODEX 미국·나스닥 등 <strong>해외 지수 추종 ETF</strong>는 "국내상장 해외 ETF"를 선택하세요.';
+    }
+  }
   if (coinF) coinF.classList.toggle('hidden', !isCoin);
   if (usdtF) usdtF.classList.toggle('hidden', !isCash);
   const usdtMultiF = $('#usdtMultiField');
@@ -248,7 +323,9 @@ function updateFormFields(cat) {
   if (txnSection) txnSection.classList.toggle('hidden', !isInvestment);
   if (valueField) valueField.classList.toggle('hidden', isInvestment || (isCash && $('#isUsdt')?.checked));
   if (priceLabel) priceLabel.textContent = isInvestment ? '현재 단가' : '금액';
-  if (nameInput) nameInput.placeholder = NAME_PLACEHOLDER[cat] || '자산명';
+  if (nameInput) {
+    nameInput.placeholder = isDomesticForeignEtf ? '예: TIGER 미국S&P500, KODEX 미국나스닥100' : (NAME_PLACEHOLDER[cat] || '자산명');
+  }
   const coinCurrField = $('#coinCurrencyField');
   if (coinCurrField) coinCurrField.classList.toggle('hidden', !isCoin);
   if (!isCoin) {
@@ -267,8 +344,8 @@ function openAddAsset() {
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 추가</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
     <div class="form-group"><label id="catSelectLabel">카테고리</label>${renderCategorySelector('국내주식', 'catSelect')}</div>
     <div class="form-group"><label for="assetName">자산명 *</label><input type="text" id="assetName" placeholder="예: 삼성전자, SK하이닉스" maxlength="100" required></div>
-    <div class="form-row" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" placeholder="예: 005930" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket"><option value="KOSPI">KOSPI</option><option value="KOSDAQ">KOSDAQ</option><option value="NYSE">NYSE</option><option value="NASDAQ">NASDAQ</option><option value="">기타</option></select></div></div>
-    <div class="form-hint-info" id="stockKrHint" role="note">💡 TIGER/KODEX 미국·나스닥 등 <strong>해외 지수 추종 ETF</strong>는 "해외주식" 카테고리를 선택하세요</div>
+    <div class="form-row" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" placeholder="예: 005930" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${_renderStockMarketOptions('국내주식', STOCK_KIND_DOMESTIC, 'KOSPI')}</select></div></div>
+    <div class="form-hint-info hidden" id="stockKrHint" role="note"></div>
     <div class="form-group hidden" id="coinField"><label for="coinSelect">코인 ID (CoinGecko)</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, id]) => `<option value="${escAttr(id)}">${escHtml(sym)} (${escHtml(id)})</option>`).join('')}<option value="__custom__">직접 입력</option></select><input type="text" id="coinCustomId" class="hidden" placeholder="CoinGecko ID 입력 (예: tether-gold)" maxlength="100" style="margin-top:6px"></div>
     <div class="form-group hidden" id="usdtField"><label><input type="checkbox" id="isUsdt"> USDT (자동 환율 업데이트)</label></div>
     <div class="hidden" id="usdtMultiField">
@@ -297,7 +374,9 @@ function openAddAsset() {
 function doAddAsset() {
   const name = $('#assetName')?.value.trim();
   if (!name) { showToast('자산명을 입력하세요', 'error'); return; }
-  const cat = $('.modal.active .cat-btn.active')?.dataset?.cat || '기타';
+  const activeCatBtn = $('.modal.active .cat-btn.active');
+  const cat = activeCatBtn?.dataset?.cat || '기타';
+  const isStock = STOCK_CATS.includes(cat);
   const isInvestment = INVESTMENT_CATS.includes(cat);
   const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
   let amount, txns, usdtQty, usdtDetails;
@@ -329,8 +408,8 @@ function doAddAsset() {
   }
   const asset = addAsset({
     name, category: cat, amount,
-    stockCode: isInvestment ? ($('#assetCode')?.value.trim() || '') : '',
-    market: isInvestment ? ($('#assetMarket')?.value || '') : '',
+    stockCode: isStock ? ($('#assetCode')?.value.trim() || '') : '',
+    market: isStock ? ($('#assetMarket')?.value || '') : '',
     coinId: cat === '코인' ? _getCoinIdValue() : '',
     isUsdt: isUsdtChecked,
     usdtQty: isUsdtChecked ? usdtQty : undefined,
@@ -374,14 +453,15 @@ function openEditAsset(id) {
   const isStock = ['국내주식', '해외주식'].includes(asset.category);
   const isCoin = asset.category === '코인';
   const isCash = asset.category === '현금';
+  const stockKind = _stockKindForAsset(asset);
   _modalCleanup.removeAll();
   _usdtFormInitialTotal = asset.isUsdt ? safeNum(asset.usdtQty) : 0;
   const container = $('#modalMain');
   container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 수정</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
-    <div class="form-group"><label id="editCatSelectLabel">카테고리</label>${renderCategorySelector(asset.category, 'editCatSelect')}</div>
+    <div class="form-group"><label id="editCatSelectLabel">카테고리</label>${renderCategorySelector(asset.category, 'editCatSelect', stockKind)}</div>
     <div class="form-group"><label for="editName">자산명</label><input type="text" id="editName" value="${escAttr(asset.name)}" maxlength="100"></div>
-    <div class="form-row ${isStock ? '' : 'hidden'}" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" value="${escAttr(asset.stockCode)}" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${['KOSPI', 'KOSDAQ', 'NYSE', 'NASDAQ', ''].map(m => `<option value="${escAttr(m)}" ${asset.market === m ? 'selected' : ''}>${m || '기타'}</option>`).join('')}</select></div></div>
-    <div class="form-hint-info ${asset.category === '국내주식' ? '' : 'hidden'}" id="stockKrHint" role="note">💡 TIGER/KODEX 미국·나스닥 등 <strong>해외 지수 추종 ETF</strong>는 "해외주식" 카테고리를 선택하세요</div>
+    <div class="form-row ${isStock ? '' : 'hidden'}" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" value="${escAttr(asset.stockCode)}" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${_renderStockMarketOptions(asset.category, stockKind, asset.market)}</select></div></div>
+    <div class="form-hint-info hidden" id="stockKrHint" role="note"></div>
     <div class="form-group ${isCoin ? '' : 'hidden'}" id="coinField"><label for="coinSelect">코인 ID</label><select id="coinSelect"><option value="">선택하세요</option>${Object.entries(COIN_IDS).map(([sym, cid]) => `<option value="${escAttr(cid)}" ${asset.coinId === cid ? 'selected' : ''}>${escHtml(sym)}</option>`).join('')}<option value="__custom__" ${asset.coinId && !Object.values(COIN_IDS).includes(asset.coinId) ? 'selected' : ''}>직접 입력</option></select><input type="text" id="coinCustomId" class="${asset.coinId && !Object.values(COIN_IDS).includes(asset.coinId) ? '' : 'hidden'}" value="${escAttr(asset.coinId && !Object.values(COIN_IDS).includes(asset.coinId) ? asset.coinId : '')}" placeholder="CoinGecko ID 입력 (예: tether-gold)" maxlength="100" style="margin-top:6px"></div>
     <div class="form-group ${isCash ? '' : 'hidden'}" id="usdtField"><label><input type="checkbox" id="isUsdt" ${asset.isUsdt ? 'checked' : ''}> USDT</label></div>
     <div class="${asset.isUsdt ? '' : 'hidden'}" id="usdtMultiField">
@@ -394,6 +474,7 @@ function openEditAsset(id) {
     <div class="form-group"><label for="editNote">메모</label><input type="text" id="editNote" value="${escAttr(asset.note || '')}" maxlength="500"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button><button class="btn-p" data-action="do-edit-asset" data-id="${id}">저장</button></div></div></div>`;
   openModal('modalMain');
+  updateFormFields(asset.category, stockKind);
   _setupModalMainDelegation(container);
   _setupAmountHints(['editPrice:editPriceHint']);
   _setupUsdtCheckbox();
@@ -403,7 +484,9 @@ function openEditAsset(id) {
 function doEditAsset(id) {
   const prevAsset = getAsset(id);
   if (prevAsset) tryAutoBackup('major', `자산 수정 직전: ${prevAsset.name}`);
-  const cat = $$('#modalMain .cat-btn.active')[0]?.dataset?.cat || '기타';
+  const activeCatBtn = $$('#modalMain .cat-btn.active')[0];
+  const cat = activeCatBtn?.dataset?.cat || '기타';
+  const isStock = STOCK_CATS.includes(cat);
   const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
   let newAmount, usdtQty, usdtDetails;
   if (isUsdtChecked) {
@@ -418,9 +501,9 @@ function doEditAsset(id) {
   const updates = {
     name: $('#editName')?.value.trim() || '이름 없음',
     category: cat,
-    stockCode: $('#assetCode')?.value.trim() || '',
-    market: $('#assetMarket')?.value || '',
-    coinId: _getCoinIdValue(),
+    stockCode: isStock ? ($('#assetCode')?.value.trim() || '') : '',
+    market: isStock ? ($('#assetMarket')?.value || '') : '',
+    coinId: cat === '코인' ? _getCoinIdValue() : '',
     isUsdt: isUsdtChecked,
     usdtQty: isUsdtChecked ? usdtQty : undefined,
     usdtDetails: isUsdtChecked ? usdtDetails : undefined,
