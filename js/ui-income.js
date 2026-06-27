@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.2 — Income UI
+   My Portfolio v5.30.3 — Income UI
    Cycle C compatible
    Soft Neutral palette + dash-charts 재사용
    ============================================= */
