@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.29.1 — Analysis UI
+   My Portfolio v5.30.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -68,6 +68,7 @@ function _setupAnalysisDelegation(container) {
     else if (action === 'clear-gemini-key') doClearGeminiKey();
     else if (action === 'run-gemini-analysis') doRunGeminiAnalysis();
     else if (action === 'toggle-stock-sector') { const sectorKey = target.dataset.sectorKey || target.dataset.sector; if (sectorKey) toggleStockSector(sectorKey); }
+    else if (action === 'toggle-sector-cost-compare') toggleSectorCostCompare();
     else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   }
   container.onclick = (e) => {
@@ -551,9 +552,18 @@ function _setupAllocationLiveSum() {
 function renderStockSectorAnalysisSection() {
   const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'ai' });
   if (!sectorHtml) return '';
+  const costCompare = isSectorCostCompareEnabled();
   return `
     <div class="card" role="region" aria-label="주식 섹터 분포">
-      <div class="card-title">주식 섹터 분포</div>
+      <div class="card-title">
+        <span>주식 섹터 분포</span>
+        <div class="card-title-actions">
+          <button type="button" class="btn-sm" data-action="toggle-sector-cost-compare"
+            aria-pressed="${costCompare}" aria-label="섹터 원금 비교 그래프 ${costCompare ? '끄기' : '켜기'}">
+            ${costCompare ? '원금 비교 끄기' : '원금 비교 켜기'}
+          </button>
+        </div>
+      </div>
       ${sectorHtml}
     </div>
   `;
@@ -762,12 +772,14 @@ function _buildGeminiPortfolioPrompt() {
       amountKRW: Math.round(safeNum(catTotals[c])),
       pct: total > 0 ? Number(((safeNum(catTotals[c]) / total) * 100).toFixed(2)) : 0,
     }));
-  const sectorRows = (sector.groups && sector.groups.length ? sector.groups : [{ label: '전체 주식', total: sector.total, rows: sector.rows }])
+  const sectorRows = (sector.groups && sector.groups.length ? sector.groups : [{ label: '전체 주식', total: sector.total, costTotal: sector.costTotal, rows: sector.rows }])
     .flatMap(group => group.rows.map(s => ({
       region: group.label,
       sector: s.label,
       amountKRW: Math.round(s.value),
+      costKRW: Math.round(safeNum(s.cost)),
       pctOfRegionStocks: group.total > 0 ? Number(((s.value / group.total) * 100).toFixed(2)) : 0,
+      pctOfRegionCost: group.costTotal > 0 ? Number(((safeNum(s.cost) / group.costTotal) * 100).toFixed(2)) : 0,
       sampleAssets: s.assets.slice(0, 5).map(item => item.asset.name),
     })));
   const topAssets = appState.assets

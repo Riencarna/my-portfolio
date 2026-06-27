@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.29.1 — State Management
+   My Portfolio v5.30.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -960,20 +960,25 @@ function loadDashPrefs() {
         return {
           hidden: Array.isArray(parsed.hidden) ? parsed.hidden.map(String) : [],
           order: Array.isArray(parsed.order) ? parsed.order.map(String) : [],
+          totalHidden: !!parsed.totalHidden,
+          sectorCostCompare: parsed.sectorCostCompare !== false,
         };
       }
     }
   } catch (e) {
     console.warn('loadDashPrefs failed:', e);
   }
-  return { hidden: [], order: [] };
+  return { hidden: [], order: [], totalHidden: false, sectorCostCompare: true };
 }
 
 function saveDashPrefs(prefs) {
   try {
+    const existing = loadDashPrefs();
     localStorage.setItem(DASH_PREFS_KEY, JSON.stringify({
-      hidden: Array.isArray(prefs.hidden) ? prefs.hidden.slice(0, 50) : [],
-      order: Array.isArray(prefs.order) ? prefs.order.slice(0, 50) : [],
+      hidden: Array.isArray(prefs.hidden) ? prefs.hidden.slice(0, 50) : existing.hidden,
+      order: Array.isArray(prefs.order) ? prefs.order.slice(0, 50) : existing.order,
+      totalHidden: prefs.totalHidden !== undefined ? !!prefs.totalHidden : !!existing.totalHidden,
+      sectorCostCompare: prefs.sectorCostCompare !== undefined ? prefs.sectorCostCompare !== false : existing.sectorCostCompare !== false,
     }));
   } catch (e) {
     console.warn('saveDashPrefs failed:', e);

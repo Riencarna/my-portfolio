@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.29.1 — Dashboard UI
+   My Portfolio v5.30.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -175,12 +175,18 @@ function _renderDashToolbar(editMode) {
 
 // ── Card Renderers ──
 function _renderHeroCard(ctx) {
+  const totalHidden = isDashTotalHidden();
   return `
     <section class="dash-hero" role="region" aria-label="총 자산 현황">
+      <button type="button" class="dash-total-toggle" data-action="toggle-dash-total"
+        aria-label="총 자산 ${totalHidden ? '드러내기' : '숨기기'}" aria-pressed="${totalHidden}" title="총 자산 ${totalHidden ? '드러내기' : '숨기기'}">
+        ${totalHidden ? '👁' : '🙈'}
+      </button>
       <div class="dash-hero-label">총 자산</div>
-      <div class="dash-hero-value" id="totalValue">${escHtml(fmtKRW(ctx.total))}</div>
+      <div class="dash-hero-value ${totalHidden ? 'dash-value-hidden' : ''}" id="totalValue"
+        aria-label="${totalHidden ? '총 자산 숨김' : `총 자산 ${fmtKRW(ctx.total)}`}">${escHtml(totalHidden ? maskMoney() : fmtKRW(ctx.total))}</div>
       <div class="dash-hero-change ${profitClass(ctx.change)}" aria-label="일일 변동">
-        ${ctx.change !== 0 ? `${ctx.change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(ctx.change)))} (${escHtml(fmtPct(ctx.changePct))})` : '변동 없음'}
+        ${totalHidden ? '변동 금액 숨김' : (ctx.change !== 0 ? `${ctx.change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(ctx.change)))} (${escHtml(fmtPct(ctx.changePct))})` : '변동 없음')}
       </div>
       ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
     </section>
@@ -248,6 +254,7 @@ function _renderFireGoalCard(ctx) {
     `;
   }
   const total = ctx.total;
+  const totalDisplay = isDashTotalHidden() ? maskMoney() : fmtKRW(total);
   const pct = goal.amount > 0 ? (total / goal.amount) * 100 : 0;
   const monthlySaving = safeNum(goal.monthlySaving);
   const expectedReturn = safeNum(goal.expectedReturn != null ? goal.expectedReturn : 7);
@@ -271,7 +278,7 @@ function _renderFireGoalCard(ctx) {
         </div>
         <div class="dash-fire-stats">
           <span>${escHtml(fmtPct(pct, 1))}</span>
-          <span class="text-muted">${escHtml(fmtKRW(total))} / ${escHtml(fmtKRW(goal.amount))}</span>
+          <span class="text-muted">${escHtml(totalDisplay)} / ${escHtml(fmtKRW(goal.amount))}</span>
         </div>
         ${goal.amount > total ? `
           <div class="dash-fire-proj text-muted">예상 도달: ${escHtml(projLabel)}${projDate ? ` (${escHtml(projDate)})` : ''}</div>
@@ -285,7 +292,7 @@ function _renderFireGoalCard(ctx) {
           </div>
           <div class="dash-fire-stats">
             <span>${escHtml(fmtPct(firePct, 1))}</span>
-            <span class="text-muted">${escHtml(fmtKRW(total))} / ${escHtml(fmtKRW(fireAmount))}</span>
+            <span class="text-muted">${escHtml(totalDisplay)} / ${escHtml(fmtKRW(fireAmount))}</span>
           </div>
         </div>
       ` : ''}
@@ -360,34 +367,42 @@ function _renderAllocationCard(ctx) {
 }
 
 function _renderStockSectorCard() {
+  const costCompare = isSectorCostCompareEnabled();
+  const toggle = `
+    <button type="button" class="btn-sm" data-action="toggle-sector-cost-compare"
+      aria-pressed="${costCompare}" aria-label="섹터 원금 비교 그래프 ${costCompare ? '끄기' : '켜기'}">
+      ${costCompare ? '원금 비교 끄기' : '원금 비교 켜기'}
+    </button>
+  `;
   const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'dash' });
   if (!sectorHtml) {
     return `
       <div class="card" role="region" aria-label="주식 섹터 분포">
-        <div class="card-title">주식 섹터 분포</div>
+        <div class="card-title"><span>주식 섹터 분포</span><div class="card-title-actions">${toggle}</div></div>
         <p class="text-muted">표시할 주식 자산이 없습니다.</p>
       </div>
     `;
   }
   return `
     <div class="card" role="region" aria-label="주식 섹터 분포">
-      <div class="card-title">주식 섹터 분포</div>
+      <div class="card-title"><span>주식 섹터 분포</span><div class="card-title-actions">${toggle}</div></div>
       ${sectorHtml}
     </div>
   `;
 }
 
 function _renderPieCard(ctx) {
+  const totalHidden = isDashTotalHidden();
   return `
     <div class="card" role="region" aria-label="자산 분포 차트">
       <div class="card-title">자산 분포</div>
-      ${renderDistributionBelt(ctx.catTotals, ctx.total, '자산 분포')}
+      ${renderDistributionBelt(ctx.catTotals, ctx.total, '자산 분포', null, { hideTotal: totalHidden })}
       ${renderPieLegend(ctx.catTotals, ctx.total)}
     </div>
   `;
 }
 
-function renderDistributionBelt(totals, total, label, rowsOverride = null) {
+function renderDistributionBelt(totals, total, label, rowsOverride = null, options = {}) {
   const rows = rowsOverride || appState.categoryOrder
     .filter(c => safeNum(totals[c]) > 0)
     .map(c => ({
@@ -413,7 +428,7 @@ function renderDistributionBelt(totals, total, label, rowsOverride = null) {
       <div class="belt-chart">${segments}</div>
       <div class="belt-summary">
         <span>${escHtml(label)}</span>
-        <strong>${escHtml(fmtKRW(total))}</strong>
+        <strong>${escHtml(options.hideTotal ? maskMoney() : fmtKRW(total))}</strong>
         ${top ? `<span class="text-muted">최대 ${escHtml(top.label)} ${topPct.toFixed(1)}%</span>` : ''}
       </div>
     </div>
@@ -427,7 +442,8 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   const showTitle = options.showTitle !== false;
   const scope = String(options.scope || variant || 'sector').replace(/[^\w-]/g, '');
   const compact = variant === 'dash';
-  const groups = (sector.groups && sector.groups.length ? sector.groups : [{ id: 'all', label: '전체 주식', total: sector.total, rows: sector.rows, unclassified: sector.unclassified }])
+  const showCostCompare = isSectorCostCompareEnabled();
+  const groups = (sector.groups && sector.groups.length ? sector.groups : [{ id: 'all', label: '전체 주식', total: sector.total, costTotal: sector.costTotal, rows: sector.rows, unclassified: sector.unclassified }])
     .filter(group => group.total > 0 && group.rows.length > 0);
   const groupSections = groups.map(group => {
     const rows = group.rows.map(row => ({
@@ -436,6 +452,14 @@ function renderStockSectorSection(variant = 'full', options = {}) {
       value: row.value,
       color: row.color,
     }));
+    const costRows = group.rows
+      .filter(row => safeNum(row.cost) > 0)
+      .map(row => ({
+        id: row.id,
+        label: row.label,
+        value: safeNum(row.cost),
+        color: row.color,
+      }));
     const list = group.rows.slice(0, compact ? 5 : group.rows.length).map(row => {
       const pct = group.total > 0 ? (row.value / group.total) * 100 : 0;
       const stateKey = `${group.id}:${row.id}`;
@@ -480,7 +504,12 @@ function renderStockSectorSection(variant = 'full', options = {}) {
           <span>${escHtml(group.label)} 섹터</span>
           <strong>${escHtml(fmtKRW(group.total))}</strong>
         </div>
-        ${renderDistributionBelt({}, group.total, `${group.label} 섹터`, rows)}
+        <div class="sector-belt-stack">
+          ${renderDistributionBelt({}, group.total, `${group.label} 평가액 비중`, rows)}
+          ${showCostCompare && safeNum(group.costTotal) > 0 && costRows.length
+            ? renderDistributionBelt({}, group.costTotal, `${group.label} 투자 원금 비중`, costRows)
+            : ''}
+        </div>
         <div class="sector-list">${list}</div>
         ${unknown}
       </div>
@@ -536,6 +565,8 @@ function _handleDashAction(target, e) {
   else if (action === 'auto-update') startAutoUpdate();
   else if (action === 'toggle-dash-cat') { const catId = target.dataset.cat; if (catId) toggleDashCat(catId); }
   else if (action === 'toggle-stock-sector') { const sectorKey = target.dataset.sectorKey || target.dataset.sector; if (sectorKey) toggleStockSector(sectorKey); }
+  else if (action === 'toggle-sector-cost-compare') toggleSectorCostCompare();
+  else if (action === 'toggle-dash-total') toggleDashTotalHidden();
   else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   else if (action === 'go-tab') { const tab = target.dataset.tab; if (tab) goTab(tab); }
   else if (action === 'toggle-dash-edit') toggleDashEditMode();
@@ -551,6 +582,31 @@ function toggleStockSector(sectorId) {
   UIState.stockSectorOpen[sectorId] = !UIState.stockSectorOpen[sectorId];
   if (currentTab === 'pgAi') renderAnalysis();
   else if (currentTab === 'pgDash') renderDashboard();
+}
+
+function maskMoney() {
+  return '••••••';
+}
+
+function isDashTotalHidden() {
+  return !!loadDashPrefs().totalHidden;
+}
+
+function toggleDashTotalHidden() {
+  const prefs = loadDashPrefs();
+  saveDashPrefs({ totalHidden: !prefs.totalHidden });
+  renderDashboard();
+}
+
+function isSectorCostCompareEnabled() {
+  return loadDashPrefs().sectorCostCompare !== false;
+}
+
+function toggleSectorCostCompare() {
+  const prefs = loadDashPrefs();
+  saveDashPrefs({ sectorCostCompare: prefs.sectorCostCompare === false });
+  if (currentTab === 'pgAi') renderAnalysis();
+  else renderDashboard();
 }
 
 function _handleTrendClick(days, btn) {

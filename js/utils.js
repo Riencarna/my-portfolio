@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.29.1 — Utilities
+   My Portfolio v5.30.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -303,59 +303,72 @@ function inferStockSector(asset) {
 
 function calcStockSectorTotals(assets) {
   const totals = {};
+  const costTotals = {};
   const sectorAssets = {};
   const regions = {
-    domestic: { id: 'domestic', label: '국내주식', total: 0, totals: {}, assets: {} },
-    foreign: { id: 'foreign', label: '해외주식', total: 0, totals: {}, assets: {} },
+    domestic: { id: 'domestic', label: '국내주식', total: 0, costTotal: 0, totals: {}, costTotals: {}, assets: {} },
+    foreign: { id: 'foreign', label: '해외주식', total: 0, costTotal: 0, totals: {}, costTotals: {}, assets: {} },
   };
   let stockTotal = 0;
+  let stockCostTotal = 0;
   for (const rule of STOCK_SECTOR_RULES) {
     totals[rule.id] = 0;
+    costTotals[rule.id] = 0;
     sectorAssets[rule.id] = [];
     for (const region of Object.values(regions)) {
       region.totals[rule.id] = 0;
+      region.costTotals[rule.id] = 0;
       region.assets[rule.id] = [];
     }
   }
 
   for (const asset of assets || []) {
     if (!isStockAsset(asset)) continue;
-    const value = safeNum(calcAssetValue(asset).value);
+    const assetValue = calcAssetValue(asset);
+    const value = safeNum(assetValue.value);
     if (value <= 0) continue;
+    const cost = safeNum(assetValue.cost);
     const sector = inferStockSector(asset) || STOCK_SECTOR_MAP.other_stock;
     const region = getStockRegion(asset);
     totals[sector.id] = safeNum(totals[sector.id]) + value;
+    costTotals[sector.id] = safeNum(costTotals[sector.id]) + cost;
     stockTotal += value;
-    sectorAssets[sector.id].push({ asset, value });
+    stockCostTotal += cost;
+    sectorAssets[sector.id].push({ asset, value, cost });
     if (region && regions[region.id]) {
       regions[region.id].total += value;
+      regions[region.id].costTotal += cost;
       regions[region.id].totals[sector.id] = safeNum(regions[region.id].totals[sector.id]) + value;
-      regions[region.id].assets[sector.id].push({ asset, value });
+      regions[region.id].costTotals[sector.id] = safeNum(regions[region.id].costTotals[sector.id]) + cost;
+      regions[region.id].assets[sector.id].push({ asset, value, cost });
     }
   }
 
-  const buildRows = (bucketTotals, bucketAssets) => STOCK_SECTOR_RULES
+  const buildRows = (bucketTotals, bucketCostTotals, bucketAssets) => STOCK_SECTOR_RULES
     .map(rule => ({
       ...rule,
       value: safeNum(bucketTotals[rule.id]),
+      cost: safeNum(bucketCostTotals[rule.id]),
       assets: bucketAssets[rule.id] || [],
     }))
     .filter(row => row.value > 0)
     .sort((a, b) => b.value - a.value);
 
-  const rows = buildRows(totals, sectorAssets);
+  const rows = buildRows(totals, costTotals, sectorAssets);
   const groups = Object.values(regions)
     .map(region => ({
       id: region.id,
       label: region.label,
       total: safeNum(region.total),
-      rows: buildRows(region.totals, region.assets),
+      costTotal: safeNum(region.costTotal),
+      rows: buildRows(region.totals, region.costTotals, region.assets),
       unclassified: (region.assets.other_stock || []).map(item => item.asset),
     }))
     .filter(region => region.total > 0 && region.rows.length > 0);
 
   return {
     total: safeNum(stockTotal),
+    costTotal: safeNum(stockCostTotal),
     rows,
     groups,
     unclassified: (sectorAssets.other_stock || []).map(item => item.asset),
