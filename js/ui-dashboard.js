@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.0 — Dashboard UI
+   My Portfolio v5.30.1 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -167,9 +167,15 @@ function _renderDashToolbar(editMode) {
       </div>
     `;
   }
-  // 비편집 모드: 점선 toolbar 래퍼 없이 버튼만 — 버튼은 .dash-edit-toggle의 absolute positioning으로 #pgDash 우측 상단에 떠 있음
+  const totalHidden = isDashTotalHidden();
   return `
-    <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
+    <div class="dash-top-actions" role="toolbar" aria-label="대시보드 빠른 설정">
+      <button type="button" class="btn-sm dash-total-toggle" data-action="toggle-dash-total"
+        aria-label="총 자산 ${totalHidden ? '드러내기' : '숨기기'}" aria-pressed="${totalHidden}" title="총 자산 ${totalHidden ? '드러내기' : '숨기기'}">
+        ${totalHidden ? '👁' : '🙈'}
+      </button>
+      <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
+    </div>
   `;
 }
 
@@ -178,10 +184,6 @@ function _renderHeroCard(ctx) {
   const totalHidden = isDashTotalHidden();
   return `
     <section class="dash-hero" role="region" aria-label="총 자산 현황">
-      <button type="button" class="dash-total-toggle" data-action="toggle-dash-total"
-        aria-label="총 자산 ${totalHidden ? '드러내기' : '숨기기'}" aria-pressed="${totalHidden}" title="총 자산 ${totalHidden ? '드러내기' : '숨기기'}">
-        ${totalHidden ? '👁' : '🙈'}
-      </button>
       <div class="dash-hero-label">총 자산</div>
       <div class="dash-hero-value ${totalHidden ? 'dash-value-hidden' : ''}" id="totalValue"
         aria-label="${totalHidden ? '총 자산 숨김' : `총 자산 ${fmtKRW(ctx.total)}`}">${escHtml(totalHidden ? maskMoney() : fmtKRW(ctx.total))}</div>
