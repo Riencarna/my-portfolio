@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.1 — Dashboard UI
+   My Portfolio v5.30.2 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -172,10 +172,29 @@ function _renderDashToolbar(editMode) {
     <div class="dash-top-actions" role="toolbar" aria-label="대시보드 빠른 설정">
       <button type="button" class="btn-sm dash-total-toggle" data-action="toggle-dash-total"
         aria-label="총 자산 ${totalHidden ? '드러내기' : '숨기기'}" aria-pressed="${totalHidden}" title="총 자산 ${totalHidden ? '드러내기' : '숨기기'}">
-        ${totalHidden ? '👁' : '🙈'}
+        ${renderTotalPrivacyIcon(totalHidden)}
       </button>
       <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
     </div>
+  `;
+}
+
+function renderTotalPrivacyIcon(totalHidden) {
+  if (totalHidden) {
+    return `
+      <svg class="dash-total-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    `;
+  }
+  return `
+    <svg class="dash-total-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 3l18 18"></path>
+      <path d="M10.7 5.7A10.5 10.5 0 0 1 12 5.6c6 0 9.5 6.4 9.5 6.4a16 16 0 0 1-3.1 4"></path>
+      <path d="M6.1 6.3C3.8 8 2.5 12 2.5 12s3.5 6.4 9.5 6.4a10.7 10.7 0 0 0 4-.8"></path>
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path>
+    </svg>
   `;
 }
 

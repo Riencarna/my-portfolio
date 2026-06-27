@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.1 — Stylesheet
+   My Portfolio v5.30.2 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -521,6 +521,8 @@ input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px;vertic
   transition:background var(--t-base),border-color var(--t-base),transform var(--t-base)}
 .dash-total-toggle:hover{background:var(--surface-hover);border-color:var(--bd-strong);transform:translateY(-1px)}
 .dash-total-toggle:focus-visible{box-shadow:var(--focus-ring)}
+.dash-total-icon{width:18px;height:18px;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.dash-total-toggle[aria-pressed="true"] .dash-total-icon{color:var(--primary)}
 .dash-hero-value{
   font-size:clamp(32px,5.5vw,52px);font-weight:800;letter-spacing:-2px;margin-bottom:10px;
   font-variant-numeric:tabular-nums;color:var(--t1);

@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.30.1 — Configuration
+   My Portfolio v5.30.2 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.30.1';
+const APP_VERSION = '5.30.2';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
