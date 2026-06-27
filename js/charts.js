@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.3 — Charts (Chart.js)
+   My Portfolio v5.31.0 — Charts (Chart.js)
    Cycle C compatible
    Soft Neutral: lavender/coral palette
    ============================================= */
@@ -13,6 +13,27 @@ function getThemeColor(varName) {
     console.warn('getThemeColor failed for', varName, e);
     return '#888';
   }
+}
+
+const CATEGORY_GROWTH_COLORS = Object.freeze({
+  '국내주식': '#4F6DF5',
+  '해외주식': '#8B5CF6',
+  '코인': '#F59E0B',
+  '현금': '#10B981',
+  '예적금': '#0EA5E9',
+  '부동산': '#F43F5E',
+  '기타': '#64748B',
+});
+
+function colorAlpha(color, alpha) {
+  const hex = String(color || '').trim();
+  const m = hex.match(/^#([0-9a-f]{6})$/i);
+  if (!m) return color;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 const centerTextPlugin = {
@@ -103,6 +124,8 @@ function renderLineChart(canvasId, labels, datasets, opts = {}) {
   if (!isChartReady()) { console.warn('Chart.js not loaded — skipping', canvasId); return null; }
   const canvas = document.getElementById(canvasId);
   if (!canvas) { console.error(`Canvas not found: ${canvasId}`); return null; }
+  const yTickCallback = opts.yTickCallback || (v => fmtKRW(v));
+  const tooltipLabelCallback = opts.tooltipLabelCallback || (item => ` ${item.dataset.label}: ${fmtKRW(item.parsed.y)}`);
   return new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets },
@@ -110,16 +133,29 @@ function renderLineChart(canvasId, labels, datasets, opts = {}) {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { display: opts.showX !== false, grid: { display: false },
+        x: { display: opts.showX !== false, stacked: !!opts.stacked, grid: { display: false },
           ticks: { color: getThemeColor('--t4'), font: { size: 10 }, maxTicksLimit: opts.maxXTicks || 6 } },
-        y: { display: opts.showY !== false, grid: { color: 'rgba(128,128,128,0.1)' },
-          ticks: { color: getThemeColor('--t4'), font: { size: 10 }, callback: v => fmtKRW(v) } },
+        y: { display: opts.showY !== false, stacked: !!opts.stacked, beginAtZero: !!opts.beginAtZero,
+          grid: { color: 'rgba(128,128,128,0.1)' },
+          ticks: { color: getThemeColor('--t4'), font: { size: 10 }, callback: yTickCallback } },
       },
       plugins: {
-        legend: { display: !!opts.legend },
-        tooltip: { callbacks: { label: item => ` ${item.dataset.label}: ${fmtKRW(item.parsed.y)}` } },
+        legend: {
+          display: !!opts.legend,
+          position: opts.legendPosition || 'top',
+          labels: {
+            color: getThemeColor('--t2'),
+            usePointStyle: true,
+            pointStyle: 'rectRounded',
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 12,
+            font: { size: 11, weight: '600' },
+          },
+        },
+        tooltip: { callbacks: { label: tooltipLabelCallback } },
       },
-      elements: { line: { tension: 0.35, borderWidth: 2 }, point: { radius: opts.pointRadius ?? 2, hoverRadius: 5 } },
+      elements: { line: { tension: opts.tension ?? 0.35, borderWidth: opts.lineWidth ?? 2 }, point: { radius: opts.pointRadius ?? 2, hoverRadius: 5 } },
       animation: { duration: opts.animate === false ? 0 : 600 },
     },
   });
@@ -178,7 +214,7 @@ function renderPortfolioPie() {
   }
 }
 
-function renderTrendChart(days = 30) {
+function renderTrendChart(days = 30, options = {}) {
   destroyChart('trend');
   let history = appState.history;
   if (days > 0) history = history.slice(-days);
@@ -186,19 +222,33 @@ function renderTrendChart(days = 30) {
   const canvas = document.getElementById('chartTrend');
   if (!canvas) return;
   const labels = history.map(h => fmtDate(h.date).slice(5));
-  const data = history.map(h => h.total);
+  const hideAbsolute = !!options.hideAbsolute;
+  const baseTotal = safeNum(history.find(h => safeNum(h.total) > 0)?.total || history[0]?.total);
+  const data = hideAbsolute && baseTotal > 0
+    ? history.map(h => safeNum(((safeNum(h.total) - baseTotal) / baseTotal) * 100))
+    : history.map(h => h.total);
   const primary = getThemeColor('--primary') || '#7C6FF0';
   charts.trend = renderLineChart('chartTrend', labels, [{
-    label: '총 자산', data, borderColor: primary,
+    label: hideAbsolute ? '총 자산 변동률' : '총 자산', data, borderColor: primary,
     backgroundColor: makeGradient(canvas, primary), fill: true,
-  }], { pointRadius: data.length > CHART_POINT_THRESHOLD ? 0 : 2 });
+  }], hideAbsolute ? {
+    pointRadius: data.length > CHART_POINT_THRESHOLD ? 0 : 2,
+    yTickCallback: v => fmtPct(v, 1),
+    tooltipLabelCallback: item => ` ${item.dataset.label}: ${fmtPct(item.parsed.y, 2)}`,
+    beginAtZero: true,
+  } : { pointRadius: data.length > CHART_POINT_THRESHOLD ? 0 : 2 });
 
   const altContainer = document.getElementById('chartTrendAlt');
   if (altContainer) {
     const step = Math.max(1, Math.floor(history.length / 10));
     const rows = history.filter((_, i) => i % step === 0 || i === history.length - 1)
-      .map(h => [fmtDate(h.date), fmtKRW(h.total)]);
-    altContainer.innerHTML = chartAltTable(['날짜', '총 자산'], rows, '자산 추이 데이터');
+      .map(h => {
+        const value = hideAbsolute && baseTotal > 0
+          ? fmtPct(((safeNum(h.total) - baseTotal) / baseTotal) * 100, 2)
+          : fmtKRW(h.total);
+        return [fmtDate(h.date), value];
+      });
+    altContainer.innerHTML = chartAltTable(['날짜', hideAbsolute ? '변동률' : '총 자산'], rows, '자산 추이 데이터');
   }
 }
 
@@ -212,15 +262,34 @@ function renderGrowthChart(days = 0, byCategory = false) {
   const labels = history.map(h => fmtDate(h.date).slice(5));
 
   if (byCategory) {
-    const datasets = [];
+    const categorySeries = [];
     for (const cat of CATEGORIES) {
       const data = history.map(h => h.byCategory?.[cat.id] || 0);
       if (data.some(v => v > 0)) {
-        datasets.push({ label: cat.label, data, borderColor: cat.color,
-          backgroundColor: cat.color + '22', fill: true, borderWidth: 1.5 });
+        const color = CATEGORY_GROWTH_COLORS[cat.id] || cat.color;
+        categorySeries.push({
+          label: cat.label,
+          data,
+          finalValue: data[data.length - 1] || 0,
+          borderColor: color,
+          backgroundColor: colorAlpha(color, 0.28),
+          pointBackgroundColor: color,
+          fill: true,
+          borderWidth: 2,
+        });
       }
     }
-    charts.growth = renderLineChart('chartGrowth', labels, datasets, { legend: true, pointRadius: 0 });
+    const datasets = categorySeries
+      .sort((a, b) => b.finalValue - a.finalValue)
+      .map(({ finalValue, ...dataset }) => dataset);
+    charts.growth = renderLineChart('chartGrowth', labels, datasets, {
+      legend: true,
+      pointRadius: 0,
+      stacked: true,
+      beginAtZero: true,
+      maxXTicks: 8,
+      tension: 0.22,
+    });
   } else {
     const primary = getThemeColor('--primary') || '#7C6FF0';
     charts.growth = renderLineChart('chartGrowth', labels, [{

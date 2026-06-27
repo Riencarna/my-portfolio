@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.3 — History & Export UI
+   My Portfolio v5.31.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -108,7 +108,7 @@ function _renderRecordsTab() {
         <button class="btn-sm" data-action="growth-view" data-days="90" data-by-cat="false" aria-pressed="false">90일</button>
         <button class="btn-sm" data-action="growth-view" data-days="0" data-by-cat="true" aria-pressed="false">카테고리별</button>
       </div>
-      <div class="chart-wrap chart-wrap-220" role="img" aria-label="자산 성장 차트">
+      <div class="chart-wrap chart-wrap-260" role="img" aria-label="자산 성장 차트">
         <canvas id="chartGrowth"></canvas>
       </div>
       <div id="chartGrowthAlt"></div>

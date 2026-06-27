@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.30.3 — Dashboard UI
+   My Portfolio v5.31.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -58,7 +58,7 @@ function renderDashboard() {
   destroyChart('pie');
   destroyChart('trend');
   runWhenIdle(() => {
-    if (!hiddenSet.has('trend') || editMode) renderTrendChart(UIState.dashboardTrendDays);
+    if (!hiddenSet.has('trend') || editMode) renderTrendChart(UIState.dashboardTrendDays, { hideAbsolute: isDashTotalHidden() });
   });
 
   _setupDashboardDelegation(container);
@@ -171,7 +171,7 @@ function _renderDashToolbar(editMode) {
   return `
     <div class="dash-top-actions" role="toolbar" aria-label="대시보드 빠른 설정">
       <button type="button" class="btn-sm dash-total-toggle" data-action="toggle-dash-total"
-        aria-label="총 자산 ${totalHidden ? '드러내기' : '숨기기'}" aria-pressed="${totalHidden}" title="총 자산 ${totalHidden ? '드러내기' : '숨기기'}">
+        aria-label="대시보드 금액 ${totalHidden ? '드러내기' : '숨기기'}" aria-pressed="${totalHidden}" title="대시보드 금액 ${totalHidden ? '드러내기' : '숨기기'}">
         ${renderTotalPrivacyIcon(totalHidden)}
       </button>
       <button class="btn-sm dash-edit-toggle" data-action="toggle-dash-edit" aria-label="대시보드 편집">✎ 편집</button>
@@ -389,13 +389,14 @@ function _renderAllocationCard(ctx) {
 
 function _renderStockSectorCard() {
   const costCompare = isSectorCostCompareEnabled();
+  const totalHidden = isDashTotalHidden();
   const toggle = `
     <button type="button" class="btn-sm" data-action="toggle-sector-cost-compare"
       aria-pressed="${costCompare}" aria-label="섹터 원금 비교 그래프 ${costCompare ? '끄기' : '켜기'}">
       ${costCompare ? '원금 비교 끄기' : '원금 비교 켜기'}
     </button>
   `;
-  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'dash' });
+  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'dash', hideAmounts: totalHidden });
   if (!sectorHtml) {
     return `
       <div class="card" role="region" aria-label="주식 섹터 분포">
@@ -418,7 +419,7 @@ function _renderPieCard(ctx) {
     <div class="card" role="region" aria-label="자산 분포 차트">
       <div class="card-title">자산 분포</div>
       ${renderDistributionBelt(ctx.catTotals, ctx.total, '자산 분포', null, { hideTotal: totalHidden })}
-      ${renderPieLegend(ctx.catTotals, ctx.total)}
+      ${renderPieLegend(ctx.catTotals, ctx.total, { hideAmounts: totalHidden })}
     </div>
   `;
 }
@@ -464,10 +465,12 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   const scope = String(options.scope || variant || 'sector').replace(/[^\w-]/g, '');
   const compact = variant === 'dash';
   const showCostCompare = isSectorCostCompareEnabled();
+  const hideAmounts = !!options.hideAmounts;
+  const displayAmount = value => hideAmounts ? maskMoney() : fmtKRW(value);
   const groups = (sector.groups && sector.groups.length ? sector.groups : [{ id: 'all', label: '전체 주식', total: sector.total, costTotal: sector.costTotal, rows: sector.rows, unclassified: sector.unclassified }])
     .filter(group => group.total > 0 && group.rows.length > 0);
   const groupSections = groups.map(group => {
-    const rows = group.rows.map(row => ({
+    const valueRows = group.rows.map(row => ({
       id: row.id,
       label: row.label,
       value: row.value,
@@ -481,41 +484,59 @@ function renderStockSectorSection(variant = 'full', options = {}) {
         value: safeNum(row.cost),
         color: row.color,
       }));
-    const list = group.rows.slice(0, compact ? 5 : group.rows.length).map(row => {
-      const pct = group.total > 0 ? (row.value / group.total) * 100 : 0;
-      const stateKey = `${group.id}:${row.id}`;
-      const isOpen = !!UIState.stockSectorOpen[stateKey];
-      const panelId = `sectorAssets_${scope}_${group.id}_${row.id}`;
-      const assetList = isOpen ? row.assets
-        .slice()
-        .sort((a, b) => b.value - a.value)
-        .map(item => {
-          const asset = item.asset || {};
-          const code = asset.stockCode ? ` · ${asset.stockCode}` : '';
-          const assetPct = row.value > 0 ? (item.value / row.value) * 100 : 0;
-          return `
-            <button type="button" class="sector-asset-row" data-action="open-asset-detail" data-id="${escAttr(asset.id)}"
-              aria-label="${escAttr(asset.name || '이름 없는 주식')} 상세 보기">
-              <span class="sector-asset-name">${escHtml(asset.name || '이름 없는 주식')}<span class="sector-asset-code">${escHtml(code)}</span></span>
-              <span class="sector-asset-value">${escHtml(fmtKRW(item.value))}</span>
-              <span class="sector-asset-pct">${assetPct.toFixed(1)}%</span>
-            </button>
-          `;
-        }).join('') : '';
-      return `
-        <button type="button" class="sector-row sector-row-toggle" data-action="toggle-stock-sector" data-sector-key="${escAttr(stateKey)}"
-          aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}">
-          <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
-          <span class="sector-label">${escHtml(row.label)}</span>
-          <span class="sector-value">${escHtml(fmtKRW(row.value))}</span>
-          <span class="sector-pct">${pct.toFixed(1)}%</span>
-          <span class="sector-chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▾</span>
-        </button>
-        <div class="sector-assets ${isOpen ? 'open' : ''}" id="${escAttr(panelId)}" ${isOpen ? '' : 'hidden'}>
-          ${assetList}
-        </div>
-      `;
-    }).join('');
+    const renderMetricRows = metric => {
+      const isCost = metric === 'cost';
+      const total = isCost ? group.costTotal : group.total;
+      const metricRows = group.rows
+        .filter(row => safeNum(isCost ? row.cost : row.value) > 0)
+        .slice(0, compact ? 5 : group.rows.length);
+      return metricRows.map(row => {
+        const rowValue = safeNum(isCost ? row.cost : row.value);
+        const pct = total > 0 ? (rowValue / total) * 100 : 0;
+        const stateKey = `${group.id}:${metric}:${row.id}`;
+        const isOpen = !!UIState.stockSectorOpen[stateKey];
+        const panelId = `sectorAssets_${scope}_${group.id}_${metric}_${row.id}`;
+        const assetList = isOpen ? row.assets
+          .slice()
+          .filter(item => safeNum(isCost ? item.cost : item.value) > 0)
+          .sort((a, b) => safeNum(isCost ? b.cost : b.value) - safeNum(isCost ? a.cost : a.value))
+          .map(item => {
+            const asset = item.asset || {};
+            const code = asset.stockCode ? ` · ${asset.stockCode}` : '';
+            const itemValue = safeNum(isCost ? item.cost : item.value);
+            const assetPct = rowValue > 0 ? (itemValue / rowValue) * 100 : 0;
+            return `
+              <button type="button" class="sector-asset-row" data-action="open-asset-detail" data-id="${escAttr(asset.id)}"
+                aria-label="${escAttr(asset.name || '이름 없는 주식')} 상세 보기">
+                <span class="sector-asset-name">${escHtml(asset.name || '이름 없는 주식')}<span class="sector-asset-code">${escHtml(code)}</span></span>
+                <span class="sector-asset-value">${escHtml(displayAmount(itemValue))}</span>
+                <span class="sector-asset-pct">${assetPct.toFixed(1)}%</span>
+              </button>
+            `;
+          }).join('') : '';
+        return `
+          <button type="button" class="sector-row sector-row-toggle" data-action="toggle-stock-sector" data-sector-key="${escAttr(stateKey)}"
+            aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}">
+            <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
+            <span class="sector-label">${escHtml(row.label)}</span>
+            <span class="sector-value">${escHtml(displayAmount(rowValue))}</span>
+            <span class="sector-pct">${pct.toFixed(1)}%</span>
+            <span class="sector-chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▾</span>
+          </button>
+          <div class="sector-assets ${isOpen ? 'open' : ''}" id="${escAttr(panelId)}" ${isOpen ? '' : 'hidden'}>
+            ${assetList}
+          </div>
+        `;
+      }).join('');
+    };
+    const renderMetricPanel = (metric, title, total, rows) => `
+      <div class="sector-metric-panel sector-metric-${escAttr(metric)}">
+        <div class="sector-metric-title">${escHtml(title)}</div>
+        ${renderDistributionBelt({}, total, `${group.label} ${title}`, rows, { hideTotal: hideAmounts })}
+        <div class="sector-list">${renderMetricRows(metric)}</div>
+      </div>
+    `;
+    const hasCostCompare = showCostCompare && safeNum(group.costTotal) > 0 && costRows.length > 0;
     const unknown = group.unclassified && group.unclassified.length > 0
       ? `<div class="sector-note">기타 주식: ${escHtml(group.unclassified.map(a => a.name).slice(0, 4).join(', '))}${group.unclassified.length > 4 ? ' 외' : ''}</div>`
       : '';
@@ -523,15 +544,12 @@ function renderStockSectorSection(variant = 'full', options = {}) {
       <div class="sector-region">
         <div class="sector-region-title">
           <span>${escHtml(group.label)} 섹터</span>
-          <strong>${escHtml(fmtKRW(group.total))}</strong>
+          <strong>${escHtml(displayAmount(group.total))}</strong>
         </div>
-        <div class="sector-belt-stack">
-          ${renderDistributionBelt({}, group.total, `${group.label} 평가액 비중`, rows)}
-          ${showCostCompare && safeNum(group.costTotal) > 0 && costRows.length
-            ? renderDistributionBelt({}, group.costTotal, `${group.label} 투자 원금 비중`, costRows)
-            : ''}
+        <div class="sector-comparison-grid ${hasCostCompare ? '' : 'sector-comparison-single'}">
+          ${renderMetricPanel('value', '평가액 비중', group.total, valueRows)}
+          ${hasCostCompare ? renderMetricPanel('cost', '투자 원금 비중', group.costTotal, costRows) : ''}
         </div>
-        <div class="sector-list">${list}</div>
         ${unknown}
       </div>
     `;
@@ -638,7 +656,7 @@ function _handleTrendClick(days, btn) {
   });
   btn.classList.add('active');
   btn.setAttribute('aria-pressed', 'true');
-  renderTrendChart(days);
+  renderTrendChart(days, { hideAbsolute: isDashTotalHidden() });
 }
 
 // ── Edit Mode Actions ──
@@ -848,7 +866,7 @@ async function startAutoUpdate() {
   renderPageHeader();
 }
 
-function renderPieLegend(catTotals, total) {
+function renderPieLegend(catTotals, total, options = {}) {
   const items = appState.categoryOrder
     .filter(c => catTotals[c] > 0)
     .map(c => {
@@ -859,7 +877,7 @@ function renderPieLegend(catTotals, total) {
         <div class="legend-item">
           <span class="legend-dot" data-color="${escAttr(cat.color)}" aria-hidden="true"></span>
           <span class="legend-label">${cat.icon} ${escHtml(cat.label)}</span>
-          <span class="legend-value">${escHtml(fmtKRW(val))}</span>
+          <span class="legend-value">${escHtml(options.hideAmounts ? maskMoney() : fmtKRW(val))}</span>
           <span class="legend-pct">${pct}%</span>
         </div>
       `;
