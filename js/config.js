@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.29.0 — Configuration
+   My Portfolio v5.29.1 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.29.0';
+const APP_VERSION = '5.29.1';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -206,9 +206,9 @@ const STOCK_SECTOR_RULES = Object.freeze([
     keywords: ['2차전지','배터리','양극재','음극재','전해액','리튬','에코프로','포스코퓨처엠','lg에너지솔루션','battery','lithium'],
   },
   {
-    id: 'software_ai', label: 'AI/소프트웨어', color: '#A395F5',
-    tickers: ['MSFT','GOOGL','GOOG','META','AMZN','PLTR','CRM','NOW','ADBE','ORCL','SNOW','DDOG','NET'],
-    keywords: ['ai','인공지능','소프트웨어','클라우드','saas','플랫폼','데이터센터','마이크로소프트','구글','메타','아마존','팔란티어'],
+    id: 'software_ai', label: '빅테크/AI·소프트웨어', color: '#A395F5',
+    tickers: ['AAPL','MSFT','GOOGL','GOOG','META','AMZN','PLTR','CRM','NOW','ADBE','ORCL','SNOW','DDOG','NET'],
+    keywords: ['빅테크','big tech','ai','인공지능','소프트웨어','클라우드','saas','플랫폼','데이터센터','애플','apple','마이크로소프트','구글','메타','아마존','팔란티어'],
   },
   {
     id: 'bio_health', label: '바이오/헬스케어', color: '#6BBF8A',
@@ -226,14 +226,29 @@ const STOCK_SECTOR_RULES = Object.freeze([
     keywords: ['인터넷','콘텐츠','엔터','게임','웹툰','네이버','카카오','하이브','크래프톤','netflix','disney','gaming'],
   },
   {
+    id: 'food_beverage', label: '음식료', color: '#D09A50',
+    tickers: ['003230','004370','271560','097950','007310','280360','005610'],
+    keywords: ['음식료','식품','라면','불닭','삼양식품','농심','오리온','cj제일제당','오뚜기','빙그레','spc삼립','food','beverage'],
+  },
+  {
+    id: 'beauty_cosmetics', label: '뷰티/화장품', color: '#D988B9',
+    tickers: ['278470','090430','051900','192820','161890','018290','214420'],
+    keywords: ['뷰티','화장품','미용','에이피알','apr','메디큐브','에이지알','아모레','lg생활건강','코스맥스','한국콜마','애경산업','cosmetics','beauty'],
+  },
+  {
+    id: 'home_living', label: '가구/리빙', color: '#A8795A',
+    tickers: ['003800','079430','122900'],
+    keywords: ['가구','리빙','침대','매트리스','인테리어','에이스침대','현대리바트','한샘','furniture','living'],
+  },
+  {
     id: 'energy_chem', label: '에너지/화학', color: '#B5ADA0',
     tickers: ['XOM','CVX','COP','BP','SHEL','OXY','010950','009830','078930','011170'],
     keywords: ['에너지','정유','화학','석유','가스','태양광','수소','energy','oil','gas','chemical'],
   },
   {
     id: 'consumer', label: '소비재/브랜드', color: '#C69C72',
-    tickers: ['AAPL','COST','MCD','SBUX','KO','PEP','NKE','PG','LVMUY','UL','005930','051900','090430'],
-    keywords: ['소비재','브랜드','리테일','음식료','화장품','애플','코카콜라','나이키','costco','starbucks','consumer'],
+    tickers: ['COST','MCD','SBUX','KO','PEP','NKE','PG','LVMUY','UL','005930'],
+    keywords: ['소비재','브랜드','리테일','코카콜라','나이키','costco','starbucks','consumer'],
   },
   {
     id: 'industrial', label: '산업재/인프라', color: '#67A9A5',
