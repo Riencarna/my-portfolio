@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.28.0 — Utilities
+   My Portfolio v5.29.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -270,6 +270,16 @@ function isStockAsset(asset) {
   return !!asset && STOCK_CATS.includes(asset.category);
 }
 
+function getStockRegion(asset) {
+  if (!asset) return null;
+  if (asset.category === '국내주식') return { id: 'domestic', label: '국내주식' };
+  if (asset.category === '해외주식') return { id: 'foreign', label: '해외주식' };
+  const market = String(asset.market || '').toUpperCase();
+  if (['KOSPI', 'KOSDAQ'].includes(market)) return { id: 'domestic', label: '국내주식' };
+  if (['NYSE', 'NASDAQ'].includes(market)) return { id: 'foreign', label: '해외주식' };
+  return null;
+}
+
 function inferStockSector(asset) {
   if (!isStockAsset(asset)) return null;
   const code = normalizeTicker(asset.stockCode);
@@ -294,10 +304,18 @@ function inferStockSector(asset) {
 function calcStockSectorTotals(assets) {
   const totals = {};
   const sectorAssets = {};
+  const regions = {
+    domestic: { id: 'domestic', label: '국내주식', total: 0, totals: {}, assets: {} },
+    foreign: { id: 'foreign', label: '해외주식', total: 0, totals: {}, assets: {} },
+  };
   let stockTotal = 0;
   for (const rule of STOCK_SECTOR_RULES) {
     totals[rule.id] = 0;
     sectorAssets[rule.id] = [];
+    for (const region of Object.values(regions)) {
+      region.totals[rule.id] = 0;
+      region.assets[rule.id] = [];
+    }
   }
 
   for (const asset of assets || []) {
@@ -305,23 +323,41 @@ function calcStockSectorTotals(assets) {
     const value = safeNum(calcAssetValue(asset).value);
     if (value <= 0) continue;
     const sector = inferStockSector(asset) || STOCK_SECTOR_MAP.other_stock;
+    const region = getStockRegion(asset);
     totals[sector.id] = safeNum(totals[sector.id]) + value;
     stockTotal += value;
     sectorAssets[sector.id].push({ asset, value });
+    if (region && regions[region.id]) {
+      regions[region.id].total += value;
+      regions[region.id].totals[sector.id] = safeNum(regions[region.id].totals[sector.id]) + value;
+      regions[region.id].assets[sector.id].push({ asset, value });
+    }
   }
 
-  const rows = STOCK_SECTOR_RULES
+  const buildRows = (bucketTotals, bucketAssets) => STOCK_SECTOR_RULES
     .map(rule => ({
       ...rule,
-      value: safeNum(totals[rule.id]),
-      assets: sectorAssets[rule.id] || [],
+      value: safeNum(bucketTotals[rule.id]),
+      assets: bucketAssets[rule.id] || [],
     }))
     .filter(row => row.value > 0)
     .sort((a, b) => b.value - a.value);
 
+  const rows = buildRows(totals, sectorAssets);
+  const groups = Object.values(regions)
+    .map(region => ({
+      id: region.id,
+      label: region.label,
+      total: safeNum(region.total),
+      rows: buildRows(region.totals, region.assets),
+      unclassified: (region.assets.other_stock || []).map(item => item.asset),
+    }))
+    .filter(region => region.total > 0 && region.rows.length > 0);
+
   return {
     total: safeNum(stockTotal),
     rows,
+    groups,
     unclassified: (sectorAssets.other_stock || []).map(item => item.asset),
   };
 }

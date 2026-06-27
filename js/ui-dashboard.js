@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.28.0 — Dashboard UI
+   My Portfolio v5.29.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -426,56 +426,70 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   const bare = !!options.bare;
   const showTitle = options.showTitle !== false;
   const scope = String(options.scope || variant || 'sector').replace(/[^\w-]/g, '');
-  const rows = sector.rows.map(row => ({
-    id: row.id,
-    label: row.label,
-    value: row.value,
-    color: row.color,
-  }));
   const compact = variant === 'dash';
-  const list = sector.rows.slice(0, compact ? 5 : sector.rows.length).map(row => {
-    const pct = sector.total > 0 ? (row.value / sector.total) * 100 : 0;
-    const isOpen = !!UIState.stockSectorOpen[row.id];
-    const panelId = `sectorAssets_${scope}_${row.id}`;
-    const assetList = isOpen ? row.assets
-      .slice()
-      .sort((a, b) => b.value - a.value)
-      .map(item => {
-        const asset = item.asset || {};
-        const code = asset.stockCode ? ` · ${asset.stockCode}` : '';
-        const assetPct = row.value > 0 ? (item.value / row.value) * 100 : 0;
-        return `
-          <button type="button" class="sector-asset-row" data-action="open-asset-detail" data-id="${escAttr(asset.id)}"
-            aria-label="${escAttr(asset.name || '이름 없는 주식')} 상세 보기">
-            <span class="sector-asset-name">${escHtml(asset.name || '이름 없는 주식')}<span class="sector-asset-code">${escHtml(code)}</span></span>
-            <span class="sector-asset-value">${escHtml(fmtKRW(item.value))}</span>
-            <span class="sector-asset-pct">${assetPct.toFixed(1)}%</span>
-          </button>
-        `;
-      }).join('') : '';
+  const groups = (sector.groups && sector.groups.length ? sector.groups : [{ id: 'all', label: '전체 주식', total: sector.total, rows: sector.rows, unclassified: sector.unclassified }])
+    .filter(group => group.total > 0 && group.rows.length > 0);
+  const groupSections = groups.map(group => {
+    const rows = group.rows.map(row => ({
+      id: row.id,
+      label: row.label,
+      value: row.value,
+      color: row.color,
+    }));
+    const list = group.rows.slice(0, compact ? 5 : group.rows.length).map(row => {
+      const pct = group.total > 0 ? (row.value / group.total) * 100 : 0;
+      const stateKey = `${group.id}:${row.id}`;
+      const isOpen = !!UIState.stockSectorOpen[stateKey];
+      const panelId = `sectorAssets_${scope}_${group.id}_${row.id}`;
+      const assetList = isOpen ? row.assets
+        .slice()
+        .sort((a, b) => b.value - a.value)
+        .map(item => {
+          const asset = item.asset || {};
+          const code = asset.stockCode ? ` · ${asset.stockCode}` : '';
+          const assetPct = row.value > 0 ? (item.value / row.value) * 100 : 0;
+          return `
+            <button type="button" class="sector-asset-row" data-action="open-asset-detail" data-id="${escAttr(asset.id)}"
+              aria-label="${escAttr(asset.name || '이름 없는 주식')} 상세 보기">
+              <span class="sector-asset-name">${escHtml(asset.name || '이름 없는 주식')}<span class="sector-asset-code">${escHtml(code)}</span></span>
+              <span class="sector-asset-value">${escHtml(fmtKRW(item.value))}</span>
+              <span class="sector-asset-pct">${assetPct.toFixed(1)}%</span>
+            </button>
+          `;
+        }).join('') : '';
+      return `
+        <button type="button" class="sector-row sector-row-toggle" data-action="toggle-stock-sector" data-sector-key="${escAttr(stateKey)}"
+          aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}">
+          <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
+          <span class="sector-label">${escHtml(row.label)}</span>
+          <span class="sector-value">${escHtml(fmtKRW(row.value))}</span>
+          <span class="sector-pct">${pct.toFixed(1)}%</span>
+          <span class="sector-chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▾</span>
+        </button>
+        <div class="sector-assets ${isOpen ? 'open' : ''}" id="${escAttr(panelId)}" ${isOpen ? '' : 'hidden'}>
+          ${assetList}
+        </div>
+      `;
+    }).join('');
+    const unknown = group.unclassified && group.unclassified.length > 0
+      ? `<div class="sector-note">기타 주식: ${escHtml(group.unclassified.map(a => a.name).slice(0, 4).join(', '))}${group.unclassified.length > 4 ? ' 외' : ''}</div>`
+      : '';
     return `
-      <button type="button" class="sector-row sector-row-toggle" data-action="toggle-stock-sector" data-sector="${escAttr(row.id)}"
-        aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}">
-        <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
-        <span class="sector-label">${escHtml(row.label)}</span>
-        <span class="sector-value">${escHtml(fmtKRW(row.value))}</span>
-        <span class="sector-pct">${pct.toFixed(1)}%</span>
-        <span class="sector-chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▾</span>
-      </button>
-      <div class="sector-assets ${isOpen ? 'open' : ''}" id="${escAttr(panelId)}" ${isOpen ? '' : 'hidden'}>
-        ${assetList}
+      <div class="sector-region">
+        <div class="sector-region-title">
+          <span>${escHtml(group.label)} 섹터</span>
+          <strong>${escHtml(fmtKRW(group.total))}</strong>
+        </div>
+        ${renderDistributionBelt({}, group.total, `${group.label} 섹터`, rows)}
+        <div class="sector-list">${list}</div>
+        ${unknown}
       </div>
     `;
   }).join('');
-  const unknown = sector.unclassified.length > 0
-    ? `<div class="sector-note">기타 주식: ${escHtml(sector.unclassified.map(a => a.name).slice(0, 4).join(', '))}${sector.unclassified.length > 4 ? ' 외' : ''}</div>`
-    : '';
   return `
     <div class="stock-sector-section ${bare ? 'stock-sector-bare' : ''}">
       ${showTitle ? '<div class="alloc-view-title">주식 섹터 분포</div>' : ''}
-      ${renderDistributionBelt({}, sector.total, '주식 섹터', rows)}
-      <div class="sector-list">${list}</div>
-      ${unknown}
+      ${groupSections}
     </div>
   `;
 }
@@ -521,7 +535,7 @@ function _handleDashAction(target, e) {
   if (action === 'trend') _handleTrendClick(Number(target.dataset.days), target);
   else if (action === 'auto-update') startAutoUpdate();
   else if (action === 'toggle-dash-cat') { const catId = target.dataset.cat; if (catId) toggleDashCat(catId); }
-  else if (action === 'toggle-stock-sector') { const sectorId = target.dataset.sector; if (sectorId) toggleStockSector(sectorId); }
+  else if (action === 'toggle-stock-sector') { const sectorKey = target.dataset.sectorKey || target.dataset.sector; if (sectorKey) toggleStockSector(sectorKey); }
   else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   else if (action === 'go-tab') { const tab = target.dataset.tab; if (tab) goTab(tab); }
   else if (action === 'toggle-dash-edit') toggleDashEditMode();

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.28.0 — Analysis UI
+   My Portfolio v5.29.0 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -67,7 +67,7 @@ function _setupAnalysisDelegation(container) {
     else if (action === 'save-gemini-key') doSaveGeminiKey();
     else if (action === 'clear-gemini-key') doClearGeminiKey();
     else if (action === 'run-gemini-analysis') doRunGeminiAnalysis();
-    else if (action === 'toggle-stock-sector') { const sectorId = target.dataset.sector; if (sectorId) toggleStockSector(sectorId); }
+    else if (action === 'toggle-stock-sector') { const sectorKey = target.dataset.sectorKey || target.dataset.sector; if (sectorKey) toggleStockSector(sectorKey); }
     else if (action === 'open-asset-detail') { const id = target.dataset.id; if (id) openAssetDetail(id); }
   }
   container.onclick = (e) => {
@@ -717,6 +717,10 @@ async function loadBenchmark() {
 function renderGeminiSection(total, catTotals) {
   const hasKey = !!getGeminiApiKey();
   const sector = calcStockSectorTotals(appState.assets);
+  const sectorSummary = (sector.groups || [])
+    .filter(group => group.rows.length)
+    .map(group => `${group.label} ${group.rows.length}개`)
+    .join(' · ') || `주식 섹터 ${sector.rows.length}개`;
   return `
     <div class="card" role="region" aria-label="Gemini AI 포트폴리오 분석">
       <div class="card-title">
@@ -736,7 +740,7 @@ function renderGeminiSection(total, catTotals) {
         <div class="gemini-privacy text-muted">분석 생성 시 총액, 카테고리, 상위 자산, 섹터 요약이 Gemini API로 전송됩니다.</div>
         <div class="gemini-snapshot" aria-label="AI 분석 입력 요약">
           <span>총 자산 ${escHtml(fmtKRW(total))}</span>
-          <span>주식 섹터 ${sector.rows.length}개</span>
+          <span>${escHtml(sectorSummary)}</span>
           <span>자산 ${appState.assets.length}개</span>
         </div>
         <div id="geminiResult" class="gemini-result" aria-live="polite">
@@ -758,12 +762,14 @@ function _buildGeminiPortfolioPrompt() {
       amountKRW: Math.round(safeNum(catTotals[c])),
       pct: total > 0 ? Number(((safeNum(catTotals[c]) / total) * 100).toFixed(2)) : 0,
     }));
-  const sectorRows = sector.rows.map(s => ({
-    sector: s.label,
-    amountKRW: Math.round(s.value),
-    pctOfStocks: sector.total > 0 ? Number(((s.value / sector.total) * 100).toFixed(2)) : 0,
-    sampleAssets: s.assets.slice(0, 5).map(item => item.asset.name),
-  }));
+  const sectorRows = (sector.groups && sector.groups.length ? sector.groups : [{ label: '전체 주식', total: sector.total, rows: sector.rows }])
+    .flatMap(group => group.rows.map(s => ({
+      region: group.label,
+      sector: s.label,
+      amountKRW: Math.round(s.value),
+      pctOfRegionStocks: group.total > 0 ? Number(((s.value / group.total) * 100).toFixed(2)) : 0,
+      sampleAssets: s.assets.slice(0, 5).map(item => item.asset.name),
+    })));
   const topAssets = appState.assets
     .map(a => {
       const v = calcAssetValue(a);
