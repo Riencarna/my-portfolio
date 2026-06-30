@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.32.1 — App Entry Point
+   My Portfolio v5.34.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -9,13 +9,13 @@ let _prevTabIdx = 0;
 let _swipeStartX = 0;
 let _swipeStartY = 0;
 const TAB_ORDER = ['pgDash', 'pgList', 'pgInc', 'pgHist', 'pgAi'];
-const TAB_ICONS = ['📊', '📋', '💰', '📁', '🔍'];
-const TAB_LABELS = ['대시보드', '자산', '수입', '기록', '분석'];
+const TAB_ICONS = ['📊', '📋', '🧾', '📁', '🔍'];
+const TAB_LABELS = ['대시보드', '자산', '가계부', '기록', '분석'];
 
 // FAB menu items
 const FAB_ITEMS = [
   { icon: '📋', label: '자산 추가', action: 'fab-add-asset' },
-  { icon: '💰', label: '수입 추가', action: 'fab-add-income' },
+  { icon: '🧾', label: '가계부 입력', action: 'fab-add-income' },
 ];
 
 function getFABItems() {
@@ -302,13 +302,13 @@ function renderSidebar() {
 
   sidebar.innerHTML = `
     <div class="sidebar-brand">
-      <div class="sidebar-brand-row">
+      <button class="sidebar-brand-row sidebar-brand-home" data-action="go-home" aria-label="대시보드 홈으로 이동">
         <img class="sidebar-icon" src="icon.svg" alt="" width="36" height="36">
         <div class="sidebar-brand-text">
           <div class="sidebar-logo">${escHtml(APP_NAME)}</div>
           <div class="sidebar-version">v${APP_VERSION}</div>
         </div>
-      </div>
+      </button>
       ${meta.list.length > 0 ? `
         <div class="sidebar-pf" data-action="open-portfolio-manager"
           role="button" tabindex="0" aria-label="포트폴리오 전환: ${escAttr(pf?.name || '기본')}">
@@ -353,7 +353,8 @@ function renderSidebar() {
     const target = e.target.closest('[data-action]');
     if (!target) return;
     const action = target.dataset.action;
-    if (action === 'go-tab') goTab(target.dataset.tab);
+    if (action === 'go-home') goTab('pgDash');
+    else if (action === 'go-tab') goTab(target.dataset.tab);
     else if (action === 'open-portfolio-manager') openPortfolioManager();
     else if (action === 'open-monthly-report') openMonthlyReport();
     else if (action === 'open-wallet-scan') openWalletScan();
@@ -405,7 +406,7 @@ function renderPageHeader() {
         <button class="btn-p" data-action="open-add-asset" aria-label="자산 추가">+ 자산 추가</button>
       ` : ''}
       ${currentTab === 'pgInc' ? `
-        <button class="btn-p" data-action="open-add-income" aria-label="수입 추가">+ 수입 추가</button>
+        <button class="btn-p" data-action="open-add-income" aria-label="가계부 내역 추가">+ 내역 추가</button>
       ` : ''}
       <button class="btn-icon header-theme-btn" id="headerThemeBtn" data-action="cycle-theme"
         aria-label="테마: ${escAttr(themeMeta.label)}. 클릭하면 ${escAttr(themeMeta.next)}"

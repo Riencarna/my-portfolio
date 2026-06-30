@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.32.1 — Utilities
+   My Portfolio v5.34.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -503,13 +503,15 @@ function sanitizeTxn(t) {
   };
 }
 
-// sanitizeIncome: coerces ID to String, validates category
+// sanitizeIncome: coerces ID to String and preserves custom ledger categories
 function sanitizeIncome(i) {
+  const type = i.type === 'expense' ? 'expense' : 'income';
   return {
     id: i.id != null ? String(i.id) : uid(),
+    type,
     date: isValidDate(i.date) ? i.date : today(),
-    amount: safeNum(i.amount),
-    cat: INCOME_MAP[i.cat] ? i.cat : 'other',
+    amount: Math.abs(safeNum(i.amount)),
+    cat: i.cat ? stripHtml(i.cat, 80) : 'other',
     source: i.source ? stripHtml(i.source, 100) : '',
     memo: i.memo ? stripHtml(i.memo, 200) : '',
     recurring: !!i.recurring,

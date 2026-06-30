@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.32.1 — Configuration
+   My Portfolio v5.34.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.32.1';
+const APP_VERSION = '5.34.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -150,6 +150,22 @@ const INCOME_CATS = Object.freeze([
   { id: 'other',    label: '기타',       icon: '📦' },
 ]);
 const INCOME_MAP = Object.freeze(Object.fromEntries(INCOME_CATS.map(c => [c.id, c])));
+
+// Expense categories
+const EXPENSE_CATS = Object.freeze([
+  { id: 'food',      label: '식비',       icon: '🍽️' },
+  { id: 'cafe',      label: '카페/간식',  icon: '☕' },
+  { id: 'transport', label: '교통/차량',  icon: '🚗' },
+  { id: 'housing',   label: '주거/통신',  icon: '🏠' },
+  { id: 'life',      label: '생활용품',   icon: '🧺' },
+  { id: 'shopping',  label: '쇼핑',       icon: '🛍️' },
+  { id: 'health',    label: '의료/건강',  icon: '💊' },
+  { id: 'family',    label: '가족/경조',  icon: '👨‍👩‍👧' },
+  { id: 'tax',       label: '세금/보험',  icon: '🧾' },
+  { id: 'travel',    label: '여행/문화',  icon: '✈️' },
+  { id: 'other',     label: '기타',       icon: '📦' },
+]);
+const EXPENSE_MAP = Object.freeze(Object.fromEntries(EXPENSE_CATS.map(c => [c.id, c])));
 
 // CoinGecko ID mapping
 const COIN_IDS = Object.freeze({
@@ -390,6 +406,8 @@ const UIState = {
   txnFilterCat: 'all',
   txnSort: 'date-desc',
   txnShown: TXN_PAGE_SIZE,
+  bookFilter: 'all',
+  bookSearch: '',
   incomeMonth: (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -415,5 +433,7 @@ const UIState = {
     this.txnFilterCat = 'all';
     this.txnSort = 'date-desc';
     this.txnShown = TXN_PAGE_SIZE;
+    this.bookFilter = 'all';
+    this.bookSearch = '';
   },
 };

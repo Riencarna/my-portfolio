@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.32.1 — Monthly Report UI
+   My Portfolio v5.34.0 — Monthly Report UI
    ============================================= */
 
 const MONTHLY_REPORT_DISMISS_KEY = 'mp_monthly_report_dismissed';
@@ -96,8 +96,12 @@ function buildMonthlyReport(year, month) {
   const topLoss = sortedByChange.filter(a => a.change < 0).slice(-3).reverse();
 
   const monthPrefix = _monthKey(year, month);
-  const incomeItems = appState.income.filter(i => i && i.date && i.date.startsWith(monthPrefix));
+  const ledgerItems = appState.income.filter(i => i && i.date && i.date.startsWith(monthPrefix));
+  const incomeItems = ledgerItems.filter(i => getBookType(i) === 'income');
+  const expenseItems = ledgerItems.filter(i => getBookType(i) === 'expense');
   const incomeTotal = incomeItems.reduce((s, i) => s + safeNum(i.amount), 0);
+  const expenseTotal = expenseItems.reduce((s, i) => s + safeNum(i.amount), 0);
+  const netCashFlow = incomeTotal - expenseTotal;
 
   let buyTotal = 0, sellTotal = 0, buyCount = 0, sellCount = 0;
   for (const a of appState.assets) {
@@ -116,9 +120,11 @@ function buildMonthlyReport(year, month) {
     startTotal, endTotal, change, changePct,
     catChanges, topGain, topLoss,
     incomeTotal, incomeCount: incomeItems.length,
+    expenseTotal, expenseCount: expenseItems.length,
+    netCashFlow, ledgerCount: ledgerItems.length,
     buyTotal, sellTotal, buyCount, sellCount,
     trendData,
-    hasData: !!(startSnap || endSnap || incomeItems.length > 0 || (buyCount + sellCount) > 0),
+    hasData: !!(startSnap || endSnap || ledgerItems.length > 0 || (buyCount + sellCount) > 0),
   };
 }
 
@@ -266,6 +272,16 @@ function _renderMonthlyReportBody(r) {
           <div class="report-flow-label">수입</div>
           <div class="report-flow-value positive">${escHtml(fmtKRW(r.incomeTotal))}</div>
           <div class="report-flow-sub">${r.incomeCount}건</div>
+        </div>
+        <div class="report-flow-card">
+          <div class="report-flow-label">지출</div>
+          <div class="report-flow-value negative">${escHtml(fmtKRW(r.expenseTotal))}</div>
+          <div class="report-flow-sub">${r.expenseCount}건</div>
+        </div>
+        <div class="report-flow-card">
+          <div class="report-flow-label">순흐름</div>
+          <div class="report-flow-value ${profitClass(r.netCashFlow)}">${r.netCashFlow >= 0 ? '+' : ''}${escHtml(fmtKRW(r.netCashFlow))}</div>
+          <div class="report-flow-sub">가계부 ${r.ledgerCount}건</div>
         </div>
         <div class="report-flow-card">
           <div class="report-flow-label">매수</div>

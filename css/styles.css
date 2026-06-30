@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.32.1 — Stylesheet
+   My Portfolio v5.34.0 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -230,7 +230,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 
 /* ── Tabular numbers ── */
 .total-value,.asset-value,.asset-profit,.cat-total,.cat-value,
-.income-total,.income-item-amount,.period-value,.benchmark-value,
+.income-total,.income-item-amount,.book-summary-value,.period-value,.benchmark-value,
 .txn-total,.tx-total,.detail-item span:not(.detail-label),
 .legend-value,.legend-pct,.history-total,.wallet-value{
   font-variant-numeric:tabular-nums}
@@ -253,6 +253,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
   border-bottom:1px solid var(--bd);
 }
 .sidebar-brand-row{display:flex;align-items:center;gap:12px}
+.sidebar-brand-home{
+  width:100%;text-align:left;color:inherit;border-radius:var(--radius-md);
+  padding:0;transition:background var(--t-base),transform var(--t-base)}
+.sidebar-brand-home:hover{background:var(--surface-alt);transform:translateY(-1px)}
+.sidebar-brand-home:focus-visible{box-shadow:var(--focus-ring)}
 .sidebar-icon{width:36px;height:36px;border-radius:var(--radius-md);flex-shrink:0}
 .sidebar-brand-text{min-width:0}
 .sidebar-logo{
@@ -459,6 +464,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
   width:38px;height:38px;min-width:38px;display:inline-flex;align-items:center;justify-content:center;
   border-radius:var(--radius-md);font-size:16px;transition:all var(--t-base);color:var(--t2)}
 .btn-icon:hover{background:var(--surface-alt);color:var(--t1)}
+.btn-icon:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
 .header-theme-btn{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .btn-danger{color:var(--danger)}
 .btn-accent{background:var(--accent);color:#fff}
@@ -930,23 +936,78 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .btn-hist-del:hover{color:var(--danger);background:var(--danger-soft)}
 
 /* =============================================
-   INCOME
+   HOUSEHOLD BOOK
    ============================================= */
 .month-nav{display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:18px}
 .month-label{font-size:18px;font-weight:700;min-width:120px;text-align:center;color:var(--t1);letter-spacing:-0.3px}
-.income-summary{text-align:center;padding:12px 0}
-.income-total{font-size:clamp(26px,4vw,34px);font-weight:800;margin-bottom:8px;color:var(--t1);letter-spacing:-0.8px}
-.income-growth{font-size:14px;font-weight:600}
+.book-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.book-summary-card{
+  display:flex;flex-direction:column;gap:4px;
+  padding:14px;background:var(--surface-alt);border:1px solid var(--bd);
+  border-radius:var(--radius-lg);min-width:0}
+.book-summary-main{background:var(--primary-soft);border-color:color-mix(in srgb,var(--primary) 35%,var(--bd))}
+.book-summary-label{font-size:12px;color:var(--t3);font-weight:700}
+.book-summary-value{font-size:clamp(18px,2.5vw,24px);font-weight:800;color:var(--t1);letter-spacing:0;word-break:break-word}
+.book-summary-value.positive{color:var(--success)}
+.book-summary-value.negative{color:var(--danger)}
+.book-summary-sub{font-size:12px;color:var(--t4);font-weight:600}
+.book-summary-sub.positive{color:var(--success)}
+.book-summary-sub.negative{color:var(--danger)}
+.book-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.book-tabs{display:flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--bd);border-radius:var(--radius-lg)}
+.book-tab{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px 10px;border-radius:var(--radius-md);font-size:13px;font-weight:700;
+  color:var(--t3);transition:all var(--t-base);min-height:38px}
+.book-tab span{font-size:11px;color:var(--t4);font-weight:700}
+.book-tab:hover{color:var(--t1);background:var(--surface)}
+.book-tab.active{background:var(--surface);color:var(--primary);box-shadow:var(--shadow-xs)}
+.book-tab.active span{color:var(--primary)}
+.book-search-wrap{position:relative}
+.book-search{padding-right:40px}
 .income-list{display:flex;flex-direction:column;gap:4px}
 .income-item{
   display:flex;align-items:center;justify-content:space-between;
-  padding:14px 12px;border-bottom:1px solid var(--bd)}
-.income-item-main{display:flex;align-items:center;gap:14px}
+  gap:12px;padding:14px 12px;border-bottom:1px solid var(--bd)}
+.income-item:last-child{border-bottom:none}
+.income-item-main{display:flex;align-items:center;gap:14px;min-width:0}
 .income-cat-icon{font-size:22px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:var(--surface-alt);border-radius:50%;flex-shrink:0}
+.income-cat-icon.income{background:var(--success-soft)}
+.income-cat-icon.expense{background:var(--danger-soft)}
+.income-item-text{min-width:0}
 .income-item-source{font-size:14px;font-weight:600;color:var(--t1)}
-.income-item-date{font-size:12px;color:var(--t4);margin-top:2px}
-.income-item-right{display:flex;align-items:center;gap:10px}
-.income-item-amount{font-size:15px;font-weight:700;color:var(--t1)}
+.income-item-date{font-size:12px;color:var(--t4);margin-top:2px;line-height:1.4}
+.book-type-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:var(--radius-full);font-size:10px;font-weight:800;margin-right:4px}
+.book-type-badge.income{background:var(--success-soft);color:var(--success)}
+.book-type-badge.expense{background:var(--danger-soft);color:var(--danger)}
+.income-item-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.income-item-amount{font-size:15px;font-weight:800;color:var(--t1);white-space:nowrap}
+.income-item-amount.income{color:var(--success)}
+.income-item-amount.expense{color:var(--danger)}
+.book-type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;background:var(--surface-alt);border:1px solid var(--bd);border-radius:var(--radius-lg)}
+.book-type-option{padding:10px 12px;border-radius:var(--radius-md);font-size:14px;font-weight:800;color:var(--t3);transition:all var(--t-base)}
+.book-type-option:hover{background:var(--surface);color:var(--t1)}
+.book-type-option.active{background:var(--primary);color:#fff;box-shadow:var(--shadow-xs)}
+.book-cat-type-toggle{margin-bottom:16px}
+.book-cat-manager-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.book-cat-manager-title{font-size:14px;font-weight:800;color:var(--t1)}
+.book-cat-manager-hint{font-size:12px;color:var(--t4);margin-top:3px}
+.book-cat-list{display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto;margin-bottom:16px}
+.book-cat-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 12px;background:var(--surface-alt);border:1px solid var(--bd);
+  border-radius:var(--radius-md)}
+.book-cat-main{display:flex;align-items:center;gap:10px;min-width:0}
+.book-cat-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surface);font-size:18px;flex-shrink:0}
+.book-cat-text{min-width:0}
+.book-cat-label{font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-cat-meta{font-size:11px;color:var(--t4);margin-top:1px}
+.book-cat-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.book-cat-add{padding:12px;background:var(--surface-alt);border:1px dashed var(--bd-strong);border-radius:var(--radius-md)}
+.book-cat-add-title{font-size:12px;font-weight:800;color:var(--t3);margin-bottom:8px}
+.book-cat-add-row{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:8px;align-items:center}
+.book-cat-icon-field{flex:0 0 92px}
+.empty-state-compact{padding:18px 12px}
 
 /* =============================================
    ANALYSIS
@@ -1298,7 +1359,9 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .gemini-key-row{grid-template-columns:1fr}
   .dash-hero{padding:32px 20px 28px}
   .dash-hero-value{font-size:clamp(28px,7vw,40px)}
-  .income-total{font-size:clamp(22px,6vw,30px)}
+  .book-summary-grid{grid-template-columns:repeat(2,1fr)}
+  .income-item{align-items:flex-start}
+  .income-item-right{flex-wrap:wrap;justify-content:flex-end;max-width:44%}
   .onboard-steps{flex-direction:column;align-items:center}
   .step{flex-direction:row;max-width:100%;text-align:left}
   .modal-box{max-width:calc(100% - 24px);border-radius:var(--radius-2xl)}
@@ -1323,6 +1386,15 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .sector-asset-row{grid-template-columns:minmax(0,1fr) auto}
   .sector-asset-pct{display:none}
   .gemini-actions .btn-p,.gemini-actions .btn-sm{flex:1}
+  .book-summary-grid{grid-template-columns:1fr}
+  .book-tabs{gap:3px}
+  .book-tab{font-size:12px;padding:8px 6px}
+  .income-item{flex-direction:column}
+  .income-item-main,.income-item-right{width:100%;max-width:none}
+  .income-item-right{justify-content:space-between}
+  .book-cat-manager-head{flex-direction:column}
+  .book-cat-add-row{grid-template-columns:58px 1fr}
+  .book-cat-add-row .btn-p{grid-column:1 / -1}
 }
 
 /* ── CSV Import Preview ── */
@@ -1488,16 +1560,17 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .report-top-val.positive{color:var(--success)}
 .report-top-val.negative{color:var(--danger)}
 .report-top-empty{font-size:12px;color:var(--t4);text-align:center;padding:8px 0}
-.report-flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.report-flow-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
 .report-flow-card{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
 .report-flow-label{font-size:11px;color:var(--t4);margin-bottom:4px}
 .report-flow-value{font-size:14px;font-weight:700;color:var(--t1)}
 .report-flow-value.positive{color:var(--success)}
+.report-flow-value.negative{color:var(--danger)}
 .report-flow-sub{font-size:11px;color:var(--t4);margin-top:2px}
 @media (max-width:600px){
   .report-summary-grid{grid-template-columns:1fr}
   .report-top-grid{grid-template-columns:1fr}
-  .report-flow-grid{grid-template-columns:repeat(3,1fr)}
+  .report-flow-grid{grid-template-columns:repeat(2,1fr)}
   .card-report-notice{flex-direction:column;align-items:stretch}
   .report-notice-actions{justify-content:flex-end}
 }

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.32.1 — State Management
+   My Portfolio v5.34.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -13,6 +13,7 @@ function defaultState() {
     categoryOrder: [...CAT_IDS],
     goal: null,
     income: [],
+    bookCategories: null,
     allocation: null,
   };
 }
@@ -1001,13 +1002,14 @@ function loadPresets() {
         return {
           accounts: Array.isArray(parsed.accounts) ? parsed.accounts.map(String).slice(0, PRESET_MAX) : [],
           incomeSources: Array.isArray(parsed.incomeSources) ? parsed.incomeSources.map(String).slice(0, PRESET_MAX) : [],
+          expenseSources: Array.isArray(parsed.expenseSources) ? parsed.expenseSources.map(String).slice(0, PRESET_MAX) : [],
         };
       }
     }
   } catch (e) {
     console.warn('loadPresets failed:', e);
   }
-  return { accounts: [], incomeSources: [] };
+  return { accounts: [], incomeSources: [], expenseSources: [] };
 }
 
 function addPreset(type, value) {
