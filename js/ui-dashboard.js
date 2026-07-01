@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.1 — Dashboard UI
+   My Portfolio v5.36.6 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -148,7 +148,9 @@ function _wrapDashCard(id, label, innerHtml, isHidden, editMode, staggerIdx) {
         <span class="dash-edit-label">${escHtml(label)}</span>
         <button class="dash-move-btn" data-action="dash-move-up" data-card="${escAttr(id)}" aria-label="${escAttr(label)} 위로 이동">▲</button>
         <button class="dash-move-btn" data-action="dash-move-down" data-card="${escAttr(id)}" aria-label="${escAttr(label)} 아래로 이동">▼</button>
-        <button class="dash-vis-btn" data-action="toggle-dash-card" data-card="${escAttr(id)}" aria-label="${escAttr(label)} ${isHidden ? '표시' : '숨김'}" aria-pressed="${isHidden ? 'false' : 'true'}">${isHidden ? '🙈' : '👁'}</button>
+        <button class="dash-vis-btn" data-action="toggle-dash-card" data-card="${escAttr(id)}" aria-label="${escAttr(label)} ${isHidden ? '표시' : '숨김'}" aria-pressed="${isHidden ? 'false' : 'true'}">
+          ${renderTotalPrivacyIcon(isHidden, 'dash-vis-icon')}
+        </button>
       </div>
       <div class="dash-card-inner">${innerHtml}</div>
     </div>
@@ -159,7 +161,7 @@ function _renderDashToolbar(editMode) {
   if (editMode) {
     return `
       <div class="dash-toolbar" role="toolbar" aria-label="대시보드 편집 도구">
-        <span class="dash-toolbar-hint">💡 카드를 드래그하거나 ▲▼로 순서 변경, 👁로 표시/숨김 전환</span>
+        <span class="dash-toolbar-hint">카드를 드래그하거나 ▲▼로 순서를 바꾸고, 눈 아이콘으로 표시/숨김을 전환하세요.</span>
         <div class="dash-toolbar-actions">
           <button class="btn-sm" data-action="reset-dash-prefs" aria-label="대시보드 초기화">초기화</button>
           <button class="btn-p" data-action="toggle-dash-edit" aria-label="편집 완료">✓ 완료</button>
@@ -179,17 +181,18 @@ function _renderDashToolbar(editMode) {
   `;
 }
 
-function renderTotalPrivacyIcon(totalHidden) {
+function renderTotalPrivacyIcon(totalHidden, extraClass = '') {
+  const className = `dash-total-icon${extraClass ? ` ${extraClass}` : ''}`;
   if (totalHidden) {
     return `
-      <svg class="dash-total-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <svg class="${escAttr(className)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"></path>
         <circle cx="12" cy="12" r="3"></circle>
       </svg>
     `;
   }
   return `
-    <svg class="dash-total-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg class="${escAttr(className)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M3 3l18 18"></path>
       <path d="M10.7 5.7A10.5 10.5 0 0 1 12 5.6c6 0 9.5 6.4 9.5 6.4a16 16 0 0 1-3.1 4"></path>
       <path d="M6.1 6.3C3.8 8 2.5 12 2.5 12s3.5 6.4 9.5 6.4a10.7 10.7 0 0 0 4-.8"></path>
@@ -396,7 +399,7 @@ function _renderStockSectorCard() {
       ${costCompare ? '원금 비교 끄기' : '원금 비교 켜기'}
     </button>
   `;
-  const sectorHtml = renderStockSectorSection('full', { bare: true, showTitle: false, scope: 'dash', hideAmounts: totalHidden });
+  const sectorHtml = renderStockSectorSection('dash', { bare: true, showTitle: false, scope: 'dash', hideAmounts: totalHidden });
   if (!sectorHtml) {
     return `
       <div class="card" role="region" aria-label="주식 섹터 분포">
@@ -463,7 +466,7 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   const bare = !!options.bare;
   const showTitle = options.showTitle !== false;
   const scope = String(options.scope || variant || 'sector').replace(/[^\w-]/g, '');
-  const compact = variant === 'dash';
+  const compact = variant === 'dash' || !!options.compact;
   const showCostCompare = isSectorCostCompareEnabled();
   const hideAmounts = !!options.hideAmounts;
   const displayAmount = value => hideAmounts ? maskMoney() : fmtKRW(value);
@@ -590,8 +593,9 @@ function renderStockSectorSection(variant = 'full', options = {}) {
     const unknown = group.unclassified && group.unclassified.length > 0
       ? `<div class="sector-note">기타 주식: ${escHtml(group.unclassified.map(a => a.name).slice(0, 4).join(', '))}${group.unclassified.length > 4 ? ' 외' : ''}</div>`
       : '';
+    const regionClass = String(group.id || 'all').replace(/[^\w-]/g, '') || 'all';
     return `
-      <div class="sector-region">
+      <div class="sector-region sector-region-${escAttr(regionClass)}">
         <div class="sector-region-title">
           <span>${escHtml(group.label)} 섹터</span>
           <strong>${escHtml(displayAmount(group.total))}</strong>
@@ -604,10 +608,11 @@ function renderStockSectorSection(variant = 'full', options = {}) {
       </div>
     `;
   }).join('');
+  const regionLayoutClass = groups.length > 1 ? 'sector-region-grid' : 'sector-region-stack';
   return `
-    <div class="stock-sector-section ${bare ? 'stock-sector-bare' : ''}">
+    <div class="stock-sector-section ${bare ? 'stock-sector-bare' : ''} ${compact ? 'stock-sector-compact' : ''}">
       ${showTitle ? '<div class="alloc-view-title">주식 섹터 분포</div>' : ''}
-      ${groupSections}
+      <div class="${regionLayoutClass}">${groupSections}</div>
     </div>
   `;
 }

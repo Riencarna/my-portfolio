@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.36.1
+/* Service Worker - My Portfolio v5.36.6
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.36.1";
+var CACHE_NAME = "myportfolio-v5.36.6";
 
 var STATIC_ASSETS = [
   "./",
