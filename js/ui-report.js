@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.34.0 — Monthly Report UI
+   My Portfolio v5.36.1 — Monthly Report UI
    ============================================= */
 
 const MONTHLY_REPORT_DISMISS_KEY = 'mp_monthly_report_dismissed';
@@ -39,6 +39,107 @@ function _lastSnapInMonth(year, month) {
 function _snapsInMonth(year, month) {
   const prefix = _monthKey(year, month);
   return appState.history.filter(h => h && h.date && h.date.startsWith(prefix));
+}
+
+function _sumSnapshotCategories(snap, cats) {
+  const byCategory = snap?.byCategory || {};
+  return cats.reduce((sum, cat) => sum + safeNum(byCategory[cat]), 0);
+}
+
+function _buildMonthlyInvestmentReport(year, month, startSnap, endSnap) {
+  const monthPrefix = _monthKey(year, month);
+  const startByAsset = startSnap?.byAsset || {};
+  const endByAsset = endSnap?.byAsset || {};
+  const startValue = _sumSnapshotCategories(startSnap, INVESTMENT_CATS);
+  const endValue = _sumSnapshotCategories(endSnap, INVESTMENT_CATS);
+  const catMap = new Map(INVESTMENT_CATS.map(cat => [cat, {
+    cat,
+    start: safeNum(startSnap?.byCategory?.[cat]),
+    end: safeNum(endSnap?.byCategory?.[cat]),
+    buy: 0,
+    sell: 0,
+    buyCount: 0,
+    sellCount: 0,
+  }]));
+  const assetRows = [];
+
+  for (const asset of appState.assets) {
+    if (!INVESTMENT_CATS.includes(asset.category)) continue;
+    const start = safeNum(startByAsset[asset.id]);
+    const end = safeNum(endByAsset[asset.id]);
+    let buy = 0, sell = 0, buyCount = 0, sellCount = 0;
+
+    for (const t of (asset.txns || [])) {
+      if (!t.date || !t.date.startsWith(monthPrefix)) continue;
+      const value = safeNum(t.price) * safeNum(t.qty);
+      if (t.type === 'buy') { buy += value; buyCount++; }
+      else if (t.type === 'sell') { sell += value; sellCount++; }
+    }
+
+    const bucket = catMap.get(asset.category);
+    if (bucket) {
+      bucket.buy += buy;
+      bucket.sell += sell;
+      bucket.buyCount += buyCount;
+      bucket.sellCount += sellCount;
+    }
+
+    if (start > 0 || end > 0 || buy > 0 || sell > 0) {
+      const netFlow = buy - sell;
+      const profit = end - start - netFlow;
+      const base = start + buy;
+      assetRows.push({
+        id: asset.id,
+        name: asset.name,
+        category: asset.category,
+        start,
+        end,
+        buy,
+        sell,
+        netFlow,
+        profit,
+        returnPct: base > 0 ? (profit / base) * 100 : 0,
+      });
+    }
+  }
+
+  const catRows = [...catMap.values()].map(row => {
+    const netFlow = row.buy - row.sell;
+    const profit = row.end - row.start - netFlow;
+    const base = row.start + row.buy;
+    return {
+      ...row,
+      netFlow,
+      profit,
+      returnPct: base > 0 ? (profit / base) * 100 : 0,
+    };
+  }).filter(row => row.start > 0 || row.end > 0 || row.buy > 0 || row.sell > 0);
+
+  const buyTotal = catRows.reduce((sum, row) => sum + safeNum(row.buy), 0);
+  const sellTotal = catRows.reduce((sum, row) => sum + safeNum(row.sell), 0);
+  const buyCount = catRows.reduce((sum, row) => sum + safeNum(row.buyCount), 0);
+  const sellCount = catRows.reduce((sum, row) => sum + safeNum(row.sellCount), 0);
+  const netFlow = buyTotal - sellTotal;
+  const profit = endValue - startValue - netFlow;
+  const capitalBase = startValue + buyTotal;
+  const sortedAssets = assetRows.slice().sort((a, b) => b.profit - a.profit);
+
+  return {
+    startValue,
+    endValue,
+    buyTotal,
+    sellTotal,
+    buyCount,
+    sellCount,
+    netFlow,
+    profit,
+    returnPct: capitalBase > 0 ? (profit / capitalBase) * 100 : 0,
+    capitalBase,
+    catRows,
+    topGain: sortedAssets.filter(a => a.profit > 0).slice(0, 3),
+    topLoss: sortedAssets.filter(a => a.profit < 0).slice(-3).reverse(),
+    hasData: !!endSnap && (startValue > 0 || endValue > 0 || buyTotal > 0 || sellTotal > 0),
+  };
 }
 
 function getAvailableReportMonths() {
@@ -114,6 +215,7 @@ function buildMonthlyReport(year, month) {
   }
 
   const trendData = monthSnaps.map(s => ({ date: s.date, total: safeNum(s.total) }));
+  const investment = _buildMonthlyInvestmentReport(year, month, startSnap, endSnap);
 
   return {
     year, month, monthStr,
@@ -124,7 +226,8 @@ function buildMonthlyReport(year, month) {
     netCashFlow, ledgerCount: ledgerItems.length,
     buyTotal, sellTotal, buyCount, sellCount,
     trendData,
-    hasData: !!(startSnap || endSnap || ledgerItems.length > 0 || (buyCount + sellCount) > 0),
+    investment,
+    hasData: !!(startSnap || endSnap || ledgerItems.length > 0 || (buyCount + sellCount) > 0 || investment.hasData),
   };
 }
 
@@ -205,6 +308,8 @@ function _renderMonthlyReportBody(r) {
         </div>
       </div>
     </div>
+
+    ${_renderInvestmentReportSection(r.investment)}
 
     ${r.trendData.length >= 2 ? `
       <div class="report-section">
@@ -298,6 +403,89 @@ function _renderMonthlyReportBody(r) {
   `;
 }
 
+function _renderInvestmentReportSection(inv) {
+  if (!inv || !inv.hasData) return '';
+  const profitCls = profitClass(inv.profit);
+  const profitSign = inv.profit >= 0 ? '+' : '';
+  const flowLabel = inv.netFlow >= 0 ? '순매수' : '순매도';
+  const flowCls = inv.netFlow >= 0 ? 'positive' : 'negative';
+  const flowAmount = fmtKRW(Math.abs(inv.netFlow));
+  const renderAssetRows = (rows, emptyText) => rows.length === 0
+    ? `<div class="report-top-empty">${emptyText}</div>`
+    : rows.map(a => {
+      const cls = profitClass(a.profit);
+      const sign = a.profit >= 0 ? '+' : '';
+      return `
+        <div class="report-top-row">
+          <div class="report-top-name">${escHtml(a.name)}</div>
+          <div class="report-top-val ${cls}">
+            ${sign}${escHtml(fmtKRW(a.profit))}
+            <span class="report-top-pct">${escHtml(fmtPct(a.returnPct))}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  return `
+    <div class="report-section report-invest-section">
+      <div class="report-section-title">투자 수익 리포트</div>
+      <div class="report-summary-grid report-invest-summary">
+        <div class="report-summary-card">
+          <div class="report-summary-label">월초 투자자산</div>
+          <div class="report-summary-value">${escHtml(fmtKRW(inv.startValue))}</div>
+        </div>
+        <div class="report-summary-card">
+          <div class="report-summary-label">월말 투자자산</div>
+          <div class="report-summary-value">${escHtml(fmtKRW(inv.endValue))}</div>
+        </div>
+        <div class="report-summary-card report-summary-flow ${flowCls}">
+          <div class="report-summary-label">${flowLabel}</div>
+          <div class="report-summary-value">${escHtml(flowAmount)}</div>
+          <div class="report-summary-pct">매수 ${inv.buyCount}건 · 매도 ${inv.sellCount}건</div>
+        </div>
+        <div class="report-summary-card report-summary-change ${profitCls}">
+          <div class="report-summary-label">월간 수익금</div>
+          <div class="report-summary-value">${profitSign}${escHtml(fmtKRW(inv.profit))}</div>
+          <div class="report-summary-pct">수익률 ${escHtml(fmtPct(inv.returnPct))}</div>
+        </div>
+      </div>
+      <div class="report-invest-note">수익금은 월말 투자 평가액 - 월초 투자 평가액 - 순매수로 계산합니다.</div>
+
+      ${inv.catRows.length > 0 ? `
+        <div class="report-cat-list report-invest-cat-list">
+          ${inv.catRows.map(c => {
+            const cat = CAT_MAP[c.cat] || { icon: '📦', label: c.cat };
+            const cls = profitClass(c.profit);
+            const sign = c.profit >= 0 ? '+' : '';
+            return `
+              <div class="report-cat-row">
+                <div class="report-cat-name"><span aria-hidden="true">${cat.icon}</span> ${escHtml(cat.label)}</div>
+                <div class="report-cat-vals">
+                  <span class="report-cat-end">${escHtml(fmtKRW(c.end))}</span>
+                  <span class="report-cat-change ${cls}">${sign}${escHtml(fmtKRW(c.profit))} (${escHtml(fmtPct(c.returnPct))})</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      ${(inv.topGain.length > 0 || inv.topLoss.length > 0) ? `
+        <div class="report-top-grid report-invest-top-grid">
+          <div class="report-top-card report-top-gain">
+            <div class="report-top-title">투자 수익 상위</div>
+            ${renderAssetRows(inv.topGain, '수익이 난 투자 자산이 없습니다')}
+          </div>
+          <div class="report-top-card report-top-loss">
+            <div class="report-top-title">투자 손실 상위</div>
+            ${renderAssetRows(inv.topLoss, '손실이 난 투자 자산이 없습니다')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function _setupMonthlyReportDelegation(container) {
   const clickHandler = (e) => {
     const target = e.target.closest('[data-action]');
@@ -354,11 +542,16 @@ function renderMonthlyReportCard() {
   const monthKey = _monthKey(prev.year, prev.month);
   const cls = profitClass(r.change);
   const sign = r.change >= 0 ? '+' : '';
+  const inv = r.investment;
+  const invLine = inv && inv.hasData
+    ? `<div class="report-notice-sub report-notice-invest ${profitClass(inv.profit)}">투자 ${inv.profit >= 0 ? '+' : ''}${escHtml(fmtKRW(inv.profit))} (${escHtml(fmtPct(inv.returnPct))})</div>`
+    : '';
   return `
     <div class="card card-report-notice" role="alert">
       <div class="report-notice-text">
         <div class="report-notice-title">📊 ${escHtml(r.monthStr)} 리포트가 도착했어요</div>
-        <div class="report-notice-sub ${cls}">${sign}${escHtml(fmtKRW(r.change))}${r.startTotal > 0 ? ` (${escHtml(fmtPct(r.changePct))})` : ''}</div>
+        <div class="report-notice-sub ${cls}">순자산 ${sign}${escHtml(fmtKRW(r.change))}${r.startTotal > 0 ? ` (${escHtml(fmtPct(r.changePct))})` : ''}</div>
+        ${invLine}
       </div>
       <div class="report-notice-actions">
         <button class="btn-p" data-action="open-monthly-report" data-month="${monthKey}">자세히 보기</button>

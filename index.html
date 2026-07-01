@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- My Portfolio v5.34.0 | Soft Neutral UI -->
+<!-- My Portfolio v5.36.1 | Soft Neutral UI -->
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -24,7 +24,7 @@
       https://api.avax.network;
     img-src 'self' data:;">
 
-  <title>My Portfolio v5.34.0</title>
+  <title>My Portfolio v5.36.1</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -55,12 +55,9 @@
   </div>
 
   <!-- SW Update Banner -->
-  <div id="updateBanner" class="update-banner hidden" role="alert">
-    <span>새 버전이 있습니다.</span>
-    <div class="update-banner-actions">
-      <button class="btn-sm" data-action="apply-update">업데이트</button>
-      <button class="btn-sm" data-action="dismiss-update" aria-label="닫기">✕</button>
-    </div>
+  <div id="updateBanner" class="update-banner hidden" role="status" aria-live="polite">
+    <span class="update-banner-spinner" aria-hidden="true"></span>
+    <span id="updateBannerText">새 버전을 적용 중입니다. 잠시 후 자동으로 새로고침됩니다.</span>
   </div>
 
   <!-- Sidebar (desktop/tablet) -->

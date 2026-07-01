@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.34.0 — App Entry Point
+   My Portfolio v5.36.1 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -98,7 +98,7 @@ async function fetchMarketRatesOnLoad() {
 }
 
 // ── Service Worker with Update Banner ──
-let _waitingSW = null;
+let _didReloadForSWUpdate = false;
 
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
@@ -108,8 +108,7 @@ function registerSW() {
       if (!newWorker) return;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          _waitingSW = newWorker;
-          showUpdateBanner();
+          showUpdateBanner('새 버전을 적용 중입니다. 잠시 후 자동으로 새로고침됩니다.');
         }
       });
     });
@@ -118,26 +117,20 @@ function registerSW() {
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    location.reload();
+    if (_didReloadForSWUpdate) return;
+    _didReloadForSWUpdate = true;
+    showUpdateBanner('새 버전 적용이 완료되었습니다. 페이지를 새로고침합니다.');
+    setTimeout(() => location.reload(), 700);
   });
 }
 
-function showUpdateBanner() {
+function showUpdateBanner(message) {
   const banner = $('#updateBanner');
   if (!banner) return;
+  const text = $('#updateBannerText');
+  if (text && message) text.textContent = message;
   banner.classList.remove('hidden');
   banner.classList.add('visible');
-}
-
-function dismissUpdateBanner() {
-  const banner = $('#updateBanner');
-  if (banner) { banner.classList.add('hidden'); banner.classList.remove('visible'); }
-}
-
-function applyUpdate() {
-  if (_waitingSW) {
-    _waitingSW.postMessage({ type: 'SKIP_WAITING' });
-  }
 }
 
 // ── Theme ──
@@ -655,8 +648,6 @@ document.addEventListener('click', e => {
   const action = target.dataset.action;
 
   switch (action) {
-    case 'apply-update': applyUpdate(); break;
-    case 'dismiss-update': dismissUpdateBanner(); break;
     case 'toggle-fab': toggleFAB(); break;
     case 'close-fab': closeFAB(); break;
     case 'fab-add-asset': closeFAB(); openAddAsset(); break;

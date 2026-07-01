@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.34.0
+/* Service Worker - My Portfolio v5.36.1
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.34.0";
+var CACHE_NAME = "myportfolio-v5.36.1";
 
 var STATIC_ASSETS = [
   "./",
@@ -93,7 +93,7 @@ self.addEventListener("activate", function(e) {
   self.clients.claim();
 });
 
-// Message: handle SKIP_WAITING from client for click-to-refresh
+// Message: keep manual activation support for older open tabs
 self.addEventListener("message", function(e) {
   if (e.data && e.data.type === "SKIP_WAITING") {
     self.skipWaiting();

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.34.0 — Dashboard UI
+   My Portfolio v5.36.1 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -489,6 +489,7 @@ function renderStockSectorSection(variant = 'full', options = {}) {
       const total = isCost ? group.costTotal : group.total;
       const metricRows = group.rows
         .filter(row => safeNum(isCost ? row.cost : row.value) > 0)
+        .sort((a, b) => safeNum(isCost ? b.cost : b.value) - safeNum(isCost ? a.cost : a.value))
         .slice(0, compact ? 5 : group.rows.length);
       return metricRows.map(row => {
         const rowValue = safeNum(isCost ? row.cost : row.value);
@@ -516,12 +517,14 @@ function renderStockSectorSection(variant = 'full', options = {}) {
           }).join('') : '';
         return `
           <button type="button" class="sector-row sector-row-toggle" data-action="toggle-stock-sector" data-sector-key="${escAttr(stateKey)}"
-            aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}">
+            aria-expanded="${isOpen}" aria-controls="${escAttr(panelId)}"
+            style="--sector-color:${escAttr(row.color)};--sector-pct:${Math.min(pct, 100).toFixed(2)}%">
             <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
             <span class="sector-label">${escHtml(row.label)}</span>
             <span class="sector-value">${escHtml(displayAmount(rowValue))}</span>
             <span class="sector-pct">${pct.toFixed(1)}%</span>
             <span class="sector-chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▾</span>
+            <span class="sector-mini-bar" aria-hidden="true"><span class="sector-mini-fill"></span></span>
           </button>
           <div class="sector-assets ${isOpen ? 'open' : ''}" id="${escAttr(panelId)}" ${isOpen ? '' : 'hidden'}>
             ${assetList}
@@ -529,11 +532,58 @@ function renderStockSectorSection(variant = 'full', options = {}) {
         `;
       }).join('');
     };
+    const renderDonutPanel = (title, total, rows) => {
+      const activeRows = rows
+        .filter(row => safeNum(row.value) > 0)
+        .sort((a, b) => safeNum(b.value) - safeNum(a.value));
+      if (!activeRows.length || total <= 0) return '';
+      let cursor = 0;
+      const parts = activeRows.map(row => {
+        const start = cursor;
+        const pct = total > 0 ? (safeNum(row.value) / total) * 100 : 0;
+        cursor = Math.min(360, cursor + (pct * 3.6));
+        return `${row.color} ${start.toFixed(2)}deg ${cursor.toFixed(2)}deg`;
+      });
+      if (cursor < 360) parts.push(`var(--surface-sunken) ${cursor.toFixed(2)}deg 360deg`);
+      const top = activeRows.reduce((best, row) => !best || row.value > best.value ? row : best, null);
+      const topPct = top && total > 0 ? (safeNum(top.value) / total) * 100 : 0;
+      const legendRows = activeRows.slice(0, 3).map(row => {
+        const pct = total > 0 ? (safeNum(row.value) / total) * 100 : 0;
+        return `
+          <div class="sector-donut-legend-row">
+            <span class="legend-dot" data-color="${escAttr(row.color)}" aria-hidden="true"></span>
+            <span class="sector-donut-legend-label">${escHtml(row.label)}</span>
+            <strong>${pct.toFixed(1)}%</strong>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="sector-donut-panel">
+          <div class="sector-donut" style="--sector-donut-gradient:${escAttr(parts.join(','))}"
+            role="img" aria-label="${escAttr(group.label)} ${title} 도넛 차트">
+            <div class="sector-donut-hole">
+              <span>최대 섹터</span>
+              <strong>${escHtml(top ? top.label : '-')}</strong>
+              <em>${topPct.toFixed(1)}%</em>
+            </div>
+          </div>
+          <div class="sector-donut-total">
+            <strong>${escHtml(displayAmount(total))}</strong>
+            <span>${activeRows.length}개 섹터</span>
+          </div>
+          <div class="sector-donut-legend">${legendRows}</div>
+        </div>
+      `;
+    };
     const renderMetricPanel = (metric, title, total, rows) => `
       <div class="sector-metric-panel sector-metric-${escAttr(metric)}">
         <div class="sector-metric-title">${escHtml(title)}</div>
-        ${renderDistributionBelt({}, total, `${group.label} ${title}`, rows, { hideTotal: hideAmounts })}
-        <div class="sector-list">${renderMetricRows(metric)}</div>
+        <div class="sector-visual-grid">
+          <div class="sector-list-panel">
+            <div class="sector-list">${renderMetricRows(metric)}</div>
+          </div>
+          ${renderDonutPanel(title, total, rows)}
+        </div>
       </div>
     `;
     const hasCostCompare = showCostCompare && safeNum(group.costTotal) > 0 && costRows.length > 0;
