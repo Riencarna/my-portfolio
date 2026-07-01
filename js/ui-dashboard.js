@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.6 — Dashboard UI
+   My Portfolio v5.36.7 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -470,32 +470,44 @@ function renderStockSectorSection(variant = 'full', options = {}) {
   const showCostCompare = isSectorCostCompareEnabled();
   const hideAmounts = !!options.hideAmounts;
   const displayAmount = value => hideAmounts ? maskMoney() : fmtKRW(value);
+  const dashboardSectorLimit = 4;
   const groups = (sector.groups && sector.groups.length ? sector.groups : [{ id: 'all', label: '전체 주식', total: sector.total, costTotal: sector.costTotal, rows: sector.rows, unclassified: sector.unclassified }])
     .filter(group => group.total > 0 && group.rows.length > 0);
   const groupSections = groups.map(group => {
-    const valueRows = group.rows.map(row => ({
-      id: row.id,
-      label: row.label,
-      value: row.value,
-      color: row.color,
-    }));
-    const costRows = group.rows
-      .filter(row => safeNum(row.cost) > 0)
-      .map(row => ({
-        id: row.id,
-        label: row.label,
-        value: safeNum(row.cost),
-        color: row.color,
-      }));
-    const renderMetricRows = metric => {
+    const buildMetricRows = metric => {
       const isCost = metric === 'cost';
-      const total = isCost ? group.costTotal : group.total;
       const metricRows = group.rows
         .filter(row => safeNum(isCost ? row.cost : row.value) > 0)
         .sort((a, b) => safeNum(isCost ? b.cost : b.value) - safeNum(isCost ? a.cost : a.value))
-        .slice(0, compact ? 5 : group.rows.length);
-      return metricRows.map(row => {
-        const rowValue = safeNum(isCost ? row.cost : row.value);
+        .map(row => ({
+          ...row,
+          value: safeNum(isCost ? row.cost : row.value),
+          cost: safeNum(row.cost),
+          assets: row.assets || [],
+        }));
+      if (!compact || metricRows.length <= dashboardSectorLimit) return metricRows;
+      const topRows = metricRows.slice(0, dashboardSectorLimit);
+      const restRows = metricRows.slice(dashboardSectorLimit);
+      const otherValue = restRows.reduce((sum, row) => sum + safeNum(row.value), 0);
+      const otherCost = restRows.reduce((sum, row) => sum + safeNum(row.cost), 0);
+      const otherAssets = restRows.flatMap(row => row.assets || [])
+        .filter(item => safeNum(isCost ? item.cost : item.value) > 0);
+      return topRows.concat({
+        id: `other-${metric}`,
+        label: `기타 ${restRows.length}개`,
+        color: (STOCK_SECTOR_MAP.other_stock && STOCK_SECTOR_MAP.other_stock.color) || '#A8A29A',
+        value: otherValue,
+        cost: isCost ? otherValue : otherCost,
+        assets: otherAssets,
+      });
+    };
+    const valueRows = buildMetricRows('value');
+    const costRows = buildMetricRows('cost');
+    const renderMetricRows = (metric, rows) => {
+      const isCost = metric === 'cost';
+      const total = isCost ? group.costTotal : group.total;
+      return rows.map(row => {
+        const rowValue = safeNum(row.value);
         const pct = total > 0 ? (rowValue / total) * 100 : 0;
         const stateKey = `${group.id}:${metric}:${row.id}`;
         const isOpen = !!UIState.stockSectorOpen[stateKey];
@@ -583,7 +595,7 @@ function renderStockSectorSection(variant = 'full', options = {}) {
         <div class="sector-metric-title">${escHtml(title)}</div>
         <div class="sector-visual-grid">
           <div class="sector-list-panel">
-            <div class="sector-list">${renderMetricRows(metric)}</div>
+            <div class="sector-list">${renderMetricRows(metric, rows)}</div>
           </div>
           ${renderDonutPanel(title, total, rows)}
         </div>

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.6 — State Management
+   My Portfolio v5.36.7 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
