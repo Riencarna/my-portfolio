@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.9 — App Entry Point
+   My Portfolio v5.36.10 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -77,10 +77,15 @@ async function autoUpdateOnLoad() {
     const summary = await autoUpdateAll(null, { silent: true });
     if (!summary || summary.skipped || summary.total === 0) return;
 
-    localStorage.setItem('lastAutoUpdateMs', String(Date.now()));
+    // 저장 가격을 사용했으면 5분 중복 방지를 걸지 않아 다음 실행에서 다시 최신값을 시도한다.
+    if (!summary.fallback) localStorage.setItem('lastAutoUpdateMs', String(Date.now()));
     render();
-    if (summary.stale > 0) {
-      showToast(`⚠️ 값 미변화 의심 ${summary.stale}건`, 'info');
+    if (summary.fallback > 0 || summary.failed > 0 || summary.stale > 0) {
+      const parts = [`최신 ${summary.success}건`];
+      if (summary.fallback > 0) parts.push(`⚠️ 저장 가격 ${summary.fallback}건 사용`);
+      if (summary.failed > 0) parts.push(`실패 ${summary.failed}건`);
+      if (summary.stale > 0) parts.push(`값 미변화 의심 ${summary.stale}건`);
+      showToast(`가격 자동 업데이트: ${parts.join(' · ')}`, 'info');
     }
   } catch (e) {
     console.warn('Background auto-update failed:', e.message);

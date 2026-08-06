@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.9 — API Integration
+   My Portfolio v5.36.10 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
@@ -12,6 +12,63 @@ let cachedUsdt = null;
 let cachedBenchmark = null;
 let updateLogs = [];
 let autoUpdateProgress = { total: 0, done: 0, running: false };
+
+const MP_FALLBACK_HEADER = 'X-MP-Cache-Fallback';
+const MP_FALLBACK_REASON_HEADER = 'X-MP-Fallback-Reason';
+const MP_ORIGIN_STATUS_HEADER = 'X-MP-Origin-Status';
+const MP_CACHED_AT_HEADER = 'X-MP-Cache-Stored-At';
+const MP_FALLBACK_HEADERS = [
+  MP_FALLBACK_HEADER,
+  MP_FALLBACK_REASON_HEADER,
+  MP_ORIGIN_STATUS_HEADER,
+  MP_CACHED_AT_HEADER,
+];
+
+function createPriceFetchMeta() {
+  return { cacheFallback: false, reasons: [], originStatuses: [], cachedAt: '' };
+}
+
+function readCacheFallbackInfo(resp) {
+  if (!resp?.headers || resp.headers.get(MP_FALLBACK_HEADER) !== '1') return null;
+  return {
+    reason: resp.headers.get(MP_FALLBACK_REASON_HEADER) || 'server-error',
+    originStatus: resp.headers.get(MP_ORIGIN_STATUS_HEADER) || '',
+    cachedAt: resp.headers.get(MP_CACHED_AT_HEADER) || '',
+  };
+}
+
+function mergeCacheFallbackMeta(meta, info) {
+  if (!meta || !info) return false;
+  meta.cacheFallback = true;
+  if (info.reason && !meta.reasons.includes(info.reason)) meta.reasons.push(info.reason);
+  if (info.originStatus && !meta.originStatuses.includes(info.originStatus)) meta.originStatuses.push(info.originStatus);
+  if (info.cachedAt) {
+    const currentMs = new Date(meta.cachedAt).getTime();
+    const incomingMs = new Date(info.cachedAt).getTime();
+    if (!meta.cachedAt || (Number.isFinite(incomingMs) && (!Number.isFinite(currentMs) || incomingMs < currentMs))) {
+      meta.cachedAt = info.cachedAt;
+    }
+  }
+  return true;
+}
+
+function noteCacheFallbackResponse(resp, meta) {
+  return mergeCacheFallbackMeta(meta, readCacheFallbackInfo(resp));
+}
+
+function fallbackInfoTime(info) {
+  const time = new Date(info?.cachedAt || '').getTime();
+  return Number.isFinite(time) && time > 0 ? time : 0;
+}
+
+function createAllOriginsContentResponse(data, wrapperResp) {
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  for (const name of MP_FALLBACK_HEADERS) {
+    const value = wrapperResp?.headers?.get(name);
+    if (value) headers.set(name, value);
+  }
+  return new Response(data.contents, { status: 200, headers });
+}
 
 // ── Last-Known Rate Snapshot (localStorage) ──
 // 모든 라이브 시세 소스가 실패했을 때 1350원 하드코딩 폴백 대신 사용.
@@ -56,7 +113,7 @@ function formatRateAge(time) {
 // `1350원이 silently 박히는 것`을 방지하기 위해 source/age도 같이 반환.
 function getUsdtRateSync() {
   if (cachedUsdt && Number.isFinite(cachedUsdt.rate) && cachedUsdt.rate > 0) {
-    return { rate: cachedUsdt.rate, source: cachedUsdt.source || 'live', time: cachedUsdt.time, fallback: false };
+    return { rate: cachedUsdt.rate, source: cachedUsdt.source || 'live', time: cachedUsdt.time, fallback: !!cachedUsdt.fallbackInfo };
   }
   const lastUsdt = getLastRate('usdt');
   if (lastUsdt) {
@@ -72,7 +129,7 @@ function getUsdtRateSync() {
 function getRateDisplayInfo(kind) {
   const live = kind === 'usdkrw' ? cachedRate : cachedUsdt;
   if (live && Number.isFinite(live.rate) && live.rate > 0) {
-    return { rate: live.rate, source: live.source || 'live', time: live.time, fallback: false };
+    return { rate: live.rate, source: live.source || 'live', time: live.time, fallback: !!live.fallbackInfo };
   }
   const last = getLastRate(kind);
   if (last) {
@@ -274,7 +331,7 @@ async function corsFetch(url, timeout = API_TIMEOUT) {
           if (!r.ok) throw new Error('allorigins not ok: ' + r.status);
           const d = await r.json();
           if (!d.contents) throw new Error('allorigins empty');
-          return new Response(d.contents, { status: 200, headers: { 'Content-Type': 'application/json' } });
+          return createAllOriginsContentResponse(d, r);
         })
     );
     return await Promise.any(proxyPromises);
@@ -287,8 +344,9 @@ async function corsFetch(url, timeout = API_TIMEOUT) {
 // 우선순위: Yahoo KRW=X → Daum FRX.KRWUSD → open.er-api → floatrates.
 // 앞 두 곳은 실시간 외환시세, 뒤 두 곳은 하루 1~2회 갱신되는 reference rate라 폴백 전용.
 // Upbit USDC/USDT는 김치프리미엄이 끼어 환율 지표로 부적합 → 제외.
-async function fetchExchangeRate(force = false) {
+async function fetchExchangeRate(force = false, meta = null) {
   if (!force && cachedRate && Date.now() - cachedRate.time < CACHE_TTL_RATE) {
+    mergeCacheFallbackMeta(meta, cachedRate.fallbackInfo);
     return cachedRate.rate;
   }
   try {
@@ -296,8 +354,10 @@ async function fetchExchangeRate(force = false) {
     const d = await r.json();
     const price = d.chart?.result?.[0]?.meta?.regularMarketPrice;
     if (Number.isFinite(price) && price > 0) {
-      cachedRate = { rate: price, time: Date.now(), source: 'yahoo' };
-      saveLastRate('usdkrw', cachedRate.rate, 'yahoo');
+      const fallbackInfo = readCacheFallbackInfo(r);
+      mergeCacheFallbackMeta(meta, fallbackInfo);
+      cachedRate = { rate: price, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'yahoo', fallbackInfo };
+      if (!fallbackInfo) saveLastRate('usdkrw', cachedRate.rate, 'yahoo');
       return cachedRate.rate;
     }
   } catch (e) {
@@ -307,8 +367,10 @@ async function fetchExchangeRate(force = false) {
     const r = await corsFetch(`${API.daum}/FRX.KRWUSD`, 5000);
     const d = await r.json();
     if (Number.isFinite(d.basePrice) && d.basePrice > 0) {
-      cachedRate = { rate: d.basePrice, time: Date.now(), source: 'daum' };
-      saveLastRate('usdkrw', cachedRate.rate, 'daum');
+      const fallbackInfo = readCacheFallbackInfo(r);
+      mergeCacheFallbackMeta(meta, fallbackInfo);
+      cachedRate = { rate: d.basePrice, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'daum', fallbackInfo };
+      if (!fallbackInfo) saveLastRate('usdkrw', cachedRate.rate, 'daum');
       return cachedRate.rate;
     }
   } catch (e) {
@@ -318,8 +380,10 @@ async function fetchExchangeRate(force = false) {
     const r = await fetchWithTimeout(API.openER, 5000);
     const d = await r.json();
     if (d.rates?.KRW) {
-      cachedRate = { rate: d.rates.KRW, time: Date.now(), source: 'open.er-api' };
-      saveLastRate('usdkrw', cachedRate.rate, 'open.er-api');
+      const fallbackInfo = readCacheFallbackInfo(r);
+      mergeCacheFallbackMeta(meta, fallbackInfo);
+      cachedRate = { rate: d.rates.KRW, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'open.er-api', fallbackInfo };
+      if (!fallbackInfo) saveLastRate('usdkrw', cachedRate.rate, 'open.er-api');
       return cachedRate.rate;
     }
   } catch (e) {
@@ -329,19 +393,26 @@ async function fetchExchangeRate(force = false) {
     const r = await corsFetch(API.floatRates, 5000);
     const d = await r.json();
     if (d.krw?.rate) {
-      cachedRate = { rate: d.krw.rate, time: Date.now(), source: 'floatrates' };
-      saveLastRate('usdkrw', cachedRate.rate, 'floatrates');
+      const fallbackInfo = readCacheFallbackInfo(r);
+      mergeCacheFallbackMeta(meta, fallbackInfo);
+      cachedRate = { rate: d.krw.rate, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'floatrates', fallbackInfo };
+      if (!fallbackInfo) saveLastRate('usdkrw', cachedRate.rate, 'floatrates');
       return cachedRate.rate;
     }
   } catch (e) {
     console.warn('fetchExchangeRate floatrates failed:', e.message);
   }
-  if (cachedRate?.rate) return cachedRate.rate;
+  if (cachedRate?.rate) {
+    mergeCacheFallbackMeta(meta, cachedRate.fallbackInfo);
+    return cachedRate.rate;
+  }
   const last = getLastRate('usdkrw');
   if (last) {
     console.warn('Exchange rate: using last-known snapshot', last);
     showToast(`환율 API 실패. 마지막 저장 환율(${Math.round(last.rate)}원, ${formatRateAge(last.time)}) 사용 중`, 'info');
-    cachedRate = { rate: last.rate, time: Date.now(), source: 'last-known' };
+    const fallbackInfo = { reason: 'app-cache', originStatus: '', cachedAt: new Date(last.time).toISOString() };
+    mergeCacheFallbackMeta(meta, fallbackInfo);
+    cachedRate = { rate: last.rate, time: last.time, source: 'last-known', fallbackInfo };
     return last.rate;
   }
   console.warn('Exchange rate: using fallback', FALLBACK_USD_KRW);
@@ -350,16 +421,19 @@ async function fetchExchangeRate(force = false) {
 }
 
 // ── USDT Rate (KRW) ──
-async function fetchUsdtRate() {
+async function fetchUsdtRate(meta = null) {
   if (cachedUsdt && Date.now() - cachedUsdt.time < CACHE_TTL_RATE) {
+    mergeCacheFallbackMeta(meta, cachedUsdt.fallbackInfo);
     return cachedUsdt.rate;
   }
   try {
     const r = await fetchWithTimeout(`${API.upbit}?markets=KRW-USDT`, 5000);
     const d = await r.json();
     if (d[0]?.trade_price) {
-      cachedUsdt = { rate: d[0].trade_price, time: Date.now(), source: 'Upbit' };
-      saveLastRate('usdt', cachedUsdt.rate, 'Upbit');
+      const fallbackInfo = readCacheFallbackInfo(r);
+      mergeCacheFallbackMeta(meta, fallbackInfo);
+      cachedUsdt = { rate: d[0].trade_price, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'Upbit', fallbackInfo };
+      if (!fallbackInfo) saveLastRate('usdt', cachedUsdt.rate, 'Upbit');
       return cachedUsdt.rate;
     }
   } catch (e) {
@@ -369,8 +443,10 @@ async function fetchUsdtRate() {
     const r = await corsFetch(`${API.bithumb}/USDT_KRW`, 5000);
     const d = await r.json();
     if (d.data?.closing_price) {
-      cachedUsdt = { rate: Number(d.data.closing_price), time: Date.now(), source: 'Bithumb' };
-      saveLastRate('usdt', cachedUsdt.rate, 'Bithumb');
+      const fallbackInfo = readCacheFallbackInfo(r);
+      mergeCacheFallbackMeta(meta, fallbackInfo);
+      cachedUsdt = { rate: Number(d.data.closing_price), time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'Bithumb', fallbackInfo };
+      if (!fallbackInfo) saveLastRate('usdt', cachedUsdt.rate, 'Bithumb');
       return cachedUsdt.rate;
     }
   } catch (e) {
@@ -379,32 +455,43 @@ async function fetchUsdtRate() {
   // 직거래 시세 두 곳 모두 실패. 라이브 환율(USD/KRW)이 캐시에 살아있으면 그걸 프록시로 사용.
   // 없으면 마지막에 봤던 USDT 시세 → 마지막 환율 → 1350원 순으로 폴백.
   if (cachedRate && Date.now() - cachedRate.time < CACHE_TTL_RATE && cachedRate.source !== 'last-known') {
-    cachedUsdt = { rate: cachedRate.rate, time: Date.now(), source: 'Exchange' };
+    mergeCacheFallbackMeta(meta, cachedRate.fallbackInfo);
+    cachedUsdt = { rate: cachedRate.rate, time: cachedRate.time, source: 'Exchange', fallbackInfo: cachedRate.fallbackInfo || null };
     return cachedRate.rate;
   }
   const lastUsdt = getLastRate('usdt');
   if (lastUsdt) {
     console.warn('USDT rate: using last-known USDT snapshot', lastUsdt);
     showToast(`USDT 시세 API 실패. 마지막 저장 시세(${Math.round(lastUsdt.rate)}원, ${formatRateAge(lastUsdt.time)}) 사용 중`, 'info');
-    cachedUsdt = { rate: lastUsdt.rate, time: Date.now(), source: 'last-known' };
+    const fallbackInfo = { reason: 'app-cache', originStatus: '', cachedAt: new Date(lastUsdt.time).toISOString() };
+    mergeCacheFallbackMeta(meta, fallbackInfo);
+    cachedUsdt = { rate: lastUsdt.rate, time: lastUsdt.time, source: 'last-known', fallbackInfo };
     return lastUsdt.rate;
   }
   // 마지막 카드: fetchExchangeRate가 자체 last-known/fallback 처리 후 토스트도 띄움
   try {
-    const rate = await fetchExchangeRate();
-    cachedUsdt = { rate, time: Date.now(), source: 'Exchange' };
+    const rate = await fetchExchangeRate(false, meta);
+    const fallbackInfo = meta?.cacheFallback ? {
+      reason: meta.reasons[0] || 'server-error',
+      originStatus: meta.originStatuses[0] || '',
+      cachedAt: meta.cachedAt || '',
+    } : null;
+    cachedUsdt = { rate, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: 'Exchange', fallbackInfo };
     return rate;
   } catch (e) {
     console.warn('fetchUsdtRate exchange fallback failed:', e.message);
   }
-  if (cachedUsdt?.rate) return cachedUsdt.rate;
+  if (cachedUsdt?.rate) {
+    mergeCacheFallbackMeta(meta, cachedUsdt.fallbackInfo);
+    return cachedUsdt.rate;
+  }
   console.warn('USDT rate: using hardcoded fallback', FALLBACK_USD_KRW);
   showToast(`USDT 시세를 불러올 수 없습니다. 기본값(${FALLBACK_USD_KRW}원) 사용 중`, 'warning');
   return FALLBACK_USD_KRW;
 }
 
 // ── Coin Prices (CoinGecko) ──
-async function fetchCoinPrices(coinIds) {
+async function fetchCoinPrices(coinIds, meta = null) {
   if (!coinIds || !coinIds.length) return {};
   const ids = coinIds.join(',');
   const url = `${API.coingecko}/simple/price?ids=${ids}&vs_currencies=krw`;
@@ -412,7 +499,9 @@ async function fetchCoinPrices(coinIds) {
     const r = await fetchWithTimeout(url, API_TIMEOUT);
     if (r.ok) {
       const d = await r.json();
-      return extractCoinPrices(d);
+      const prices = extractCoinPrices(d);
+      if (Object.keys(prices).length > 0) noteCacheFallbackResponse(r, meta);
+      return prices;
     }
   } catch (e) {
     console.warn('fetchCoinPrices direct failed:', e.message);
@@ -420,7 +509,9 @@ async function fetchCoinPrices(coinIds) {
   try {
     const r = await corsFetch(url, 10000);
     const d = await r.json();
-    return extractCoinPrices(d);
+    const prices = extractCoinPrices(d);
+    if (Object.keys(prices).length > 0) noteCacheFallbackResponse(r, meta);
+    return prices;
   } catch (e) {
     console.warn('CoinGecko fetch failed:', e.message);
     return {};
@@ -438,21 +529,21 @@ function extractCoinPrices(data) {
 }
 
 // ── Stock Price ──
-async function fetchStockPrice(asset) {
+async function fetchStockPrice(asset, meta = null) {
   const { stockCode, market, name } = asset;
   if (!stockCode && !(name && ETF_PREFIXES.some(p => name.toUpperCase().startsWith(p)))) {
     return null;
   }
   if (stockCode && !['KOSPI', 'KOSDAQ'].includes(market)) {
-    return fetchForeignStockPrice(stockCode, market);
+    return fetchForeignStockPrice(stockCode, market, meta);
   }
   if (stockCode) {
-    return fetchKoreanStockPrice(stockCode);
+    return fetchKoreanStockPrice(stockCode, meta);
   }
   return null;
 }
 
-async function fetchKoreanStockPrice(code) {
+async function fetchKoreanStockPrice(code, meta = null) {
   // 1. Naver polling API (실시간) — Worker 화이트리스트 통과, 1순위로 승격(v5.11.1)
   try {
     const r = await corsFetch(`${API.naverPolling}/${code}`, API_TIMEOUT);
@@ -460,7 +551,10 @@ async function fetchKoreanStockPrice(code) {
     const item = d.datas?.[0];
     if (item) {
       const price = item.closePriceRaw ?? safeNum(String(item.closePrice).replace(/,/g, ''));
-      if (price && isFinite(price)) return Math.round(price);
+      if (price && isFinite(price)) {
+        noteCacheFallbackResponse(r, meta);
+        return Math.round(price);
+      }
     }
   } catch (e) {
     console.warn('fetchKoreanStockPrice naver polling failed:', code, e.message);
@@ -470,7 +564,11 @@ async function fetchKoreanStockPrice(code) {
     const r = await corsFetch(`${API.naver}/${code}/basic`, API_TIMEOUT);
     const d = await r.json();
     const price = d.closePrice || d.currentPrice;
-    if (price) return safeNum(String(price).replace(/,/g, ''));
+    const numericPrice = safeNum(String(price || '').replace(/,/g, ''));
+    if (numericPrice > 0) {
+      noteCacheFallbackResponse(r, meta);
+      return numericPrice;
+    }
   } catch (e) {
     console.warn('fetchKoreanStockPrice naver failed:', code, e.message);
   }
@@ -480,7 +578,10 @@ async function fetchKoreanStockPrice(code) {
       const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${code}${suffix}?interval=1d&range=1d`, API_TIMEOUT);
       const d = await r.json();
       const price = d.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if (price && isFinite(price)) return Math.round(price);
+      if (price && isFinite(price)) {
+        noteCacheFallbackResponse(r, meta);
+        return Math.round(price);
+      }
     } catch (e) {
       console.warn(`fetchKoreanStockPrice yahoo ${suffix} failed:`, code, e.message);
     }
@@ -488,7 +589,7 @@ async function fetchKoreanStockPrice(code) {
   return null;
 }
 
-async function fetchForeignStockPrice(symbol, market) {
+async function fetchForeignStockPrice(symbol, market, meta = null) {
   // 1. Naver world stock API (api.stock.naver.com)
   //    NASDAQ → symbol.O, NYSE → symbol (no suffix), unknown → try both
   const suffixes = market === 'NASDAQ' ? ['.O']
@@ -503,7 +604,8 @@ async function fetchForeignStockPrice(symbol, market) {
       if (price) {
         const usdPrice = safeNum(String(price).replace(/,/g, ''));
         if (usdPrice > 0) {
-          const rate = await fetchExchangeRate();
+          noteCacheFallbackResponse(r, meta);
+          const rate = await fetchExchangeRate(false, meta);
           return Math.round(usdPrice * rate);
         }
       }
@@ -516,11 +618,12 @@ async function fetchForeignStockPrice(symbol, market) {
   try {
     const r = await corsFetch(`${API.yahoo}/v8/finance/chart/${symbol}?interval=1d&range=1d`, API_TIMEOUT);
     const d = await r.json();
-    const meta = d.chart?.result?.[0]?.meta;
-    if (meta?.regularMarketPrice && isFinite(meta.regularMarketPrice)) {
-      const price = meta.regularMarketPrice;
-      if (meta.currency === 'KRW') return Math.round(price);
-      const rate = await fetchExchangeRate();
+    const quoteMeta = d.chart?.result?.[0]?.meta;
+    if (quoteMeta?.regularMarketPrice && isFinite(quoteMeta.regularMarketPrice)) {
+      const price = quoteMeta.regularMarketPrice;
+      noteCacheFallbackResponse(r, meta);
+      if (quoteMeta.currency === 'KRW') return Math.round(price);
+      const rate = await fetchExchangeRate(false, meta);
       return Math.round(price * rate);
     }
   } catch (e) {
@@ -535,7 +638,8 @@ async function fetchForeignStockPrice(symbol, market) {
     if (lines.length >= 2) {
       const close = parseFloat(lines[1].split(',')[6]);
       if (isFinite(close) && close > 0) {
-        const rate = await fetchExchangeRate();
+        noteCacheFallbackResponse(r, meta);
+        const rate = await fetchExchangeRate(false, meta);
         return Math.round(close * rate);
       }
     }
@@ -579,7 +683,7 @@ async function autoUpdateAll(onProgress, options = {}) {
   const { silent = false } = options;
   if (_updatePromise) {
     if (!silent) showToast('업데이트가 이미 진행 중입니다', 'info');
-    return { success: 0, failed: 0, total: 0, skipped: true };
+    return { success: 0, fallback: 0, failed: 0, stale: 0, total: 0, skipped: true };
   }
   _updatePromise = _doAutoUpdate(onProgress);
   try { return await _updatePromise; } finally { _updatePromise = null; }
@@ -594,6 +698,7 @@ async function _doAutoUpdate(onProgress) {
   const failed = [];
   const pendingUpdates = [];
   let successCount = 0;
+  let fallbackCount = 0;
   let failCount = 0;
   let staleCount = 0;
 
@@ -619,11 +724,38 @@ async function _doAutoUpdate(onProgress) {
     return (Date.now() - prevLpuMs) > STALE_DETECT_MS;
   };
 
-  const log = (name, ok, price, stale = false) => {
-    updateLogs.push({ name, ok, price, stale, time: new Date().toISOString() });
+  const log = (asset, status, price, stale = false, meta = null, suffix = '') => {
+    const cacheFallback = status === 'fallback';
+    updateLogs.push({
+      assetId: asset?.id || '',
+      name: (asset?.name || '') + suffix,
+      status,
+      ok: status !== 'failed',
+      price,
+      stale,
+      cacheFallback,
+      fallbackReason: meta?.reasons?.[0] || '',
+      originStatus: meta?.originStatuses?.[0] || '',
+      cacheStoredAt: meta?.cachedAt || '',
+      time: new Date().toISOString(),
+    });
     if (updateLogs.length > LIMITS.logs) updateLogs.shift();
-    if (ok) successCount++; else failCount++;
+    if (status === 'live') successCount++;
+    else if (cacheFallback) fallbackCount++;
+    else failCount++;
     if (stale) staleCount++;
+  };
+
+  const addPendingUpdate = (asset, amount, meta) => {
+    const update = { id: asset.id, amount };
+    if (!meta?.cacheFallback) update.lpu = now;
+    pendingUpdates.push(update);
+  };
+
+  const removeFailedLog = (asset) => {
+    const idx = updateLogs.findIndex(entry => entry.assetId === asset.id && entry.status === 'failed');
+    if (idx >= 0) updateLogs.splice(idx, 1);
+    failCount = Math.max(0, failCount - 1);
   };
 
   const now = new Date().toLocaleString('ko-KR');
@@ -631,19 +763,20 @@ async function _doAutoUpdate(onProgress) {
   // 1. USDT
   for (const item of updatable.filter(u => u.type === 'usdt')) {
     try {
-      const rate = await fetchUsdtRate();
+      const meta = createPriceFetchMeta();
+      const rate = await fetchUsdtRate(meta);
       if (rate && isFinite(rate)) {
         const qty = item.asset.usdtQty;
         const amt = (qty != null && qty > 0) ? Math.round(rate * qty) : rate;
-        pendingUpdates.push({ id: item.asset.id, amount: amt, lpu: now });
-        log(item.asset.name, true, amt, isStale(item.asset, amt));
+        addPendingUpdate(item.asset, amt, meta);
+        log(item.asset, meta.cacheFallback ? 'fallback' : 'live', amt, isStale(item.asset, amt), meta);
       } else {
-        log(item.asset.name, false);
+        log(item.asset, 'failed');
         failed.push(item);
       }
     } catch (e) {
       console.warn('autoUpdate USDT failed:', item.asset.name, e.message);
-      log(item.asset.name, false);
+      log(item.asset, 'failed');
       failed.push(item);
     }
     autoUpdateProgress.done++;
@@ -654,19 +787,20 @@ async function _doAutoUpdate(onProgress) {
   if (coinAssets.length > 0) {
     const ids = [...new Set(coinAssets.map(a => a.coinId))];
     try {
-      const prices = await fetchCoinPrices(ids);
+      const meta = createPriceFetchMeta();
+      const prices = await fetchCoinPrices(ids, meta);
       for (const a of coinAssets) {
         if (prices[a.coinId] && isFinite(prices[a.coinId])) {
-          pendingUpdates.push({ id: a.id, amount: prices[a.coinId], lpu: now });
-          log(a.name, true, prices[a.coinId], isStale(a, prices[a.coinId]));
+          addPendingUpdate(a, prices[a.coinId], meta);
+          log(a, meta.cacheFallback ? 'fallback' : 'live', prices[a.coinId], isStale(a, prices[a.coinId]), meta);
         } else {
-          log(a.name, false);
+          log(a, 'failed');
           failed.push({ asset: a, type: 'coin' });
         }
       }
     } catch (e) {
       console.warn('autoUpdate coins batch failed:', e.message);
-      coinAssets.forEach(a => { log(a.name, false); failed.push({ asset: a, type: 'coin' }); });
+      coinAssets.forEach(a => { log(a, 'failed'); failed.push({ asset: a, type: 'coin' }); });
     }
     autoUpdateProgress.done++;
     onProgress?.(autoUpdateProgress);
@@ -675,17 +809,18 @@ async function _doAutoUpdate(onProgress) {
   // 3. Stocks sequential
   for (const item of updatable.filter(u => u.type === 'stock')) {
     try {
-      const price = await fetchStockPrice(item.asset);
+      const meta = createPriceFetchMeta();
+      const price = await fetchStockPrice(item.asset, meta);
       if (price != null && isFinite(price)) {
-        pendingUpdates.push({ id: item.asset.id, amount: price, lpu: now });
-        log(item.asset.name, true, price, isStale(item.asset, price));
+        addPendingUpdate(item.asset, price, meta);
+        log(item.asset, meta.cacheFallback ? 'fallback' : 'live', price, isStale(item.asset, price), meta);
       } else {
-        log(item.asset.name, false);
+        log(item.asset, 'failed');
         failed.push(item);
       }
     } catch (e) {
       console.warn('autoUpdate stock failed:', item.asset.name, e.message);
-      log(item.asset.name, false);
+      log(item.asset, 'failed');
       failed.push(item);
     }
     autoUpdateProgress.done++;
@@ -699,20 +834,21 @@ async function _doAutoUpdate(onProgress) {
     for (const item of failed) {
       try {
         let price = null;
+        const meta = createPriceFetchMeta();
         if (item.type === 'usdt') {
-          const rate = await fetchUsdtRate();
+          const rate = await fetchUsdtRate(meta);
           const qty = item.asset.usdtQty;
           price = (qty != null && qty > 0) ? Math.round(rate * qty) : rate;
         } else if (item.type === 'coin') {
-          const prices = await fetchCoinPrices([item.asset.coinId]);
+          const prices = await fetchCoinPrices([item.asset.coinId], meta);
           price = prices[item.asset.coinId];
         } else {
-          price = await fetchStockPrice(item.asset);
+          price = await fetchStockPrice(item.asset, meta);
         }
         if (price != null && isFinite(price)) {
-          pendingUpdates.push({ id: item.asset.id, amount: price, lpu: now });
-          log(item.asset.name + ' (재시도)', true, price, isStale(item.asset, price));
-          failCount--;
+          addPendingUpdate(item.asset, price, meta);
+          removeFailedLog(item.asset);
+          log(item.asset, meta.cacheFallback ? 'fallback' : 'live', price, isStale(item.asset, price), meta, ' (재시도)');
         }
       } catch (e) {
         console.warn('autoUpdate retry failed:', item.asset?.name, e.message);
@@ -725,7 +861,7 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.running = false;
   onProgress?.({ ...autoUpdateProgress, done: autoUpdateProgress.total });
 
-  const summary = { success: successCount, failed: failCount, stale: staleCount, total: totalAssets };
+  const summary = { success: successCount, fallback: fallbackCount, failed: failCount, stale: staleCount, total: totalAssets };
   EventBus.emit('updateComplete', { logs: updateLogs, summary });
   return summary;
 }

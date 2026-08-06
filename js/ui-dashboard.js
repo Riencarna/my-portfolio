@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.9 — Dashboard UI
+   My Portfolio v5.36.10 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -881,14 +881,23 @@ function renderAutoUpdateSection() {
       </div>
       <div id="updateLogs" class="update-logs" aria-label="업데이트 로그">
         ${updateLogs.slice(-10).map(l => {
-          const cls = !l.ok ? 'log-fail' : (l.stale ? 'log-stale' : 'log-ok');
+          const cls = !l.ok ? 'log-fail' : (l.cacheFallback ? 'log-cache' : (l.stale ? 'log-stale' : 'log-ok'));
           const prefix = l.stale ? '⚠️ ' : '';
           const right = !l.ok ? '✗ 실패'
             : (l.price ? prefix + escHtml(fmtPrice(l.price)) : '✓');
-          const title = l.stale ? 'title="값 미변화 의심 — 이전 가격과 동일합니다"' : '';
-          return `<div class="log-item ${cls}" role="listitem" ${title}>
-            <span>${escHtml(l.name)}</span>
-            <span>${right}</span>
+          const storedMs = new Date(l.cacheStoredAt || '').getTime();
+          const storedAge = Number.isFinite(storedMs) && storedMs > 0 ? formatRateAge(storedMs) : '저장 시각 미상';
+          const errorLabel = l.originStatus ? `서버 오류 ${l.originStatus}`
+            : (l.fallbackReason === 'network-error' ? '네트워크 오류' : '서버 오류');
+          const fallbackDetail = l.cacheFallback
+            ? `${errorLabel} — 저장된 가격 사용 · ${storedAge}${l.stale ? ' · 값 미변화 의심' : ''}`
+            : '';
+          const titleText = fallbackDetail || (l.stale ? '값 미변화 의심 — 이전 가격과 동일합니다' : '');
+          const title = titleText ? `title="${escAttr(titleText)}"` : '';
+          const aria = fallbackDetail ? `aria-label="${escAttr(`${l.name}, ${fallbackDetail}, ${l.price ? fmtPrice(l.price) : ''}`)}"` : '';
+          return `<div class="log-item ${cls}" role="listitem" ${title} ${aria}>
+            <span class="log-name">${escHtml(l.name)}${fallbackDetail ? `<small class="log-detail">${escHtml(fallbackDetail)}</small>` : ''}</span>
+            <span class="log-value">${right}</span>
           </div>`;
         }).join('')}
       </div>
@@ -917,13 +926,12 @@ async function startAutoUpdate() {
   if (summary && summary.skipped) {
     // 백그라운드 업데이트와 충돌 — autoUpdateAll이 이미 안내 토스트를 띄움
   } else if (summary && summary.total > 0) {
-    const extras = [];
-    if (summary.failed > 0) extras.push(`실패 ${summary.failed}건`);
-    if (summary.stale > 0) extras.push(`⚠️ 값 미변화 의심 ${summary.stale}건`);
-    const msg = extras.length > 0
-      ? `가격 업데이트: ${summary.success}/${summary.total} 성공 (${extras.join(', ')})`
-      : `가격 업데이트 완료: ${summary.success}/${summary.total} 성공`;
-    const toastType = (summary.failed > 0 || summary.stale > 0) ? 'info' : 'success';
+    const parts = [`최신 ${summary.success}건`];
+    if (summary.fallback > 0) parts.push(`⚠️ 저장 가격 ${summary.fallback}건`);
+    if (summary.failed > 0) parts.push(`실패 ${summary.failed}건`);
+    if (summary.stale > 0) parts.push(`값 미변화 의심 ${summary.stale}건`);
+    const msg = `가격 업데이트: ${parts.join(' · ')}`;
+    const toastType = (summary.fallback > 0 || summary.failed > 0 || summary.stale > 0) ? 'info' : 'success';
     showToast(msg, toastType);
   } else {
     showToast('업데이트할 자산이 없습니다', 'info');

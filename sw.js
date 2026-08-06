@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.36.9
+/* Service Worker - My Portfolio v5.36.10
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.36.9";
+var CACHE_NAME = "myportfolio-v5.36.10";
 
 var STATIC_ASSETS = [
   "./",
@@ -46,6 +46,64 @@ var API_HOSTS = [
 ];
 
 var CDN_HOSTS = ["cdn.jsdelivr.net"];
+
+var MP_FALLBACK_HEADER = "X-MP-Cache-Fallback";
+var MP_FALLBACK_REASON_HEADER = "X-MP-Fallback-Reason";
+var MP_ORIGIN_STATUS_HEADER = "X-MP-Origin-Status";
+var MP_CACHED_AT_HEADER = "X-MP-Cache-Stored-At";
+var MP_RESERVED_HEADERS = [
+  MP_FALLBACK_HEADER,
+  MP_FALLBACK_REASON_HEADER,
+  MP_ORIGIN_STATUS_HEADER,
+  MP_CACHED_AT_HEADER
+];
+
+function cloneResponseWithHeaders(resp, headers) {
+  var copy = resp.clone();
+  return new Response(copy.body, {
+    status: copy.status,
+    statusText: copy.statusText,
+    headers: headers
+  });
+}
+
+function cleanNetworkResponse(resp) {
+  var hasReserved = MP_RESERVED_HEADERS.some(function(name) { return resp.headers.has(name); });
+  if (!hasReserved) return resp;
+  var headers = new Headers(resp.headers);
+  MP_RESERVED_HEADERS.forEach(function(name) { headers.delete(name); });
+  return cloneResponseWithHeaders(resp, headers);
+}
+
+function createApiCacheResponse(resp) {
+  var headers = new Headers(resp.headers);
+  MP_RESERVED_HEADERS.forEach(function(name) { headers.delete(name); });
+  headers.set(MP_CACHED_AT_HEADER, new Date().toISOString());
+  return cloneResponseWithHeaders(resp, headers);
+}
+
+function createFallbackResponse(cached, reason, originStatus) {
+  try {
+    var headers = new Headers(cached.headers);
+    headers.set(MP_FALLBACK_HEADER, "1");
+    headers.set(MP_FALLBACK_REASON_HEADER, reason);
+    if (originStatus) headers.set(MP_ORIGIN_STATUS_HEADER, String(originStatus));
+    else headers.delete(MP_ORIGIN_STATUS_HEADER);
+    var exposed = (headers.get("Access-Control-Expose-Headers") || "")
+      .split(",").map(function(v) { return v.trim(); }).filter(Boolean);
+    MP_RESERVED_HEADERS.forEach(function(name) {
+      if (!exposed.some(function(v) { return v.toLowerCase() === name.toLowerCase(); })) exposed.push(name);
+    });
+    headers.set("Access-Control-Expose-Headers", exposed.join(", "));
+    return cloneResponseWithHeaders(cached, headers);
+  } catch (_) {
+    return null;
+  }
+}
+
+function matchCurrentCache(request) {
+  return caches.open(CACHE_NAME).then(function(cache) { return cache.match(request); });
+}
 
 var OFFLINE_HTML = '<!DOCTYPE html>'
   + '<html lang="ko"><head><meta charset="UTF-8">'
@@ -112,15 +170,31 @@ self.addEventListener("fetch", function(e) {
   if (API_HOSTS.some(function(h) { return url.hostname.includes(h); })) {
     e.respondWith(
       fetch(e.request).then(function(resp) {
+        var cleanResp = cleanNetworkResponse(resp);
         if (resp.ok) {
-          var clone = resp.clone();
+          var cacheResponse = createApiCacheResponse(resp);
           return caches.open(CACHE_NAME)
-            .then(function(cache) { return cache.put(e.request, clone); })
-            .then(function() { return resp; }, function() { return resp; });
+            .then(function(cache) { return cache.put(e.request, cacheResponse); })
+            .then(function() { return cleanResp; }, function() { return cleanResp; });
         }
-        return resp;
+        // 서버 장애(5xx) 때는 마지막 정상 응답이 있으면 화면을 유지한다.
+        // 인증·요청 제한을 숨기지 않도록 4xx는 그대로 반환한다.
+        if (resp.status >= 500 && resp.status <= 599) {
+          return matchCurrentCache(e.request)
+            .then(function(cached) {
+              return cached && cached.ok
+                ? (createFallbackResponse(cached, "server-error", resp.status) || cleanResp)
+                : cleanResp;
+            }, function() { return cleanResp; });
+        }
+        return cleanResp;
       }).catch(function() {
-        return caches.match(e.request);
+        return matchCurrentCache(e.request)
+          .then(function(cached) {
+            return cached && cached.ok
+              ? (createFallbackResponse(cached, "network-error", "") || undefined)
+              : undefined;
+          });
       })
     );
     return;

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.9 — Stylesheet
+   My Portfolio v5.36.10 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -619,9 +619,13 @@ input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px;vertic
 
 /* Auto Update logs */
 .update-logs{max-height:200px;overflow-y:auto;margin-top:10px}
-.log-item{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid var(--bd)}
+.log-item{display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:12px;border-bottom:1px solid var(--bd)}
+.log-name{min-width:0;display:flex;flex-direction:column;gap:2px}
+.log-value{flex-shrink:0;align-self:center;text-align:right}
+.log-detail{font-size:11px;line-height:1.35;font-weight:600;color:var(--warning)}
 .log-ok{color:var(--success)}.log-fail{color:var(--danger)}
 .log-stale{color:var(--warning)}
+.log-cache{color:var(--warning)}
 
 /* Price flash */
 .price-flash-up{animation:flashGreen .6s ease}
@@ -1273,10 +1277,10 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
    ============================================= */
 .toast-container{
   position:fixed;bottom:32px;left:50%;transform:translateX(-50%);
-  z-index:9999;pointer-events:none}
+  width:max-content;max-width:min(calc(100vw - 28px),520px);z-index:9999;pointer-events:none}
 .toast{
   padding:14px 26px;border-radius:var(--radius-lg);font-size:14px;font-weight:600;
-  opacity:0;transition:all .3s ease;max-width:90vw;text-align:center;
+  box-sizing:border-box;width:max-content;max-width:100%;opacity:0;transition:all .3s ease;text-align:center;
   background:var(--surface);
   border:1px solid var(--bd);box-shadow:var(--shadow-lg);
   color:var(--t1);
@@ -1428,7 +1432,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .modal-box{max-width:calc(100% - 24px);border-radius:var(--radius-2xl)}
   .modal-header{padding:20px 22px 0;border-radius:var(--radius-2xl) var(--radius-2xl) 0 0}
   .modal-body{padding:18px 22px 22px}
-  .toast-container{bottom:108px}
+  .toast-container{left:50%;bottom:108px}
   .fab-container{bottom:max(84px,calc(env(safe-area-inset-bottom) + 78px))}
 }
 
