@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.7 — Utilities
+   My Portfolio v5.36.8 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -106,6 +106,61 @@ function isValidDate(str) {
   if (!m) return false;
   const d = new Date(str);
   return !isNaN(d.getTime()) && d.getDate() === Number(m[3]);
+}
+
+// 스냅샷 기록을 실제 달력 날짜 기준으로 비교한다.
+// 각 기간의 기준일 또는 그 이전에 있는 가장 가까운 기록을 사용하며,
+// 해당 기간만큼의 기록이 쌓이지 않았으면 available=false로 표시한다.
+function calcSnapshotPeriodChanges(history, periods) {
+  if (!Array.isArray(history) || !Array.isArray(periods)) return null;
+
+  const snapshots = history
+    .filter(h => h && isValidDate(h.date) && Number.isFinite(Number(h.total)))
+    .map(h => ({ ...h, total: safeNum(h.total) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (snapshots.length < 2) return null;
+
+  const current = snapshots[snapshots.length - 1];
+  const [year, month, day] = current.date.split('-').map(Number);
+  const currentDate = new Date(year, month - 1, day);
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  return periods.map(period => {
+    const days = Math.max(0, Math.floor(safeNum(period.days)));
+    const targetDate = new Date(currentDate);
+    targetDate.setDate(targetDate.getDate() - days);
+    const target = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+
+    let baseline = null;
+    for (let i = snapshots.length - 2; i >= 0; i--) {
+      if (snapshots[i].date <= target) {
+        baseline = snapshots[i];
+        break;
+      }
+    }
+
+    if (!baseline) {
+      return { ...period, ret: null, available: false, baseDate: '', currentDate: current.date, actualDays: 0 };
+    }
+
+    const prev = safeNum(baseline.total);
+    if (prev <= 0) {
+      return { ...period, ret: null, available: false, baseDate: baseline.date, currentDate: current.date, actualDays: 0 };
+    }
+    const ret = ((current.total - prev) / prev) * 100;
+    const [baseYear, baseMonth, baseDay] = baseline.date.split('-').map(Number);
+    const baseDate = new Date(baseYear, baseMonth - 1, baseDay);
+    const actualDays = Math.max(0, Math.round((currentDate - baseDate) / dayMs));
+    return {
+      ...period,
+      ret: safeNum(ret),
+      available: true,
+      baseDate: baseline.date,
+      currentDate: current.date,
+      actualDays,
+    };
+  });
 }
 
 function clampDay(year, month, day) {

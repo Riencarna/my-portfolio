@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.7 — App Entry Point
+   My Portfolio v5.36.8 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -552,15 +552,17 @@ function toggleFAB() {
   if (backdrop) backdrop.style.display = isOpen ? 'block' : 'none';
 }
 
-function closeFAB() {
+function closeFAB(restoreFocus = false) {
   const container = $('#fabContainer');
   const btn = $('#fabBtn');
   const backdrop = $('#fabBackdrop');
   if (!container || !btn) return;
+  const wasOpen = container.classList.contains('open');
   container.classList.remove('open');
   btn.classList.remove('open');
   btn.setAttribute('aria-expanded', 'false');
   if (backdrop) backdrop.style.display = 'none';
+  if (restoreFocus && wasOpen) btn.focus();
 }
 
 function syncNav() {
@@ -637,7 +639,7 @@ document.addEventListener('keydown', e => {
   }
 
   if (e.key === 'Escape') {
-    closeFAB();
+    closeFAB(true);
   }
 });
 
@@ -649,9 +651,9 @@ document.addEventListener('click', e => {
 
   switch (action) {
     case 'toggle-fab': toggleFAB(); break;
-    case 'close-fab': closeFAB(); break;
-    case 'fab-add-asset': closeFAB(); openAddAsset(); break;
-    case 'fab-add-income': closeFAB(); openAddIncome(); break;
-    case 'fab-toggle-list-edit': closeFAB(); if (currentTab === 'pgList') toggleEditMode(); break;
+    case 'close-fab': closeFAB(true); break;
+    case 'fab-add-asset': closeFAB(true); openAddAsset(); break;
+    case 'fab-add-income': closeFAB(true); openAddIncome(); break;
+    case 'fab-toggle-list-edit': closeFAB(true); if (currentTab === 'pgList') toggleEditMode(); break;
   }
 });

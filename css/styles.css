@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.7 — Stylesheet
+   My Portfolio v5.36.8 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -1210,6 +1210,7 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 .period-item:hover{border-color:var(--bd-strong)}
 .period-label{font-size:12px;color:var(--t3);margin-bottom:6px;font-weight:600}
 .period-value{font-size:16px;font-weight:700}
+.period-change-note{margin-top:12px;line-height:1.6}
 .benchmark-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
 .benchmark-item{text-align:center;padding:16px 12px;background:var(--surface-alt);border-radius:var(--radius-lg);
   border:1px solid var(--bd);transition:all var(--t-base)}
@@ -1387,7 +1388,9 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
 
 /* Mobile */
 @media(max-width:768px){
-  .sidebar{transform:translateX(-100%)}
+  /* 모바일에서는 하단 내비게이션만 사용한다. display:none으로 화면 밖
+     사이드바가 키보드 탭 순서와 접근성 트리에 남는 문제도 함께 막는다. */
+  .sidebar{display:none}
   .app-layout{margin-left:0}
   .bottom-nav{display:flex}
   .main-content{padding:18px 16px 100px}
@@ -1452,6 +1455,23 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .book-cat-manager-head{flex-direction:column}
   .book-cat-add-row{grid-template-columns:58px 1fr}
   .book-cat-add-row .btn-p{grid-column:1 / -1}
+  .modal{padding:8px}
+  .modal-box{max-width:100%;max-height:calc(100dvh - 16px);border-radius:var(--radius-xl)}
+  .modal-header{padding:16px 16px 0;border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+  .modal-body{padding:16px}
+  .modal-actions{
+    position:sticky;bottom:-16px;z-index:2;
+    margin-left:-16px;margin-right:-16px;
+    padding:14px 16px max(14px,env(safe-area-inset-bottom));
+    background:var(--surface);box-shadow:0 -8px 18px rgba(0,0,0,.08)
+  }
+}
+
+@media(max-width:360px){
+  .page-header-title{gap:0;flex:1}
+  .page-subtitle{display:none}
+  .header-actions{gap:4px}
+  .header-actions .btn-p{padding-left:12px;padding-right:12px;min-width:0}
 }
 
 /* ── CSV Import Preview ── */

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.7 — Dashboard UI
+   My Portfolio v5.36.8 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -1089,9 +1089,6 @@ function renderOnboarding() {
 }
 
 function calcPeriodReturns() {
-  const hist = appState.history;
-  if (hist.length < 2) return null;
-  const current = hist[hist.length - 1].total;
   const periods = [
     { label: '1주', days: 7 },
     { label: '1개월', days: 30 },
@@ -1099,10 +1096,5 @@ function calcPeriodReturns() {
     { label: '6개월', days: 180 },
     { label: '1년', days: 365 },
   ];
-  return periods.map(p => {
-    const idx = Math.max(0, hist.length - p.days - 1);
-    const prev = hist[idx]?.total || current;
-    const ret = prev > 0 ? ((current - prev) / prev) * 100 : 0;
-    return { ...p, ret: safeNum(ret) };
-  });
+  return calcSnapshotPeriodChanges(appState.history, periods);
 }

@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.36.7
+/* Service Worker - My Portfolio v5.36.8
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.36.7";
+var CACHE_NAME = "myportfolio-v5.36.8";
 
 var STATIC_ASSETS = [
   "./",
@@ -35,6 +35,7 @@ var API_HOSTS = [
   "m.stock.naver.com", "api.stock.naver.com",
   "polling.finance.naver.com",
   "asset-manage-alpaca.wnsduf0306.workers.dev",
+  "api.codetabs.com", "api.allorigins.win",
   "stooq.com",
   "open.er-api.com", "www.floatrates.com",
   "api.upbit.com", "api.bithumb.com", "finance.daum.net",

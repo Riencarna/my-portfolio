@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.7 — Analysis UI
+   My Portfolio v5.36.8 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -665,16 +665,23 @@ function renderPeriodReturnsSection() {
   const returns = calcPeriodReturns();
   if (!returns) return '';
   return `
-    <div class="card" role="region" aria-label="기간별 수익률">
-      <div class="card-title">기간별 수익률</div>
+    <div class="card" role="region" aria-label="기간별 자산 증감률">
+      <div class="card-title">기간별 자산 증감률</div>
       <div class="period-grid" role="list">
-        ${returns.map(p => `
-          <div class="period-item" role="listitem" aria-label="${escAttr(p.label)} 수익률 ${fmtPct(p.ret)}">
+        ${returns.map(p => {
+          const value = p.available ? fmtPct(p.ret) : '—';
+          const valueClass = p.available ? profitClass(p.ret) : 'text-muted';
+          const detail = p.available
+            ? `${p.label} 자산 증감률 ${value}, ${fmtDate(p.baseDate)}부터 ${p.actualDays}일 변화`
+            : `${p.label} 자산 증감률, 기록 부족`;
+          return `
+          <div class="period-item" role="listitem" aria-label="${escAttr(detail)}" title="${escAttr(detail)}">
             <div class="period-label">${escHtml(p.label)}</div>
-            <div class="period-value ${p.ret >= 0 ? 'positive' : 'negative'}">${escHtml(fmtPct(p.ret))}</div>
+            <div class="period-value ${valueClass}">${escHtml(value)}</div>
           </div>
-        `).join('')}
+        `; }).join('')}
       </div>
+      <p class="text-muted period-change-note">입출금·자산 추가·삭제가 포함된 총자산 변화로, 실제 투자수익률과 다를 수 있습니다. 기준일 이전의 가장 가까운 기록을 사용합니다.</p>
     </div>
   `;
 }
@@ -688,7 +695,7 @@ function renderBenchmarkSection() {
         <button class="btn-sm" id="btnBenchmark" data-action="load-benchmark" aria-label="벤치마크 데이터 불러오기">불러오기</button>
       </div>
       <div id="benchmarkResult">
-        <p class="text-muted">KOSPI / S&P500과 내 포트폴리오 수익률을 비교합니다.</p>
+        <p class="text-muted">KOSPI / S&P500 등락률과 내 총자산 증감을 비교합니다. 내 값에는 입출금이 포함될 수 있습니다.</p>
       </div>
     </div>
   `;
@@ -701,10 +708,14 @@ async function loadBenchmark() {
   try {
     const data = await fetchBenchmarkReturns();
     const myReturn = calcPeriodReturns();
-    const myYtd = myReturn?.find(p => p.label === '1년')?.ret || 0;
+    const myPeriod = myReturn?.find(p => p.label === '1년');
 
     let html = '<div class="benchmark-grid" role="list">';
-    html += `<div class="benchmark-item" role="listitem"><div class="benchmark-label">내 포트폴리오 (1년)</div><div class="benchmark-value ${profitClass(myYtd)}">${escHtml(fmtPct(myYtd))}</div></div>`;
+    if (myPeriod?.available) {
+      html += `<div class="benchmark-item" role="listitem"><div class="benchmark-label">내 총자산 증감 (${myPeriod.actualDays}일)</div><div class="benchmark-value ${profitClass(myPeriod.ret)}">${escHtml(fmtPct(myPeriod.ret))}</div></div>`;
+    } else {
+      html += '<div class="benchmark-item" role="listitem"><div class="benchmark-label">내 총자산 증감 (1년)</div><div class="benchmark-value text-muted">기록 부족</div></div>';
+    }
     if (data.kospi) {
       html += `<div class="benchmark-item" role="listitem"><div class="benchmark-label">KOSPI (1년)</div><div class="benchmark-value ${profitClass(data.kospi.ytd)}">${escHtml(fmtPct(data.kospi.ytd))}</div></div>`;
     }
@@ -712,6 +723,7 @@ async function loadBenchmark() {
       html += `<div class="benchmark-item" role="listitem"><div class="benchmark-label">S&P 500 (1년)</div><div class="benchmark-value ${profitClass(data.sp500.ytd)}">${escHtml(fmtPct(data.sp500.ytd))}</div></div>`;
     }
     html += '</div>';
+    html += '<p class="text-muted period-change-note">내 값은 입출금·자산 추가·삭제가 포함된 총자산 변화로, 지수 등락률과 계산 기준이 다릅니다.</p>';
 
     const result = $('#benchmarkResult');
     if (result) result.innerHTML = html;
