@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.8 — Charts (Chart.js)
+   My Portfolio v5.36.9 — Charts (Chart.js)
    Cycle C compatible
    Soft Neutral: lavender/coral palette
    ============================================= */

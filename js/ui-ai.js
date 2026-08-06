@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.8 — Analysis UI
+   My Portfolio v5.36.9 — Analysis UI
    Cycle C compatible
    Soft Neutral palette, stagger animations
    ============================================= */
@@ -671,13 +671,15 @@ function renderPeriodReturnsSection() {
         ${returns.map(p => {
           const value = p.available ? fmtPct(p.ret) : '—';
           const valueClass = p.available ? profitClass(p.ret) : 'text-muted';
+          const periodMeta = p.available ? `실제 ${p.actualDays}일` : '기록 부족';
           const detail = p.available
-            ? `${p.label} 자산 증감률 ${value}, ${fmtDate(p.baseDate)}부터 ${p.actualDays}일 변화`
+            ? `${p.label} 자산 증감률 ${value}, 실제 ${p.actualDays}일 비교, ${fmtDate(p.baseDate)}부터`
             : `${p.label} 자산 증감률, 기록 부족`;
           return `
           <div class="period-item" role="listitem" aria-label="${escAttr(detail)}" title="${escAttr(detail)}">
             <div class="period-label">${escHtml(p.label)}</div>
             <div class="period-value ${valueClass}">${escHtml(value)}</div>
+            <div class="period-meta ${p.available ? '' : 'text-muted'}">${escHtml(periodMeta)}</div>
           </div>
         `; }).join('')}
       </div>
