@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.10 — Dashboard UI
+   My Portfolio v5.36.11 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -212,7 +212,7 @@ function _renderHeroCard(ctx) {
       <div class="dash-hero-change ${profitClass(ctx.change)}" aria-label="일일 변동">
         ${totalHidden ? '변동 금액 숨김' : (ctx.change !== 0 ? `${ctx.change > 0 ? '▲' : '▼'} ${escHtml(fmtKRW(Math.abs(ctx.change)))} (${escHtml(fmtPct(ctx.changePct))})` : '변동 없음')}
       </div>
-      ${appState.saved ? `<div class="dash-hero-saved">마지막 저장: ${escHtml(fmtRelTime(appState.saved))}</div>` : ''}
+      <div class="dash-hero-saved ${appState.saved ? '' : 'hidden'}" id="dashLastSaved">${appState.saved ? `마지막 저장: ${escHtml(fmtRelTime(appState.saved))}` : ''}</div>
     </section>
   `;
 }

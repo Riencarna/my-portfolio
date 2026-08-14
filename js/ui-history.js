@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.10 — History & Export UI
+   My Portfolio v5.36.11 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -454,9 +454,9 @@ function setHistoryFilter(days) {
 }
 
 // ── Backup & Restore ──
-function doBackupJSON() {
+async function doBackupJSON() {
   try {
-    saveDataNow();
+    await saveDataNow();
     const data = exportData();
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
@@ -488,8 +488,8 @@ function doRestoreJSON() {
       const version = (typeof data.version === 'string') ? stripHtml(data.version, 20) : '알 수 없음';
       openConfirmModal(
         `백업 복원: v${version}, 자산 ${assetCount}개. 현재 데이터를 덮어씁니다. 계속하시겠습니까?`,
-        () => {
-          if (importData(data)) {
+        async () => {
+          if (await importData(data)) {
             showToast('복원 완료', 'success');
             render();
           }
@@ -510,7 +510,8 @@ function doMigrateIndexedDB() {
     : '현재 포트폴리오 데이터와 자동 백업을 IndexedDB로 이전할까요?\n복사 성공 후 localStorage의 큰 데이터만 정리됩니다.';
   openConfirmModal(msg, async () => {
     try {
-      saveDataNow();
+      const saved = await saveDataNow();
+      if (!saved) throw new Error('현재 데이터를 먼저 저장하지 못했습니다');
       const result = await migrateStorageToIndexedDB({ force: true, cleanup: true, includeMemory: true });
       renderHistory();
       const freed = result.bytesFreed >= 1024 * 1024
@@ -945,7 +946,7 @@ function doResetAll() {
     '모든 데이터가 영구 삭제됩니다. 백업을 먼저 하시는 것을 권장합니다. 정말 초기화하시겠습니까?',
     () => {
       openConfirmModal('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', async () => {
-        resetAllData({ skipSave: true });
+        await resetAllData({ skipSave: true });
         await clearIndexedDBStorage();
         localStorage.clear();
         sessionStorage.clear();

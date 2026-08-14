@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.10 — Modals UI
+   My Portfolio v5.36.11 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -730,8 +730,8 @@ function doRestoreAutoBackup(id) {
     : '시간 미상';
   openConfirmModal(
     `${dt} 시점으로 복원하시겠습니까?\n현재 데이터는 자동 백업에 한 번 더 저장되며, 복원 후에도 다시 되돌릴 수 있습니다.`,
-    () => {
-      if (restoreAutoBackup(id)) {
+    async () => {
+      if (await restoreAutoBackup(id)) {
         showToast('자동 백업 복원 완료', 'success');
         closeModal('modalMain');
         render();
@@ -996,7 +996,8 @@ function openPortfolioManager() {
 async function doSwitchPortfolio(pid) {
   if (pid === activePortfolioId) return;
   UIState.reset();
-  await switchPortfolio(pid);
+  const switched = await switchPortfolio(pid);
+  if (!switched) return;
   await closeAllModals();
   render();
   showToast('포트폴리오 변경됨', 'success');
@@ -1008,7 +1009,8 @@ async function doCreatePortfolio() {
   const id = await createPortfolio(name);
   if (id) {
     UIState.reset();
-    await switchPortfolio(id);
+    const switched = await switchPortfolio(id);
+    if (!switched) return;
     await closeAllModals();
     render();
     showToast(`"${name}" 생성됨`, 'success');

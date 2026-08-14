@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.10 — State Management
+   My Portfolio v5.36.11 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -26,15 +26,55 @@ let _idbAvailable = false;
 
 // ── Debounced Save ──
 let _saveTimer = null;
+let _saveQueue = Promise.resolve(true);
+let _saveGeneration = 0;
+let _pendingSaveGeneration = 0;
+let _queuedSaveCount = 0;
+let saveStatus = { state: 'idle', savedAt: '', error: '' };
+
+function getSaveStatus() {
+  return { ...saveStatus };
+}
+
+function _setSaveStatus(state, details = {}) {
+  const next = {
+    state,
+    savedAt: details.savedAt !== undefined ? details.savedAt : saveStatus.savedAt,
+    error: details.error !== undefined ? details.error : '',
+  };
+  if (next.state === saveStatus.state && next.savedAt === saveStatus.savedAt && next.error === saveStatus.error) return;
+  saveStatus = next;
+  EventBus.emit('saveStatusChanged', getSaveStatus());
+}
 
 function scheduleSave() {
+  _saveGeneration += 1;
+  _pendingSaveGeneration = _saveGeneration;
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => { _saveTimer = null; _doSave(); }, SAVE_DEBOUNCE_MS);
+  // 실패 알림은 실제 재시도가 시작될 때까지 유지한다.
+  if (saveStatus.state !== 'error') _setSaveStatus('pending');
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    const generation = _pendingSaveGeneration;
+    _pendingSaveGeneration = 0;
+    _enqueueSave(generation);
+  }, SAVE_DEBOUNCE_MS);
 }
 
 function saveDataNow() {
   if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
-  return _doSave();
+  let generation = _pendingSaveGeneration;
+  _pendingSaveGeneration = 0;
+  if (!generation) {
+    _saveGeneration += 1;
+    generation = _saveGeneration;
+  }
+  return _enqueueSave(generation);
+}
+
+function flushPendingSave() {
+  if (_saveTimer || _pendingSaveGeneration) return saveDataNow();
+  return _saveQueue;
 }
 
 function saveData() {
@@ -100,6 +140,7 @@ async function _idbSet(key, value) {
     const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB 저장 실패'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB 저장 중단'));
     tx.objectStore(IDB_STORE_NAME).put({ key, value, updatedAt: new Date().toISOString() });
   });
 }
@@ -110,6 +151,7 @@ async function _idbRemove(key) {
     const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error || new Error('IndexedDB 삭제 실패'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB 삭제 중단'));
     tx.objectStore(IDB_STORE_NAME).delete(key);
   });
 }
@@ -251,42 +293,73 @@ async function initStorageBackend() {
   }
 }
 
-function _doSave() {
+function _captureSaveJob(generation) {
+  const savedAt = new Date().toISOString();
+  const portfolioId = activePortfolioId;
+  const key = getStorageKey(portfolioId);
+  const json = JSON.stringify({ ...appState, saved: savedAt });
+  return { generation, portfolioId, key, json, savedAt };
+}
+
+function _enqueueSave(generation) {
+  let job;
   try {
-    appState.saved = new Date().toISOString();
-    const json = JSON.stringify(appState);
+    // 포트폴리오 ID와 데이터 스냅샷을 지금 고정해 전환 중 데이터가 섞이지 않게 한다.
+    job = _captureSaveJob(generation);
+  } catch (e) {
+    console.error('Failed to prepare data for saving:', e);
+    _setSaveStatus('error', { error: String(e.message || e) });
+    if (typeof showToast === 'function') showToast('데이터 저장 준비 실패', 'error');
+    return Promise.resolve(false);
+  }
+
+  _queuedSaveCount += 1;
+  const result = _saveQueue.then(() => _persistSaveJob(job));
+  // 실패한 작업 뒤에도 다음 저장이 계속 실행되도록 큐 자체는 복구한다.
+  _saveQueue = result.catch(() => false);
+  return result;
+}
+
+async function _persistSaveJob(job) {
+  _setSaveStatus('saving');
+  let succeeded = false;
+  try {
     if (_canUseIndexedDB()) {
-      const key = getStorageKey(activePortfolioId);
-      _idbSet(key, json)
-        .then(() => {
-          try { localStorage.removeItem(key); } catch (e) { console.warn('localStorage cleanup failed:', e); }
-          _invalidateStorageCache();
-        })
-        .catch(e => {
-          console.error('Failed to save data to IndexedDB:', e);
-          showToast('IndexedDB 저장 실패. JSON 백업을 확인해주세요.', 'error');
-        });
-      EventBus.emit('dataSaved');
-      tryAutoBackup('daily');
-      return true;
+      await _idbSet(job.key, job.json);
+      try { localStorage.removeItem(job.key); } catch (e) { console.warn('localStorage cleanup failed:', e); }
+    } else {
+      if (job.json.length > LIMITS.storage) {
+        const error = new Error(`저장 공간 부족 (${(job.json.length / 1024).toFixed(0)}KB / ${(LIMITS.storage / 1024).toFixed(0)}KB)`);
+        error.name = 'QuotaExceededError';
+        throw error;
+      }
+      localStorage.setItem(job.key, job.json);
     }
-    if (json.length > LIMITS.storage) {
-      showToast(`저장 공간 부족! (${(json.length / 1024).toFixed(0)}KB / ${(LIMITS.storage / 1024).toFixed(0)}KB)`, 'error');
-      return false;
-    }
-    localStorage.setItem(getStorageKey(activePortfolioId), json);
+
     _invalidateStorageCache();
-    EventBus.emit('dataSaved');
-    tryAutoBackup('daily');
+    if (activePortfolioId === job.portfolioId) appState.saved = job.savedAt;
+    succeeded = true;
+    EventBus.emit('dataSaved', { portfolioId: job.portfolioId, savedAt: job.savedAt });
+    // 자동 백업은 본 저장이 실제로 끝난 뒤에만 만든다.
+    if (activePortfolioId === job.portfolioId) tryAutoBackup('daily');
     return true;
   } catch (e) {
     console.error('Failed to save data:', e);
+    _setSaveStatus('error', { error: String(e.message || e) });
     if (e.name === 'QuotaExceededError') {
-      showToast('브라우저 저장 공간이 가득 찼습니다. 불필요한 데이터를 삭제하세요.', 'error');
+      if (typeof showToast === 'function') showToast('브라우저 저장 공간이 가득 찼습니다. JSON 백업을 확인해주세요.', 'error');
     } else {
-      showToast('데이터 저장 실패', 'error');
+      if (typeof showToast === 'function') showToast('데이터 저장 실패. JSON 백업을 확인해주세요.', 'error');
     }
     return false;
+  } finally {
+    _queuedSaveCount = Math.max(0, _queuedSaveCount - 1);
+    if (succeeded) {
+      const nextState = _queuedSaveCount > 0
+        ? 'saving'
+        : ((_saveTimer || _pendingSaveGeneration) ? 'pending' : 'saved');
+      _setSaveStatus(nextState, { savedAt: job.savedAt });
+    }
   }
 }
 
@@ -412,13 +485,14 @@ function compactAutoBackups(keep = 1) {
   };
 }
 
-function restoreAutoBackup(id) {
+async function restoreAutoBackup(id) {
   const list = loadAutoBackups();
   const entry = list.find(b => b.id === id);
   if (!entry) {
     showToast('백업을 찾을 수 없습니다', 'error');
     return false;
   }
+  const before = JSON.stringify(appState);
   try {
     tryAutoBackup('major', '복원 직전 자동 저장');
     const data = JSON.parse(entry.json);
@@ -429,7 +503,12 @@ function restoreAutoBackup(id) {
     if (!Array.isArray(appState.categoryOrder)) appState.categoryOrder = [...CAT_IDS];
     appState.assets = appState.assets.slice(0, LIMITS.assets).map(sanitizeAsset);
     invalidateCalcCache();
-    saveDataNow();
+    const saved = await saveDataNow();
+    if (!saved) {
+      appState = JSON.parse(before);
+      invalidateCalcCache();
+      return false;
+    }
     EventBus.emit('dataImported');
     return true;
   } catch (e) {
@@ -479,7 +558,8 @@ function initPortfolio() {
 async function switchPortfolio(pid) {
   const meta = loadPortfolioMeta();
   if (!meta.list.find(p => p.id === pid)) return false;
-  saveDataNow();
+  const saved = await saveDataNow();
+  if (!saved) return false;
   activePortfolioId = pid;
   meta.active = pid;
   savePortfolioMeta(meta);
@@ -528,6 +608,8 @@ function renamePortfolio(pid, name) {
 
 async function deletePortfolio(pid) {
   if (pid === 'default') { showToast('기본 포트폴리오는 삭제 불가', 'error'); return false; }
+  // 활성 포트폴리오의 예약 저장이 삭제 뒤 다시 데이터를 만들지 않도록 먼저 모두 끝낸다.
+  if (pid === activePortfolioId) await flushPendingSave();
   const meta = loadPortfolioMeta();
   meta.list = meta.list.filter(p => p.id !== pid);
   const key = getStorageKey(pid);
@@ -590,6 +672,7 @@ async function loadData() {
   }
   invalidateCalcCache();
   makeSnapshot();
+  _setSaveStatus(appState.saved ? 'saved' : 'idle', { savedAt: appState.saved || '' });
   EventBus.emit('dataLoaded');
   tryAutoBackup('daily');
 }
@@ -1058,7 +1141,7 @@ function exportData() {
   };
 }
 
-function importData(json) {
+async function importData(json) {
   const backup = JSON.stringify(appState);
   try {
     const imported = typeof json === 'string' ? JSON.parse(json) : json;
@@ -1081,7 +1164,12 @@ function importData(json) {
     appState = newState;
     invalidateCalcCache();
     makeSnapshot();
-    saveDataNow();
+    const saved = await saveDataNow();
+    if (!saved) {
+      appState = JSON.parse(backup);
+      invalidateCalcCache();
+      return false;
+    }
     EventBus.emit('dataImported');
     return true;
   } catch (e) {
@@ -1097,9 +1185,16 @@ function importData(json) {
   }
 }
 
-function resetAllData(options = {}) {
+async function resetAllData(options = {}) {
+  if (options.skipSave) {
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+    _pendingSaveGeneration = 0;
+    // 이미 시작된 쓰기까지 끝난 뒤 호출부가 저장소를 비울 수 있게 한다.
+    await _saveQueue;
+  }
   appState = defaultState();
   invalidateCalcCache();
-  if (!options.skipSave) saveDataNow();
+  if (!options.skipSave && !(await saveDataNow())) return false;
   EventBus.emit('dataReset');
+  return true;
 }

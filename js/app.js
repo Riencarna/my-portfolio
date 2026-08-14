@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.10 — App Entry Point
+   My Portfolio v5.36.11 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -34,6 +34,8 @@ function getFABItems() {
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     loadTheme();
+    EventBus.on('saveStatusChanged', updateSaveStatusUI);
+    EventBus.on('dataSaved', updateLastSavedUI);
     initPortfolio();
     await initStorageBackend();
     await loadData();
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     fetchMarketRatesOnLoad();
     setupSwipe();
+    setupSaveLifecycleFlush();
 
     EventBus.on('dataImported', () => render());
     EventBus.on('dataReset', () => render());
@@ -392,6 +395,7 @@ function renderPageHeader() {
     <div class="page-header-title">
       <span class="page-title">${TAB_LABELS[idx] || '대시보드'}</span>
       <span class="page-subtitle">${escHtml(pf?.name || APP_NAME)}</span>
+      ${renderSaveStatus()}
     </div>
     <div class="header-actions">
       ${currentTab === 'pgDash' ? `
@@ -420,7 +424,58 @@ function renderPageHeader() {
     else if (action === 'open-add-asset') openAddAsset();
     else if (action === 'open-add-income') openAddIncome();
     else if (action === 'cycle-theme') cycleThemeMode();
+    else if (action === 'open-save-backup') {
+      goTab('pgHist');
+      requestAnimationFrame(() => $('[data-action="backup-json"]')?.focus());
+    }
   };
+}
+
+function getSaveStatusView(status = getSaveStatus()) {
+  const views = {
+    idle: { label: '저장 준비', title: '변경 사항이 생기면 자동으로 저장합니다' },
+    pending: { label: '저장 대기', title: '변경 사항을 잠시 후 자동 저장합니다' },
+    saving: { label: '저장 중…', title: '브라우저 저장소에 기록하고 있습니다' },
+    saved: { label: '저장됨', title: status.savedAt ? `마지막 저장: ${fmtRelTime(status.savedAt)}` : '저장 완료' },
+    error: { label: '저장 실패', title: '저장하지 못했습니다. 눌러서 JSON 백업을 확인하세요' },
+  };
+  return views[status.state] || views.idle;
+}
+
+function renderSaveStatus() {
+  const status = getSaveStatus();
+  const view = getSaveStatusView(status);
+  const content = `<span class="save-status-dot" aria-hidden="true"></span><span class="save-status-label">${escHtml(view.label)}</span>`;
+  return `<span id="saveStatus" class="save-status save-status-${escAttr(status.state)}" role="status" aria-live="polite" aria-atomic="true" title="${escAttr(view.title)}">
+    ${status.state === 'error'
+      ? `<button type="button" class="save-status-action" data-action="open-save-backup" aria-label="${escAttr(view.title)}">${content}</button>`
+      : content}
+  </span>`;
+}
+
+function updateSaveStatusUI() {
+  const current = $('#saveStatus');
+  if (current) current.outerHTML = renderSaveStatus();
+}
+
+function updateLastSavedUI() {
+  updateSaveStatusUI();
+  const saved = $('#dashLastSaved');
+  if (saved && appState.saved) {
+    saved.textContent = `마지막 저장: ${fmtRelTime(appState.saved)}`;
+    saved.classList.remove('hidden');
+  }
+}
+
+function setupSaveLifecycleFlush() {
+  const flush = () => {
+    const result = flushPendingSave();
+    if (result?.catch) result.catch(e => console.warn('Pending save flush failed:', e));
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
+  window.addEventListener('pagehide', flush);
 }
 
 // 헤더 테마 버튼: 짧게 탭 → 토글, 길게(600ms) → OS 자동

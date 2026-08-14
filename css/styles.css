@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.10 — Stylesheet
+   My Portfolio v5.36.11 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -323,6 +323,22 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 .page-title{font-size:22px;font-weight:700;color:var(--t1);letter-spacing:-0.3px;white-space:nowrap}
 .page-subtitle{font-size:13px;color:var(--t3);font-weight:500;overflow:hidden;text-overflow:ellipsis}
 .header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.save-status{
+  display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:3px 8px;
+  border:1px solid var(--bd);border-radius:var(--radius-full);background:var(--surface);
+  color:var(--t3);font-size:11px;font-weight:600;line-height:1;white-space:nowrap}
+.save-status-dot{width:7px;height:7px;border-radius:50%;background:var(--t4);flex-shrink:0}
+.save-status-pending{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 35%,var(--bd))}
+.save-status-pending .save-status-dot{background:var(--warning)}
+.save-status-saving{color:var(--primary);border-color:color-mix(in srgb,var(--primary) 35%,var(--bd))}
+.save-status-saving .save-status-dot{background:var(--primary);animation:savePulse 1s ease-in-out infinite}
+.save-status-saved{color:var(--success);border-color:color-mix(in srgb,var(--success) 32%,var(--bd))}
+.save-status-saved .save-status-dot{background:var(--success)}
+.save-status-error{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 42%,var(--bd));background:var(--danger-soft)}
+.save-status-error .save-status-dot{background:var(--danger)}
+.save-status-action{display:inline-flex;align-items:center;gap:6px;color:inherit;font:inherit;cursor:pointer}
+.save-status-action:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:var(--radius-full)}
+@keyframes savePulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
 
 .main-content{
   padding:28px 32px 40px;
@@ -1400,6 +1416,8 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   .bottom-nav{display:flex}
   .main-content{padding:18px 16px 100px}
   .page-header{padding:14px 18px}
+  .page-header-title{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;gap:3px 8px;flex:1}
+  .save-status{grid-column:1/-1;justify-self:start}
   .bento-grid{grid-template-columns:1fr}
   .bento-span-2,.bento-span-3{grid-column:span 1}
   .dash-charts{grid-template-columns:1fr}
