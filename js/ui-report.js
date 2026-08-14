@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.11 — Monthly Report UI
+   My Portfolio v5.36.12 — Monthly Report UI
    ============================================= */
 
 const MONTHLY_REPORT_DISMISS_KEY = 'mp_monthly_report_dismissed';
