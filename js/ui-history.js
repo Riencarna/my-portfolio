@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.12 — History & Export UI
+   My Portfolio v5.37.0 — History & Export UI
    Cycle B: history tabs (records/txns), txn search/filter/sort
    Soft Neutral palette, PDF 라벤더 강조
    ============================================= */
@@ -164,6 +164,9 @@ function _getAllTxns() {
         type: t.type,
         price: t.price,
         qty: t.qty,
+        currency: getTxnCurrency(t),
+        originalPrice: getTxnOriginalPrice(t),
+        fxRate: getTxnFxRate(t),
         date: t.date,
         account: t.account,
         memo: t.memo,
@@ -235,19 +238,18 @@ function _renderTxnListContent() {
     <div class="txn-flat-list" role="list">
       ${visible.map(t => {
         const cat = CAT_MAP[t.category];
-        const total = t.price * t.qty;
         const metaParts = [];
         if (t.account) metaParts.push(escHtml(t.account));
         if (t.memo) metaParts.push(escHtml(t.memo));
         return `
-          <div class="txn-flat-item" role="listitem" data-action="open-asset-from-txn" data-id="${escAttr(t.assetId)}" tabindex="0" aria-label="${escAttr(t.assetName)} ${t.type === 'buy' ? '매수' : '매도'} ${fmtKRW(total)}">
+          <div class="txn-flat-item" role="listitem" data-action="open-asset-from-txn" data-id="${escAttr(t.assetId)}" tabindex="0" aria-label="${escAttr(t.assetName)} ${t.type === 'buy' ? '매수' : '매도'} ${escAttr(fmtTxnTotal(t))}">
             <div class="txn-flat-head">
               <span class="txn-type ${t.type}">${t.type === 'buy' ? '매수' : '매도'}</span>
               <span class="txn-flat-name"><span class="txn-cat-icon" aria-hidden="true">${cat?.icon || '📦'}</span>${escHtml(t.assetName)}</span>
-              <span class="txn-flat-total">${escHtml(fmtKRW(total))}</span>
+              <span class="txn-flat-total">${escHtml(fmtTxnTotal(t))}</span>
             </div>
             <div class="txn-flat-sub text-muted">
-              <span>${escHtml(fmtPrice(t.price))} × ${escHtml(fmtNum(t.qty, t.qty % 1 !== 0 ? 4 : 0))}</span>
+              <span>${escHtml(fmtTxnUnitPrice(t))} × ${escHtml(fmtNum(t.qty, t.qty % 1 !== 0 ? 4 : 0))}${getTxnCurrency(t) === 'USD' && getTxnFxRate(t) ? ` · 환율 ${escHtml(fmtKRW(getTxnFxRate(t)))}` : ''}</span>
               <span>${escHtml(fmtDate(t.date))}</span>
             </div>
             ${metaParts.length > 0 ? `<div class="txn-flat-meta text-muted">${metaParts.join(' · ')}</div>` : ''}
@@ -558,12 +560,14 @@ function generateAssetCSV() {
 }
 
 function generateTxnCSV() {
-  const headers = ['자산명', '카테고리', '유형', '단가', '수량', '금액', '날짜', '계좌', '메모'];
+  const headers = ['자산명', '카테고리', '유형', '통화', '원본 단가', '적용 환율', '원화 단가', '수량', '원화 금액', '날짜', '계좌', '메모'];
   const rows = [];
   for (const a of appState.assets) {
     for (const t of a.txns) {
+      const currency = getTxnCurrency(t);
       rows.push([a.name, a.category, t.type === 'buy' ? '매수' : '매도',
-        t.price, t.qty, t.price * t.qty, t.date, t.account || '', t.memo || '']
+        currency, getTxnOriginalPrice(t), getTxnFxRate(t) || '', t.price,
+        t.qty, t.price * t.qty, t.date, t.account || '', t.memo || '']
         .map(c => `"${String(c).replace(/"/g, '""')}"`)
         .join(','));
     }
@@ -603,7 +607,17 @@ function doImportCSV() {
         showToast('가져올 거래 행이 없습니다', 'info');
         return;
       }
-      _openImportPreview(parsed);
+      let exchangeRate = getRateDisplayInfo('usdkrw')?.rate || 0;
+      const needsLiveRate = parsed.some(row => row.declaredCurrency === 'USD' && !row.rowFxRate);
+      if (needsLiveRate) {
+        try {
+          exchangeRate = await fetchReliableExchangeRate() || 0;
+        } catch (rateErr) {
+          console.warn('CSV import: exchange rate lookup failed', rateErr);
+          showToast('환율을 자동으로 불러오지 못했습니다. 미리보기에서 직접 입력해주세요.', 'info');
+        }
+      }
+      _openImportPreview(parsed, exchangeRate);
     } catch (err) {
       console.error('CSV import failed:', err);
       showToast('CSV 파일을 읽을 수 없습니다', 'error');
@@ -651,13 +665,15 @@ function parseCSV(text) {
 }
 
 function detectColumnMapping(headers) {
-  const m = { date: -1, name: -1, category: -1, type: -1, price: -1, qty: -1, account: -1, memo: -1 };
+  const m = { date: -1, name: -1, category: -1, type: -1, currency: -1, price: -1, fxRate: -1, qty: -1, account: -1, memo: -1 };
   headers.forEach((h, i) => {
     const k = h.replace(/\s+/g, '').toLowerCase();
     if (m.date < 0 && /(날짜|일자|date|거래일|체결일)/i.test(k)) m.date = i;
     else if (m.name < 0 && /(자산명|종목명|name|종목)/i.test(k)) m.name = i;
     else if (m.category < 0 && /(카테고리|category|종류|구분)/i.test(k)) m.category = i;
     else if (m.type < 0 && /(유형|type|매매|매수매도)/i.test(k)) m.type = i;
+    else if (m.currency < 0 && /(통화|currency|화폐)/i.test(k)) m.currency = i;
+    else if (m.fxRate < 0 && /(적용환율|환율|fxrate|exchangerate)/i.test(k)) m.fxRate = i;
     else if (m.price < 0 && /(단가|체결가|price|가격|매수가|매도가)/i.test(k)) m.price = i;
     else if (m.qty < 0 && /(수량|qty|quantity|주식수|주수)/i.test(k)) m.qty = i;
     else if (m.account < 0 && /(계좌|account)/i.test(k)) m.account = i;
@@ -682,20 +698,60 @@ function _buildImportRows(dataRows, mapping) {
     if (r.every(c => !c || !String(c).trim())) continue;
     const dateRaw = String(r[mapping.date] || '').trim();
     const name = String(r[mapping.name] || '').trim();
-    const priceStr = String(r[mapping.price] || '').replace(/[,₩$\s]/g, '');
+    const priceRaw = String(r[mapping.price] || '').trim();
+    const priceStr = priceRaw.replace(/[,₩$원\s]/g, '');
     const qtyStr = String(r[mapping.qty] || '').replace(/[,\s]/g, '');
     const typeRaw = mapping.type >= 0 ? String(r[mapping.type] || '').trim() : '매수';
     const cat = mapping.category >= 0 ? String(r[mapping.category] || '').trim() : '';
     const account = mapping.account >= 0 ? String(r[mapping.account] || '').trim() : '';
     const memo = mapping.memo >= 0 ? String(r[mapping.memo] || '').trim() : '';
+    const currencyRaw = mapping.currency >= 0 ? String(r[mapping.currency] || '').trim() : '';
+    const declaredCurrency = _normalizeImportCurrency(currencyRaw, priceRaw);
+    const fxRateRaw = mapping.fxRate >= 0 ? String(r[mapping.fxRate] || '').replace(/[,₩원\s]/g, '') : '';
     const date = _normalizeImportDate(dateRaw);
     const type = /sell|매도/i.test(typeRaw) ? 'sell' : 'buy';
-    const price = Number(priceStr);
+    const originalPrice = Number(priceStr);
     const qty = Number(qtyStr);
-    const valid = !!(name && date && price > 0 && qty > 0 && Number.isFinite(price) && Number.isFinite(qty));
-    rows.push({ valid, name, date, price: valid ? price : 0, qty: valid ? qty : 0, type, account, memo, cat });
+    const rowFxRate = Number(fxRateRaw);
+    const validBase = !!(name && date && originalPrice > 0 && qty > 0 && Number.isFinite(originalPrice) && Number.isFinite(qty));
+    rows.push({
+      validBase, valid: false, name, date, originalPrice: validBase ? originalPrice : 0,
+      price: 0, qty: validBase ? qty : 0, type, account, memo, cat,
+      declaredCurrency, currencyRaw, currency: '',
+      rowFxRate: Number.isFinite(rowFxRate) && rowFxRate > 0 ? rowFxRate : null,
+      fxRate: null,
+    });
   }
   return rows;
+}
+
+function _normalizeImportCurrency(raw, priceRaw = '') {
+  const value = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  const symbolCurrency = /\$/.test(priceRaw) ? 'USD' : (/[₩원]/.test(priceRaw) ? 'KRW' : '');
+  if (!value) {
+    return symbolCurrency;
+  }
+  let currency = '';
+  if (['USD', '$', '달러', '미국달러'].includes(value)) currency = 'USD';
+  else if (['KRW', '₩', '원', '대한민국원'].includes(value)) currency = 'KRW';
+  if (currency) return symbolCurrency && symbolCurrency !== currency ? 'CONFLICT' : currency;
+  return 'UNSUPPORTED';
+}
+
+function _refreshCSVImportRows() {
+  if (!_csvImportState) return;
+  const defaultCurrency = _csvImportState.defaultCurrency;
+  const exchangeRate = safeNum(_csvImportState.exchangeRate);
+  for (const row of _csvImportState.rows) {
+    const currency = row.declaredCurrency || defaultCurrency;
+    const fxRate = currency === 'USD' ? (row.rowFxRate || exchangeRate) : null;
+    row.currency = currency;
+    row.fxRate = fxRate;
+    row.price = currency === 'USD' && fxRate > 0
+      ? Math.round(row.originalPrice * fxRate)
+      : (currency === 'KRW' ? row.originalPrice : 0);
+    row.valid = !!(row.validBase && ['KRW', 'USD'].includes(currency) && row.price > 0);
+  }
 }
 
 function _findExistingAsset(name) {
@@ -713,7 +769,7 @@ function _isDuplicateImportTxn(asset, row) {
   );
 }
 
-function _openImportPreview(rows) {
+function _openImportPreview(rows, exchangeRate) {
   const groups = new Map();
   for (const r of rows) {
     const k = r.name || '';
@@ -730,12 +786,21 @@ function _openImportPreview(rows) {
       assetDecisions[name] = { mode: 'skip', newCat: firstWithCat ? firstWithCat.cat : '기타' };
     }
   }
-  _csvImportState = { rows, groups, assetDecisions, importDuplicates: false };
+  _csvImportState = {
+    rows, groups, assetDecisions, importDuplicates: false,
+    defaultCurrency: '', exchangeRate: safeNum(exchangeRate),
+  };
   _renderImportPreview();
 }
 
 function _renderImportPreview() {
   const { rows, groups, assetDecisions, importDuplicates } = _csvImportState;
+  _refreshCSVImportRows();
+  const missingCurrencyCount = rows.filter(r => !r.declaredCurrency).length;
+  const invalidCurrencyCount = rows.filter(r => ['UNSUPPORTED', 'CONFLICT'].includes(r.declaredCurrency)).length;
+  const unresolvedFxCount = rows.filter(r => r.validBase && r.currency === 'USD' && !(r.fxRate > 0)).length;
+  const currencyBlocked = (missingCurrencyCount > 0 && !_csvImportState.defaultCurrency)
+    || invalidCurrencyCount > 0 || unresolvedFxCount > 0;
   let dupCount = 0, invalidCount = 0, skipCount = 0;
   let willImport = 0, willCreateAssets = 0;
   for (const r of rows) {
@@ -763,7 +828,12 @@ function _renderImportPreview() {
     const dec = assetDecisions[name];
     const existing = _findExistingAsset(name);
     const sample = rs.find(r => r.valid) || rs[0];
-    const sampleSummary = sample ? `${sample.date} ${sample.type === 'sell' ? '매도' : '매수'} ${fmtNum(sample.price, 0)}×${fmtNum(sample.qty, 4)}` : '';
+    const samplePrice = sample
+      ? (sample.currency === 'USD'
+        ? `${fmtUSD(sample.originalPrice)} → ${fmtKRW(sample.price)}`
+        : (sample.currency === 'KRW' ? fmtKRW(sample.originalPrice) : '통화 선택 필요'))
+      : '';
+    const sampleSummary = sample ? `${sample.date} ${sample.type === 'sell' ? '매도' : '매수'} ${samplePrice}×${fmtNum(sample.qty, 4)}` : '';
     const dispName = name || '(이름없음)';
     let selectedVal = 'skip';
     if (dec.mode === 'existing') selectedVal = existing && dec.assetId === existing.id ? 'existing' : `map:${dec.assetId}`;
@@ -795,6 +865,21 @@ function _renderImportPreview() {
           <div>총 <strong>${rows.length}</strong>행 · 가져올 거래 <strong>${willImport}</strong>건${willCreateAssets > 0 ? ` · 자산 생성 <strong>${willCreateAssets}</strong>개` : ''}</div>
           <div class="hint-text">중복 ${dupCount}건 · 건너뜀 ${skipCount}건 · 오류 ${invalidCount}건</div>
         </div>
+        ${missingCurrencyCount > 0 ? `<div class="form-group">
+          <label for="csvDefaultCurrency">통화가 없는 ${missingCurrencyCount}개 행의 기본 통화 *</label>
+          <select id="csvDefaultCurrency" data-action="csv-default-currency">
+            <option value="" ${!_csvImportState.defaultCurrency ? 'selected' : ''}>선택하세요</option>
+            <option value="KRW" ${_csvImportState.defaultCurrency === 'KRW' ? 'selected' : ''}>KRW (원)</option>
+            <option value="USD" ${_csvImportState.defaultCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
+          </select>
+          <div class="hint-text">통화를 선택하기 전에는 가져올 수 없습니다.</div>
+        </div>` : ''}
+        ${rows.some(r => r.currency === 'USD' && !r.rowFxRate) || _csvImportState.defaultCurrency === 'USD' ? `<div class="form-group">
+          <label for="csvExchangeRate">USD 적용 환율 (1달러당 원화) *</label>
+          <input type="number" inputmode="decimal" id="csvExchangeRate" data-action="csv-exchange-rate"
+            value="${safeNum(_csvImportState.exchangeRate)}" min="1" step="any">
+          <div class="hint-text">CSV에 행별 환율이 있으면 그 값을 우선 사용합니다. 필요하면 과거 거래 환율로 수정하세요.</div>
+        </div>` : ''}
         <div class="form-group">
           <label><input type="checkbox" id="csvImportDups" ${importDuplicates ? 'checked' : ''} data-action="csv-toggle-dups"> 중복도 함께 가져오기</label>
           <div class="hint-text">기본은 같은 날짜·단가·수량·유형 거래 제외</div>
@@ -805,10 +890,12 @@ function _renderImportPreview() {
             <tbody>${groupRows || '<tr><td colspan="2" class="hint-text">가져올 행이 없습니다</td></tr>'}</tbody>
           </table>
         </div>
-        ${invalidCount > 0 ? `<div class="hint-text" style="color:var(--danger);margin-top:8px">⚠️ 필수값(날짜/단가/수량) 누락된 ${invalidCount}건은 자동 제외됩니다</div>` : ''}
+        ${rows.some(r => !r.validBase) ? `<div class="hint-text" style="color:var(--danger);margin-top:8px">⚠️ 필수값(날짜/단가/수량)이 잘못된 ${rows.filter(r => !r.validBase).length}건은 자동 제외됩니다.</div>` : ''}
+        ${invalidCurrencyCount > 0 ? `<div class="hint-text" style="color:var(--danger);margin-top:8px">⚠️ 지원하지 않는 통화 또는 통화 기호가 서로 다른 행 ${invalidCurrencyCount}건이 있습니다. 현재는 KRW와 USD만 가져올 수 있습니다.</div>` : ''}
+        ${currencyBlocked ? `<div class="hint-text" style="color:var(--danger);margin-top:8px">⚠️ 통화와 환율을 확인해야 가져오기를 진행할 수 있습니다.</div>` : ''}
         <div class="modal-actions">
           <button class="btn-s" data-action="close-modal" data-modal="modalMain">취소</button>
-          <button class="btn-p" data-action="csv-import-confirm" ${willImport === 0 && willCreateAssets === 0 ? 'disabled' : ''}>가져오기 (${willImport}건)</button>
+          <button class="btn-p" data-action="csv-import-confirm" ${currencyBlocked || (willImport === 0 && willCreateAssets === 0) ? 'disabled' : ''}>가져오기 (${willImport}건)</button>
         </div>
       </div>
     </div>`;
@@ -825,12 +912,26 @@ function _renderImportPreview() {
       _executeCSVImport();
     }
   };
-  const changeHandler = (e) => {
+  const changeHandler = async (e) => {
     const target = e.target.closest('[data-action]');
     if (!target || !_csvImportState) return;
     const a = target.dataset.action;
     if (a === 'csv-toggle-dups') {
       _csvImportState.importDuplicates = !!target.checked;
+      _renderImportPreview();
+    } else if (a === 'csv-default-currency') {
+      _csvImportState.defaultCurrency = ['KRW', 'USD'].includes(target.value) ? target.value : '';
+      if (_csvImportState.defaultCurrency === 'USD' && !(_csvImportState.exchangeRate > 0)) {
+        try {
+          _csvImportState.exchangeRate = await fetchReliableExchangeRate() || 0;
+        } catch (rateErr) {
+          console.warn('CSV import: default USD rate lookup failed', rateErr);
+          showToast('환율을 자동으로 불러오지 못했습니다. 직접 입력해주세요.', 'info');
+        }
+      }
+      _renderImportPreview();
+    } else if (a === 'csv-exchange-rate') {
+      _csvImportState.exchangeRate = Math.max(0, safeNum(target.value));
       _renderImportPreview();
     } else if (a === 'csv-asset-decision') {
       const name = target.dataset.name;
@@ -881,6 +982,9 @@ function _executeCSVImport() {
       type: r.type,
       price: r.price,
       qty: r.qty,
+      currency: r.currency,
+      originalPrice: r.originalPrice,
+      fxRate: r.fxRate,
       date: r.date,
       account: r.account || null,
       memo: r.memo || null,

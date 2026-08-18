@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.12 — API Integration
+   My Portfolio v5.37.0 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
@@ -418,6 +418,15 @@ async function fetchExchangeRate(force = false, meta = null) {
   console.warn('Exchange rate: using fallback', FALLBACK_USD_KRW);
   showToast(`환율 정보 불러오기 실패. 기본값(${FALLBACK_USD_KRW}원) 사용 중`, 'warning');
   return FALLBACK_USD_KRW;
+}
+
+// 금융 입력 저장용 환율. 출처가 없는 하드코딩 기본값은 반환하지 않는다.
+// 호출부는 null일 때 사용자가 환율을 직접 입력하도록 안내해야 한다.
+async function fetchReliableExchangeRate() {
+  const rate = await fetchExchangeRate();
+  const info = getRateDisplayInfo('usdkrw');
+  if (!info || !Number.isFinite(info.rate) || info.rate <= 0) return null;
+  return Number.isFinite(rate) && rate > 0 ? rate : info.rate;
 }
 
 // ── USDT Rate (KRW) ──

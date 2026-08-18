@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.12 — Utilities
+   My Portfolio v5.37.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -27,6 +27,49 @@ function fmtKRW(n) {
   n = safeNum(n);
   const sign = n < 0 ? '-' : '';
   return sign + '₩' + Math.abs(Math.round(n)).toLocaleString('ko-KR');
+}
+
+function fmtUSD(n, dec = 2) {
+  n = safeNum(n);
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
+  });
+}
+
+function getTxnCurrency(txn) {
+  return txn?.currency === 'USD' ? 'USD' : 'KRW';
+}
+
+function getTxnOriginalPrice(txn) {
+  if (getTxnCurrency(txn) !== 'USD') return safeNum(txn?.price);
+  const original = safeNum(txn?.originalPrice);
+  if (original > 0) return original;
+  const rate = safeNum(txn?.fxRate);
+  return rate > 0 ? safeNum(txn?.price) / rate : safeNum(txn?.price);
+}
+
+function getTxnFxRate(txn) {
+  if (getTxnCurrency(txn) !== 'USD') return null;
+  const rate = safeNum(txn?.fxRate);
+  if (rate > 0) return rate;
+  const original = getTxnOriginalPrice(txn);
+  return original > 0 ? safeNum(txn?.price) / original : null;
+}
+
+function fmtTxnUnitPrice(txn) {
+  return getTxnCurrency(txn) === 'USD'
+    ? fmtUSD(getTxnOriginalPrice(txn))
+    : fmtPrice(txn?.price);
+}
+
+function fmtTxnTotal(txn) {
+  const qty = safeNum(txn?.qty);
+  if (getTxnCurrency(txn) === 'USD') {
+    return `${fmtUSD(getTxnOriginalPrice(txn) * qty)} (${fmtKRW(safeNum(txn?.price) * qty)})`;
+  }
+  return fmtKRW(safeNum(txn?.price) * qty);
 }
 
 function fmtAmountHint(n) {
@@ -547,11 +590,20 @@ function sanitizeAsset(a) {
 
 // sanitizeTxn: coerces ID to String
 function sanitizeTxn(t) {
+  const price = Math.max(0, safeNum(t.price));
+  const currency = t.currency === 'USD' ? 'USD' : 'KRW';
+  let originalPrice = currency === 'USD' ? Math.max(0, safeNum(t.originalPrice)) : price;
+  let fxRate = currency === 'USD' ? Math.max(0, safeNum(t.fxRate)) : 0;
+  if (currency === 'USD' && originalPrice <= 0 && fxRate > 0) originalPrice = price / fxRate;
+  if (currency === 'USD' && fxRate <= 0 && originalPrice > 0) fxRate = price / originalPrice;
   return {
     id: t.id != null ? String(t.id) : uid(),
     type: t.type === 'sell' ? 'sell' : 'buy',
-    price: safeNum(t.price),
+    price,
     qty: Math.max(0, safeNum(t.qty)),
+    currency,
+    originalPrice,
+    fxRate: currency === 'USD' && fxRate > 0 ? fxRate : null,
     account: t.account ? stripHtml(t.account, 50) : null,
     date: isValidDate(t.date) ? t.date : today(),
     memo: t.memo ? stripHtml(t.memo, 200) : null,

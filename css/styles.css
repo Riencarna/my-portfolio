@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.12 — Stylesheet
+   My Portfolio v5.37.0 — Stylesheet
    Cycle C: per-category daily delta badges
    Soft Neutral UI: lavender + cream + coral
    Design tokens + base components
@@ -1287,6 +1287,17 @@ h4{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--t2);letter-spac
   width:16px;height:16px;border-radius:50%;flex-shrink:0;
   border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
   animation:spin .8s linear infinite}
+.update-banner-action{
+  min-height:34px;padding:6px 12px;border:1px solid rgba(255,255,255,.7);
+  border-radius:var(--radius-sm);background:#fff;color:#5548c8;
+  font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.update-banner-action:hover{background:rgba(255,255,255,.9)}
+.update-banner-action:disabled{opacity:.7;cursor:wait}
+@media(max-width:600px){
+  .update-banner{align-items:flex-start;gap:8px;padding:10px 12px;font-size:12px}
+  .update-banner-spinner{margin-top:7px}
+  .update-banner-action{min-height:36px;margin-left:auto}
+}
 
 /* =============================================
    TOAST

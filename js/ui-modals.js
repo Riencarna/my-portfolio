@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.12 — Modals UI
+   My Portfolio v5.37.0 — Modals UI
    Cycle C: 자산 상세 거래 통계 섹션 (C-16)
    Soft Neutral: rounded sheets, soft shadows
    All IDs from uid() are strings — no Number() wrapping
@@ -7,6 +7,8 @@
 
 let _modalKeyHandler = null;
 let _focusStack = [];
+let _addAssetFormGeneration = 0;
+let _transactionFormGeneration = 0;
 const _modalCleanup = Cleanup.scope('modals');
 
 function _getTopmostModal() {
@@ -68,15 +70,18 @@ function _restoreFocus() {
 
 function closeModal(id) {
   const modal = $(`#${id}`);
-  if (!modal) return;
+  if (!modal) return Promise.resolve(false);
   modal.setAttribute('aria-hidden', 'true');
   modal.removeAttribute('aria-modal');
   modal.classList.add('closing');
-  setTimeout(() => {
-    modal.classList.remove('active', 'closing');
-    _removeKeyHandlerIfNoModals();
-    if ($$('.modal.active').length === 0) _restoreFocus();
-  }, MODAL_ANIM_MS);
+  return new Promise(resolve => {
+    setTimeout(() => {
+      modal.classList.remove('active', 'closing');
+      _removeKeyHandlerIfNoModals();
+      if ($$('.modal.active').length === 0) _restoreFocus();
+      resolve(true);
+    }, MODAL_ANIM_MS);
+  });
 }
 
 function closeAllModals() {
@@ -115,11 +120,20 @@ function openConfirmModal(msg, onConfirm) {
         <div class="modal-actions"><button class="btn-s" data-action="close-confirm">취소</button>
           <button class="btn-p btn-danger" data-action="confirm-ok">확인</button></div></div></div>`;
   openModal('modalConfirm');
-  const handler = (e) => {
+  const handler = async (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
     if (target.dataset.action === 'close-confirm') closeModal('modalConfirm');
-    else if (target.dataset.action === 'confirm-ok') { closeModal('modalConfirm'); onConfirm(); }
+    else if (target.dataset.action === 'confirm-ok') {
+      target.disabled = true;
+      await closeModal('modalConfirm');
+      try {
+        await onConfirm();
+      } catch (err) {
+        console.error('Confirmation action failed:', err);
+        showToast('작업을 완료하지 못했습니다', 'error');
+      }
+    }
   };
   _modalCleanup.add(container, 'click', handler);
 }
@@ -326,14 +340,11 @@ function updateFormFields(cat, stockKind = '') {
   if (nameInput) {
     nameInput.placeholder = isDomesticForeignEtf ? '예: TIGER 미국S&P500, KODEX 미국나스닥100' : (NAME_PLACEHOLDER[cat] || '자산명');
   }
-  const coinCurrField = $('#coinCurrencyField');
-  if (coinCurrField) coinCurrField.classList.toggle('hidden', !isCoin);
-  if (!isCoin) {
-    const addCurr = $('#addTxCurrency');
-    if (addCurr) addCurr.value = 'KRW';
-    const addLabel = $('#addTxPriceLabel');
-    if (addLabel) addLabel.textContent = '단가';
-  }
+  const supportsUsd = isCoin || (cat === '해외주식' && !isDomesticForeignEtf);
+  const currencyField = $('#addCurrencyField');
+  if (currencyField) currencyField.classList.toggle('hidden', !supportsUsd);
+  const defaultCurrency = cat === '해외주식' && !isDomesticForeignEtf ? 'USD' : 'KRW';
+  _setAddTxCurrencyValue(defaultCurrency);
 }
 
 // ── Add Asset ──
@@ -341,7 +352,9 @@ function openAddAsset() {
   _modalCleanup.removeAll();
   _usdtFormInitialTotal = 0;
   const container = $('#modalMain');
-  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 추가</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body">
+  const initialUsdRate = getRateDisplayInfo('usdkrw')?.rate || '';
+  const formGeneration = ++_addAssetFormGeneration;
+  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>자산 추가</h3><button class="modal-close" data-action="close-modal" data-modal="modalMain" aria-label="닫기">✕</button></div><div class="modal-body"><input type="hidden" id="addAssetFormGeneration" value="${formGeneration}">
     <div class="form-group"><label id="catSelectLabel">카테고리</label>${renderCategorySelector('국내주식', 'catSelect')}</div>
     <div class="form-group"><label for="assetName">자산명 *</label><input type="text" id="assetName" placeholder="예: 삼성전자, SK하이닉스" maxlength="100" required></div>
     <div class="form-row" id="stockFields"><div class="form-group"><label for="assetCode">종목코드</label><input type="text" id="assetCode" placeholder="예: 005930" maxlength="20"></div><div class="form-group"><label for="assetMarket">시장</label><select id="assetMarket">${_renderStockMarketOptions('국내주식', STOCK_KIND_DOMESTIC, 'KOSPI')}</select></div></div>
@@ -357,7 +370,8 @@ function openAddAsset() {
     <div class="form-group"><label for="assetNote">메모</label><input type="text" id="assetNote" placeholder="선택사항" maxlength="500"></div>
     <div class="form-group hidden" id="valueField"><label for="assetValue">금액</label><input type="number" inputmode="decimal" id="assetValue" placeholder="예: 1000000" min="0" step="any"><div class="amount-hint" id="valueHint"></div></div>
     <div id="txnSection"><hr><h4>첫 거래 입력</h4>
-    <div class="form-group hidden" id="coinCurrencyField"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button type="button" class="btn-sm active" data-action="set-add-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button type="button" class="btn-sm" data-action="set-add-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="addTxCurrency" value="KRW"></div>
+    <div class="form-group hidden" id="addCurrencyField"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button type="button" class="btn-sm active" data-action="set-add-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button type="button" class="btn-sm" data-action="set-add-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="addTxCurrency" value="KRW"></div>
+    <div class="form-group hidden" id="addFxRateField"><label for="addTxFxRate">적용 환율 (1달러당 원화) *</label><input type="number" inputmode="decimal" id="addTxFxRate" value="${initialUsdRate}" min="1" step="any"><div class="hint-text">자동 환율을 확인하고, 과거 거래라면 당시 환율로 수정하세요.</div></div>
     <div class="form-row"><div class="form-group"><label for="txPrice" id="addTxPriceLabel">단가</label><input type="number" inputmode="decimal" id="txPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txPriceHint"></div></div><div class="form-group"><label for="txQty">수량</label><input type="number" inputmode="decimal" id="txQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총 투자금: <span id="addTxTotal">₩0</span></div>
     <div class="form-row"><div class="form-group"><label for="txDate">날짜</label><input type="date" id="txDate" value="${today()}"></div><div class="form-group"><label for="txAccount">계좌</label><input type="text" id="txAccount" placeholder="선택사항" maxlength="50" list="txAccountPresets">${_renderPresetDatalist('txAccountPresets', 'accounts')}</div></div></div>
@@ -371,7 +385,8 @@ function openAddAsset() {
   _setupCoinCustomId();
 }
 
-function doAddAsset() {
+async function doAddAsset() {
+  const formGeneration = $('#addAssetFormGeneration')?.value;
   const name = $('#assetName')?.value.trim();
   if (!name) { showToast('자산명을 입력하세요', 'error'); return; }
   const activeCatBtn = $('.modal.active .cat-btn.active');
@@ -380,17 +395,41 @@ function doAddAsset() {
   const isInvestment = INVESTMENT_CATS.includes(cat);
   const isUsdtChecked = cat === '현금' && ($('#isUsdt')?.checked || false);
   let amount, txns, usdtQty, usdtDetails;
+  let addSubmitBtn = null;
   if (isInvestment) {
     let price = safeNum($('#txPrice')?.value);
     const qty = safeNum($('#txQty')?.value);
-    const addCurrency = $('#addTxCurrency')?.value;
-    if (cat === '코인' && addCurrency === 'USD' && price > 0) {
-      const rate = getUsdtRateSync().rate;
-      price = Math.round(price * rate);
+    const currency = $('#addTxCurrency')?.value === 'USD' ? 'USD' : 'KRW';
+    const originalPrice = price;
+    let fxRate = currency === 'USD' ? safeNum($('#addTxFxRate')?.value) : null;
+    if (currency === 'USD' && price > 0) {
+      addSubmitBtn = $('#modalMain [data-action="do-add-asset"]');
+      if (addSubmitBtn?.disabled) return;
+      if (addSubmitBtn) { addSubmitBtn.disabled = true; addSubmitBtn.textContent = '환율 확인 중…'; }
+      try {
+        if (!(fxRate > 0)) fxRate = await fetchReliableExchangeRate();
+        if ($('#addAssetFormGeneration')?.value !== formGeneration) return;
+        if (!(fxRate > 0)) {
+          showToast('신뢰할 수 있는 환율이 없습니다. 적용 환율을 직접 입력해주세요.', 'error');
+          if (addSubmitBtn) { addSubmitBtn.disabled = false; addSubmitBtn.textContent = '추가'; }
+          $('#addTxFxRate')?.focus();
+          return;
+        }
+        const rateInput = $('#addTxFxRate');
+        if (rateInput) rateInput.value = fxRate;
+        const modal = $('#modalMain');
+        if (!modal?.classList.contains('active') || modal.getAttribute('aria-hidden') === 'true') return;
+        price = Math.round(originalPrice * fxRate);
+      } catch (e) {
+        console.warn('doAddAsset: exchange rate fetch failed', e);
+        showToast('환율을 확인하지 못해 자산을 추가하지 않았습니다', 'error');
+        if (addSubmitBtn) { addSubmitBtn.disabled = false; addSubmitBtn.textContent = '추가'; }
+        return;
+      }
     }
     amount = price;
     txns = price > 0 && qty > 0 ? [{
-      type: 'buy', price, qty,
+      type: 'buy', price, qty, currency, originalPrice, fxRate,
       date: $('#txDate')?.value || today(),
       account: $('#txAccount')?.value.trim() || null, memo: null,
     }] : [];
@@ -424,6 +463,9 @@ function doAddAsset() {
     showToast(`"${name}" 추가됨`, 'success');
     render();
     if (isInvestment) _autoFetchNewAssetPrice(asset);
+  } else if (addSubmitBtn) {
+    addSubmitBtn.disabled = false;
+    addSubmitBtn.textContent = '추가';
   }
 }
 
@@ -574,9 +616,10 @@ function openAssetDetail(id) {
               ${t.account ? `<span class="txn-acct">${escHtml(t.account)}</span>` : ''}
             </div>
             <div class="txn-values">
-              <span>${escHtml(fmtPrice(t.price))} x ${escHtml(fmtNum(t.qty, t.qty % 1 !== 0 ? 4 : 0))}</span>
-              <span class="txn-total">${escHtml(fmtKRW(t.price * t.qty))}</span>
+              <span>${escHtml(fmtTxnUnitPrice(t))} x ${escHtml(fmtNum(t.qty, t.qty % 1 !== 0 ? 4 : 0))}</span>
+              <span class="txn-total">${escHtml(fmtTxnTotal(t))}</span>
             </div>
+            ${getTxnCurrency(t) === 'USD' && getTxnFxRate(t) ? `<div class="txn-memo text-muted">적용 환율: ${escHtml(fmtKRW(getTxnFxRate(t)))} / USD</div>` : ''}
             ${t.memo ? `<div class="txn-memo">${escHtml(t.memo)}</div>` : ''}
             <div class="txn-actions">
               <button class="btn-icon txn-edit" aria-label="거래 수정"
@@ -791,13 +834,17 @@ function doClearAutoBackups() {
 function openTransaction(assetId, type = 'buy') {
   const asset = getAsset(assetId);
   if (!asset) return;
-  const isForeign = asset.market && !['KOSPI', 'KOSDAQ', ''].includes(asset.market);
+  const isForeign = asset.category === '해외주식' && !['KOSPI', 'KOSDAQ'].includes(asset.market);
   const isCoin = asset.category === '코인';
   const showCurrency = isForeign || isCoin;
+  const defaultCurrency = isForeign ? 'USD' : 'KRW';
+  const initialFxRate = getRateDisplayInfo('usdkrw')?.rate || '';
+  const formGeneration = ++_transactionFormGeneration;
   const container = $('#modalSub');
-  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>${escHtml(asset.name)} — ${type === 'buy' ? '매수' : '매도'}</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body">
-    ${showCurrency ? `<div class="form-group"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button class="btn-sm active" data-action="set-tx-currency" data-currency="KRW" role="radio" aria-checked="true">KRW (원)</button><button class="btn-sm" data-action="set-tx-currency" data-currency="USD" role="radio" aria-checked="false">USD ($)</button></div><input type="hidden" id="txCurrency" value="KRW"></div>` : ''}
-    <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${showCurrency ? '(<span id="txCurrLabel">KRW</span>)' : ''}</label><input type="number" inputmode="decimal" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" inputmode="decimal" id="txnQty" placeholder="0" min="0" step="any"></div></div>
+  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>${escHtml(asset.name)} — ${type === 'buy' ? '매수' : '매도'}</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body"><input type="hidden" id="transactionFormGeneration" value="${formGeneration}">
+    ${showCurrency ? `<div class="form-group"><label>통화</label><div class="btn-group" role="radiogroup" aria-label="통화 선택"><button class="btn-sm ${defaultCurrency === 'KRW' ? 'active' : ''}" data-action="set-tx-currency" data-currency="KRW" role="radio" aria-checked="${defaultCurrency === 'KRW'}">KRW (원)</button><button class="btn-sm ${defaultCurrency === 'USD' ? 'active' : ''}" data-action="set-tx-currency" data-currency="USD" role="radio" aria-checked="${defaultCurrency === 'USD'}">USD ($)</button></div><input type="hidden" id="txCurrency" value="${defaultCurrency}"></div>` : ''}
+    ${showCurrency ? `<div class="form-group ${defaultCurrency === 'USD' ? '' : 'hidden'}" id="txFxRateField"><label for="txFxRate">적용 환율 (1달러당 원화) *</label><input type="number" inputmode="decimal" id="txFxRate" value="${initialFxRate}" min="1" step="any"><div class="hint-text">자동 환율을 확인하고, 과거 거래라면 당시 환율로 수정하세요.</div></div>` : ''}
+    <div class="form-row"><div class="form-group"><label for="txnPrice">단가 ${showCurrency ? `(<span id="txCurrLabel">${defaultCurrency}</span>)` : ''}</label><input type="number" inputmode="decimal" id="txnPrice" placeholder="0" min="0" step="any"><div class="amount-hint" id="txnPriceHint"></div></div><div class="form-group"><label for="txnQty">수량</label><input type="number" inputmode="decimal" id="txnQty" placeholder="0" min="0" step="any"></div></div>
     <div class="tx-total" aria-live="polite">총액: <span id="txnTotal">₩0</span></div>
     <div class="form-row"><div class="form-group"><label for="txnDate">날짜</label><input type="date" id="txnDate" value="${today()}"></div><div class="form-group"><label for="txnAccount">계좌</label><input type="text" id="txnAccount" placeholder="선택사항" maxlength="50" list="txnAccountPresets">${_renderPresetDatalist('txnAccountPresets', 'accounts')}</div></div>
     <div class="form-group"><label for="txnMemo">메모</label><input type="text" id="txnMemo" placeholder="선택사항" maxlength="200"></div>
@@ -813,15 +860,18 @@ function openTransaction(assetId, type = 'buy') {
     if (!el) return;
     const currency = $('#txCurrency')?.value;
     if (currency === 'USD') {
-      el.textContent = `$${fmtNum(p * q, 2)}`;
+      const rate = safeNum($('#txFxRate')?.value);
+      el.textContent = `${fmtUSD(p * q)}${rate ? ` (≈ ${fmtKRW(p * q * rate)})` : ''}`;
     } else {
       el.textContent = fmtKRW(p * q);
     }
   };
-  const txnPriceEl = $('#txnPrice'), txnQtyEl = $('#txnQty');
+  const txnPriceEl = $('#txnPrice'), txnQtyEl = $('#txnQty'), txFxRateEl = $('#txFxRate');
   if (txnPriceEl) _modalCleanup.add(txnPriceEl, 'input', calcTxTotal);
   if (txnQtyEl) _modalCleanup.add(txnQtyEl, 'input', calcTxTotal);
+  if (txFxRateEl) _modalCleanup.add(txFxRateEl, 'input', calcTxTotal);
   _setupAmountHints(['txnPrice:txnPriceHint']);
+  if (defaultCurrency === 'USD' && txnPriceEl) txnPriceEl.dispatchEvent(new Event('input'));
 }
 
 function _setTxCurrency(btn, currency) {
@@ -835,34 +885,63 @@ function _setTxCurrency(btn, currency) {
   if (input) input.value = currency;
   const label = $('#txCurrLabel');
   if (label) label.textContent = currency;
+  const fxField = $('#txFxRateField');
+  if (fxField) fxField.classList.toggle('hidden', currency !== 'USD');
   // refresh amount hint
   const txnPriceEl = $('#txnPrice');
   if (txnPriceEl) txnPriceEl.dispatchEvent(new Event('input'));
 }
 
 async function doTransaction(assetId, type) {
+  const formGeneration = $('#transactionFormGeneration')?.value;
   let price = safeNum($('#txnPrice')?.value);
+  const originalPrice = price;
   const qty = safeNum($('#txnQty')?.value);
   if (!price || !qty) { showToast('단가와 수량을 입력하세요', 'error'); return; }
-  const currency = $('#txCurrency')?.value;
+  const submitBtn = $('#modalSub [data-action="do-transaction"]');
+  if (submitBtn?.disabled) return;
+  const submitLabel = type === 'buy' ? '매수' : '매도';
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '처리 중…'; }
+  const restoreSubmit = () => {
+    if (submitBtn && document.contains(submitBtn)) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = submitLabel;
+    }
+  };
+  const currency = $('#txCurrency')?.value === 'USD' ? 'USD' : 'KRW';
+  let fxRate = currency === 'USD' ? safeNum($('#txFxRate')?.value) : null;
   if (currency === 'USD') {
     try {
-      const rate = await fetchExchangeRate();
-      price = Math.round(price * rate);
+      if (!(fxRate > 0)) fxRate = await fetchReliableExchangeRate();
+      if ($('#transactionFormGeneration')?.value !== formGeneration) return;
+      const modal = $('#modalSub');
+      if (!modal?.classList.contains('active') || modal.getAttribute('aria-hidden') === 'true') return;
+      if (!(fxRate > 0)) {
+        showToast('신뢰할 수 있는 환율이 없습니다. 적용 환율을 직접 입력해주세요.', 'error');
+        $('#txFxRate')?.focus();
+        restoreSubmit();
+        return;
+      }
+      const rateInput = $('#txFxRate');
+      if (rateInput) rateInput.value = fxRate;
+      price = Math.round(originalPrice * fxRate);
     } catch (e) {
       console.warn('doTransaction: exchange rate fetch failed', e);
       showToast('환율 조회 실패', 'error');
+      restoreSubmit();
       return;
     }
   }
   const asset = getAsset(assetId);
-  if (!asset) return;
+  if (!asset) { restoreSubmit(); return; }
   if (type === 'sell') {
     const v = calcAssetValue(asset);
-    if (qty > v.qty) { showToast(`보유 수량(${fmtNum(v.qty, 2)})을 초과합니다`, 'error'); return; }
+    if (qty > v.qty) { showToast(`보유 수량(${fmtNum(v.qty, 2)})을 초과합니다`, 'error'); restoreSubmit(); return; }
   }
   const success = addTransactionWithPrice(assetId, {
-    type, price, qty,
+    type, price, qty, currency,
+    originalPrice: currency === 'USD' ? originalPrice : price,
+    fxRate,
     date: $('#txnDate')?.value || today(),
     account: $('#txnAccount')?.value.trim() || null,
     memo: $('#txnMemo')?.value.trim() || null,
@@ -873,6 +952,8 @@ async function doTransaction(assetId, type) {
     closeModal('modalSub');
     showToast(`${type === 'buy' ? '매수' : '매도'} 완료`, 'success');
     openAssetDetail(assetId);
+  } else {
+    restoreSubmit();
   }
 }
 
@@ -891,11 +972,17 @@ function openEditTransaction(assetId, txnId) {
   if (!asset) return;
   const txn = asset.txns.find(t => t.id === txnId);
   if (!txn) return;
+  const isUsd = getTxnCurrency(txn) === 'USD';
+  const displayPrice = isUsd ? getTxnOriginalPrice(txn) : safeNum(txn.price);
+  const savedFxRate = getTxnFxRate(txn);
+  const formGeneration = ++_transactionFormGeneration;
   const container = $('#modalSub');
-  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>거래 수정</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body">
+  container.innerHTML = `<div class="modal-backdrop"></div><div class="modal-box"><div class="modal-header"><h3>거래 수정</h3><button class="modal-close" data-action="close-sub-modal" aria-label="닫기">✕</button></div><div class="modal-body"><input type="hidden" id="transactionFormGeneration" value="${formGeneration}">
     <div class="form-group"><label>유형</label><div class="btn-group" role="radiogroup" aria-label="거래 유형"><button type="button" class="btn-sm ${txn.type === 'buy' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="buy" role="radio" aria-checked="${txn.type === 'buy'}">매수</button><button type="button" class="btn-sm ${txn.type === 'sell' ? 'active' : ''}" data-action="set-edit-txn-type" data-type="sell" role="radio" aria-checked="${txn.type === 'sell'}">매도</button></div><input type="hidden" id="editTxnType" value="${txn.type}"></div>
-    <div class="form-row"><div class="form-group"><label for="editTxnPrice">단가</label><input type="number" inputmode="decimal" id="editTxnPrice" value="${safeNum(txn.price)}" min="0" step="any"><div class="amount-hint" id="editTxnPriceHint"></div></div><div class="form-group"><label for="editTxnQty">수량</label><input type="number" inputmode="decimal" id="editTxnQty" value="${safeNum(txn.qty)}" min="0" step="any"></div></div>
-    <div class="tx-total" aria-live="polite">총액: <span id="editTxnTotal">${escHtml(fmtKRW(txn.price * txn.qty))}</span></div>
+    <div class="form-row"><div class="form-group"><label for="editTxnPrice">단가${isUsd ? ' (USD)' : ''}</label><input type="number" inputmode="decimal" id="editTxnPrice" value="${displayPrice}" min="0" step="any"><div class="amount-hint" id="editTxnPriceHint"></div></div><div class="form-group"><label for="editTxnQty">수량</label><input type="number" inputmode="decimal" id="editTxnQty" value="${safeNum(txn.qty)}" min="0" step="any"></div></div>
+    <div class="tx-total" aria-live="polite">총액: <span id="editTxnTotal">${escHtml(fmtTxnTotal(txn))}</span></div>
+    ${isUsd ? `<div class="form-group"><label for="editTxnFxRate">적용 환율 (1달러당 원화) *</label><input type="number" inputmode="decimal" id="editTxnFxRate" value="${savedFxRate || ''}" min="1" step="any"><div class="hint-text">저장된 환율입니다. 잘못된 경우 직접 수정할 수 있습니다.</div></div>` : ''}
+    <input type="hidden" id="editTxnCurrency" value="${isUsd ? 'USD' : 'KRW'}">
     <div class="form-row"><div class="form-group"><label for="editTxnDate">날짜</label><input type="date" id="editTxnDate" value="${txn.date || today()}"></div><div class="form-group"><label for="editTxnAccount">계좌</label><input type="text" id="editTxnAccount" value="${escAttr(txn.account || '')}" placeholder="선택사항" maxlength="50" list="editTxnAccountPresets">${_renderPresetDatalist('editTxnAccountPresets', 'accounts')}</div></div>
     <div class="form-group"><label for="editTxnMemo">메모</label><input type="text" id="editTxnMemo" value="${escAttr(txn.memo || '')}" placeholder="선택사항" maxlength="200"></div>
     <div class="modal-actions"><button class="btn-s" data-action="close-sub-modal">취소</button><button class="btn-p" data-action="do-edit-txn" data-asset-id="${assetId}" data-txn-id="${txnId}">저장</button></div></div></div>`;
@@ -906,12 +993,16 @@ function openEditTransaction(assetId, txnId) {
   });
   const calcTotal = () => {
     const p = safeNum($('#editTxnPrice')?.value), q = safeNum($('#editTxnQty')?.value);
+    const currentFxRate = safeNum($('#editTxnFxRate')?.value);
     const el = $('#editTxnTotal');
-    if (el) el.textContent = fmtKRW(p * q);
+    if (el) el.textContent = isUsd
+      ? `${fmtUSD(p * q)}${currentFxRate ? ` (${fmtKRW(p * q * currentFxRate)})` : ''}`
+      : fmtKRW(p * q);
   };
-  const priceEl = $('#editTxnPrice'), qtyEl = $('#editTxnQty');
+  const priceEl = $('#editTxnPrice'), qtyEl = $('#editTxnQty'), rateEl = $('#editTxnFxRate');
   if (priceEl) _modalCleanup.add(priceEl, 'input', calcTotal);
   if (qtyEl) _modalCleanup.add(qtyEl, 'input', calcTotal);
+  if (rateEl) _modalCleanup.add(rateEl, 'input', calcTotal);
   _setupAmountHints(['editTxnPrice:editTxnPriceHint']);
 }
 
@@ -926,13 +1017,39 @@ function _setEditTxnType(btn, type) {
   if (input) input.value = type;
 }
 
-function doEditTxn(assetId, txnId) {
-  const price = safeNum($('#editTxnPrice')?.value);
+async function doEditTxn(assetId, txnId) {
+  const formGeneration = $('#transactionFormGeneration')?.value;
+  const asset = getAsset(assetId);
+  const existing = asset?.txns?.find(t => t.id === txnId);
+  if (!existing) return;
+  const originalPrice = safeNum($('#editTxnPrice')?.value);
   const qty = safeNum($('#editTxnQty')?.value);
-  if (!price || !qty) { showToast('단가와 수량을 입력하세요', 'error'); return; }
+  if (!originalPrice || !qty) { showToast('단가와 수량을 입력하세요', 'error'); return; }
+  const submitBtn = $('#modalSub [data-action="do-edit-txn"]');
+  if (submitBtn?.disabled) return;
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '저장 중…'; }
+  const restoreSubmit = () => {
+    if (submitBtn && document.contains(submitBtn)) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '저장';
+    }
+  };
+  const currency = getTxnCurrency(existing);
+  let fxRate = currency === 'USD' ? safeNum($('#editTxnFxRate')?.value) : null;
+  if (currency === 'USD' && !(fxRate > 0)) fxRate = await fetchReliableExchangeRate();
+  if ($('#transactionFormGeneration')?.value !== formGeneration) return;
+  const modal = $('#modalSub');
+  if (!modal?.classList.contains('active') || modal.getAttribute('aria-hidden') === 'true') return;
+  if (currency === 'USD' && !(fxRate > 0)) {
+    showToast('신뢰할 수 있는 환율이 없습니다. 적용 환율을 직접 입력해주세요.', 'error');
+    $('#editTxnFxRate')?.focus();
+    restoreSubmit();
+    return;
+  }
+  const price = currency === 'USD' ? Math.round(originalPrice * fxRate) : originalPrice;
   const ok = updateTransaction(assetId, txnId, {
     type: $('#editTxnType')?.value || 'buy',
-    price, qty,
+    price, qty, currency, originalPrice, fxRate,
     date: $('#editTxnDate')?.value || today(),
     account: $('#editTxnAccount')?.value.trim() || null,
     memo: $('#editTxnMemo')?.value.trim() || null,
@@ -947,6 +1064,8 @@ function doEditTxn(assetId, txnId) {
     } else if (typeof _rerenderTxnList === 'function') {
       _rerenderTxnList();
     }
+  } else {
+    restoreSubmit();
   }
 }
 
@@ -1261,7 +1380,10 @@ function _setupAmountHints(pairs) {
       } else {
         const addCurr = $('#addTxCurrency')?.value;
         const txCurr = $('#txCurrency')?.value;
-        const isUsd = (inputId === 'txPrice' && addCurr === 'USD') || (inputId === 'txnPrice' && txCurr === 'USD');
+        const editCurr = $('#editTxnCurrency')?.value;
+        const isUsd = (inputId === 'txPrice' && addCurr === 'USD')
+          || (inputId === 'txnPrice' && txCurr === 'USD')
+          || (inputId === 'editTxnPrice' && editCurr === 'USD');
         hint.textContent = isUsd ? fmtAmountHintUSD(input.value) : fmtAmountHint(input.value);
       }
     };
@@ -1277,42 +1399,40 @@ function _setupAddTxTotal() {
     if (!el) return;
     const curr = $('#addTxCurrency')?.value;
     if (curr === 'USD') {
-      const rate = getUsdtRateSync().rate;
-      el.textContent = `$${fmtNum(p * q, 2)} (≈ ${fmtKRW(Math.round(p * q * rate))})`;
+      const rate = safeNum($('#addTxFxRate')?.value);
+      el.textContent = `${fmtUSD(p * q)}${rate ? ` (≈ ${fmtKRW(p * q * rate)})` : ''}`;
     } else {
       el.textContent = fmtKRW(p * q);
     }
   };
-  const priceEl = $('#txPrice'), qtyEl = $('#txQty');
+  const priceEl = $('#txPrice'), qtyEl = $('#txQty'), rateEl = $('#addTxFxRate');
   if (priceEl) _modalCleanup.add(priceEl, 'input', calc);
   if (qtyEl) _modalCleanup.add(qtyEl, 'input', calc);
+  if (rateEl) _modalCleanup.add(rateEl, 'input', calc);
 }
 
 function _setAddTxCurrency(btn, currency) {
-  $('#coinCurrencyField')?.querySelectorAll('[role="radio"]').forEach(b => {
+  _setAddTxCurrencyValue(currency);
+  // refresh amount hint and total
+  const txPriceEl = $('#txPrice');
+  if (txPriceEl) txPriceEl.dispatchEvent(new Event('input'));
+}
+
+function _setAddTxCurrencyValue(currency) {
+  $('#addCurrencyField')?.querySelectorAll('[role="radio"]').forEach(b => {
     b.classList.remove('active');
     b.setAttribute('aria-checked', 'false');
+    if (b.dataset.currency === currency) {
+      b.classList.add('active');
+      b.setAttribute('aria-checked', 'true');
+    }
   });
-  btn.classList.add('active');
-  btn.setAttribute('aria-checked', 'true');
   const input = $('#addTxCurrency');
   if (input) input.value = currency;
   const label = $('#addTxPriceLabel');
   if (label) label.textContent = currency === 'USD' ? '단가 (USD)' : '단가';
-  // recalc total display
-  const p = safeNum($('#txPrice')?.value), q = safeNum($('#txQty')?.value);
-  const el = $('#addTxTotal');
-  if (el) {
-    if (currency === 'USD') {
-      const rate = getUsdtRateSync().rate;
-      el.textContent = `$${fmtNum(p * q, 2)} (≈ ${fmtKRW(Math.round(p * q * rate))})`;
-    } else {
-      el.textContent = fmtKRW(p * q);
-    }
-  }
-  // refresh amount hint
-  const txPriceEl = $('#txPrice');
-  if (txPriceEl) txPriceEl.dispatchEvent(new Event('input'));
+  const fxField = $('#addFxRateField');
+  if (fxField) fxField.classList.toggle('hidden', currency !== 'USD');
 }
 
 // ── Coin Custom ID ──

@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.36.12 — App Entry Point
+   My Portfolio v5.37.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -107,16 +107,19 @@ async function fetchMarketRatesOnLoad() {
 
 // ── Service Worker with Update Banner ──
 let _didReloadForSWUpdate = false;
+let _swUpdateReady = false;
 
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+  const reloadBtn = $('#updateReloadBtn');
+  if (reloadBtn) reloadBtn.onclick = _requestSWUpdateReload;
   navigator.serviceWorker.register('./sw.js').then(reg => {
     reg.addEventListener('updatefound', () => {
       const newWorker = reg.installing;
       if (!newWorker) return;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          showUpdateBanner('새 버전을 적용 중입니다. 잠시 후 자동으로 새로고침됩니다.');
+          showUpdateBanner('새 버전을 준비하고 있습니다. 현재 입력 내용은 그대로 유지됩니다.');
         }
       });
     });
@@ -125,18 +128,54 @@ function registerSW() {
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (_didReloadForSWUpdate) return;
-    _didReloadForSWUpdate = true;
-    showUpdateBanner('새 버전 적용이 완료되었습니다. 페이지를 새로고침합니다.');
-    setTimeout(() => location.reload(), 700);
+    if (_swUpdateReady || _didReloadForSWUpdate) return;
+    _swUpdateReady = true;
+    const hasOpenForm = $$('.modal.active').length > 0;
+    showUpdateBanner(
+      hasOpenForm
+        ? '새 버전이 준비되었습니다. 작성 중인 내용을 마친 뒤 새로고침하세요.'
+        : '새 버전이 준비되었습니다. 새로고침하면 바로 적용됩니다.',
+      { action: true, busy: false }
+    );
   });
 }
 
-function showUpdateBanner(message) {
+async function _applySWUpdateReload() {
+  if (_didReloadForSWUpdate) return;
+  _didReloadForSWUpdate = true;
+  showUpdateBanner('저장 중입니다. 잠시만 기다려주세요.', { action: true, busy: true });
+  const saved = typeof flushPendingSave === 'function' ? await flushPendingSave() : true;
+  if (!saved) {
+    _didReloadForSWUpdate = false;
+    showUpdateBanner('저장에 실패했습니다. 연결을 확인한 뒤 다시 시도하세요.', { action: true, busy: false });
+    return;
+  }
+  showUpdateBanner('저장 완료. 새 버전으로 새로고침합니다.', { action: true, busy: true });
+  setTimeout(() => location.reload(), 300);
+}
+
+function _requestSWUpdateReload() {
+  const hasOpenForm = $$('.modal.active').some(modal => modal.id !== 'modalConfirm');
+  if (hasOpenForm) {
+    openConfirmModal('작성 중인 입력 내용은 아직 저장되지 않았습니다. 그래도 지금 새로고침하시겠습니까?', _applySWUpdateReload);
+    return;
+  }
+  _applySWUpdateReload();
+}
+
+function showUpdateBanner(message, options = {}) {
   const banner = $('#updateBanner');
   if (!banner) return;
   const text = $('#updateBannerText');
   if (text && message) text.textContent = message;
+  const spinner = banner.querySelector('.update-banner-spinner');
+  if (spinner) spinner.classList.toggle('hidden', options.busy === false);
+  const action = $('#updateReloadBtn');
+  if (action) {
+    action.classList.toggle('hidden', !options.action);
+    action.disabled = !!options.busy;
+    action.textContent = options.busy ? '처리 중…' : '새로고침';
+  }
   banner.classList.remove('hidden');
   banner.classList.add('visible');
 }
