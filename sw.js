@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.37.0
+/* Service Worker - My Portfolio v5.37.1
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.37.0";
+var CACHE_NAME = "myportfolio-v5.37.1";
 
 var STATIC_ASSETS = [
   "./",
@@ -41,7 +41,7 @@ var API_HOSTS = [
   "api.upbit.com", "api.bithumb.com", "finance.daum.net",
   "generativelanguage.googleapis.com",
   "ethereum-rpc.publicnode.com", "bsc-dataseed.binance.org",
-  "polygon-rpc.com", "arb1.arbitrum.io",
+  "polygon.drpc.org", "arb1.arbitrum.io",
   "mainnet.optimism.io", "api.avax.network"
 ];
 

@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.37.0 — Configuration
+   My Portfolio v5.37.1 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.37.0';
+const APP_VERSION = '5.37.1';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -293,7 +293,7 @@ const STOCK_SECTOR_MAP = Object.freeze(Object.fromEntries(STOCK_SECTOR_RULES.map
 const EVM_CHAINS = Object.freeze([
   { id:'ethereum',  name:'Ethereum',        sym:'ETH',  rpc:'https://ethereum-rpc.publicnode.com',   coinId:'ethereum' },
   { id:'bsc',       name:'BNB Smart Chain',  sym:'BNB',  rpc:'https://bsc-dataseed.binance.org',      coinId:'binancecoin' },
-  { id:'polygon',   name:'Polygon',         sym:'POL',  rpc:'https://polygon-rpc.com',               coinId:'matic-network' },
+  { id:'polygon',   name:'Polygon',         sym:'POL',  rpc:'https://polygon.drpc.org',               coinId:'matic-network' },
   { id:'arbitrum',  name:'Arbitrum',        sym:'ETH',  rpc:'https://arb1.arbitrum.io/rpc',          coinId:'ethereum' },
   { id:'optimism',  name:'Optimism',        sym:'ETH',  rpc:'https://mainnet.optimism.io',           coinId:'ethereum' },
   { id:'avalanche', name:'Avalanche',       sym:'AVAX', rpc:'https://api.avax.network/ext/bc/C/rpc', coinId:'avalanche-2' },
