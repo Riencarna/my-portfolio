@@ -1,8 +1,8 @@
-/* Service Worker - My Portfolio v5.39.0
+/* Service Worker - My Portfolio v5.39.1
    Feature: stale 가격 감지 (사일런트 실패 방지)
    Soft Neutral UI overhaul (lavender/cream/coral) */
 
-var CACHE_NAME = "myportfolio-v5.39.0";
+var CACHE_NAME = "myportfolio-v5.39.1";
 
 var STATIC_ASSETS = [
   "./",
@@ -133,7 +133,11 @@ var OFFLINE_HTML = '<!DOCTYPE html>'
 self.addEventListener("install", function(e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(STATIC_ASSETS);
+      // 새 배포 직후 브라우저 HTTP 캐시에 남은 구버전 파일을 다시 담지 않도록 강제 갱신한다.
+      var refreshRequests = STATIC_ASSETS.map(function(url) {
+        return new Request(url, { cache: "reload" });
+      });
+      return cache.addAll(refreshRequests);
     })
   );
   self.skipWaiting();

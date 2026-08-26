@@ -18,8 +18,9 @@ function createHarness({ fetchImpl, cachedResponse, cacheMatchImpl }) {
   const puts = [];
   const matches = [];
   const opens = [];
+  const addedBatches = [];
   const cache = {
-    addAll: async () => {},
+    addAll: async requests => { addedBatches.push(requests); },
     match: async request => {
       calls.push('cache.match');
       matches.push(request);
@@ -58,6 +59,9 @@ function createHarness({ fetchImpl, cachedResponse, cacheMatchImpl }) {
     console,
     URL,
     Response: global.Response,
+    Request: class MockRequest {
+      constructor(url, options = {}) { this.url = url; this.cache = options.cache || 'default'; }
+    },
     Headers: global.Headers,
     Date,
     Promise,
@@ -88,11 +92,23 @@ function createHarness({ fetchImpl, cachedResponse, cacheMatchImpl }) {
     return { request, responded, response, lifetimeCount: lifetime.length };
   }
 
-  return { calls, puts, matches, opens, cacheName: context.CACHE_NAME, dispatchFetch };
+  async function dispatchInstall() {
+    const lifetime = [];
+    listeners.install({ waitUntil(promise) { lifetime.push(Promise.resolve(promise)); } });
+    await Promise.all(lifetime);
+  }
+
+  return { calls, puts, matches, opens, addedBatches, cacheName: context.CACHE_NAME, dispatchFetch, dispatchInstall };
 }
 
 (async () => {
   console.log('\n[Service Worker 런타임 캐시 전략]');
+
+  const install = createHarness({ fetchImpl: async () => new Response('ok') });
+  await install.dispatchInstall();
+  const precacheRequests = install.addedBatches[0] || [];
+  assert('새 버전 설치 시 모든 정적 파일을 HTTP 캐시에서 강제 갱신',
+    precacheRequests.length > 0 && precacheRequests.every(request => request.cache === 'reload'));
 
   const storedAt = '2026-08-06T01:02:03.000Z';
   const cachedBody = JSON.stringify({ price: 1234 });

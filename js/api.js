@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.39.0 — API Integration
+   My Portfolio v5.39.1 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
