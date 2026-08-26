@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.39.1 — Asset List UI
+   My Portfolio v5.39.2 — Asset List UI
    Cycle C: 보유중/매도완료 탭 (C-15)
    Soft Neutral: cleaner toolbar, stagger animations
    Drag&Drop logic preserved from v4.4.1
@@ -61,12 +61,11 @@ function renderList() {
 
     <div id="assetListBody" role="list" aria-label="자산 목록">
       ${(() => {
-        const prevSnap = getPreviousSnapshot();
-        const pap = prevSnap ? prevSnap.byAssetPrice || null : null;
+        const assetDeltaRefs = getAssetDeltaReferences();
         return order.map((catId, idx) => {
           const catAssets = grouped[catId] || [];
           if (catAssets.length === 0 && !UIState.isEditMode) return '';
-          return renderListCategory(catId, catAssets, idx + 3, pap);
+          return renderListCategory(catId, catAssets, idx + 3, assetDeltaRefs);
         }).join('');
       })()}
       ${assets.length === 0 ? `<div class="empty-state">${_emptyStateText()}</div>` : ''}
@@ -194,7 +193,7 @@ function toggleEditMode() {
   renderFAB();
 }
 
-function renderListCategory(catId, assets, staggerIdx = 2, prevAssetPrices = null) {
+function renderListCategory(catId, assets, staggerIdx = 2, assetDeltaRefs = null) {
   const cat = CAT_MAP[catId];
   const isOpen = UIState.listCategoryOpen[catId] !== false;
   const total = assets.reduce((s, a) => s + calcAssetValue(a).value, 0);
@@ -216,7 +215,7 @@ function renderListCategory(catId, assets, staggerIdx = 2, prevAssetPrices = nul
       ${isOpen ? `
         <div class="list-cat-body" role="list">
           ${visibleAssets.length > 0
-            ? visibleAssets.map(a => renderListAsset(a, prevAssetPrices)).join('')
+            ? visibleAssets.map(a => renderListAsset(a, assetDeltaRefs)).join('')
             : '<div class="empty-cat">자산이 없습니다</div>'}
           ${hasMore ? `
             <button class="btn-sm show-more-btn" data-action="show-more" data-cat="${escAttr(catId)}"
@@ -248,12 +247,11 @@ function showMoreAssets(catId) {
   const oldBtn = body.querySelector('.show-more-btn');
   if (oldBtn) oldBtn.remove();
 
-  const prevSnap = getPreviousSnapshot();
-  const prevAssetPrices = prevSnap ? prevSnap.byAssetPrice || null : null;
+  const assetDeltaRefs = getAssetDeltaReferences();
   const fragment = document.createDocumentFragment();
   for (const a of newItems) {
     const wrapper = document.createElement('div');
-    wrapper.innerHTML = renderListAsset(a, prevAssetPrices);
+    wrapper.innerHTML = renderListAsset(a, assetDeltaRefs);
     while (wrapper.firstChild) fragment.appendChild(wrapper.firstChild);
   }
   body.appendChild(fragment);
@@ -301,11 +299,11 @@ function _renderAssetMoveActions(asset) {
   `;
 }
 
-function renderListAsset(asset, prevAssetPrices) {
+function renderListAsset(asset, assetDeltaRefs) {
   const v = calcAssetValue(asset);
   const isInv = INVESTMENT_CATS.includes(asset.category);
   const hasProfit = isInv && v.cost > 0;
-  const deltaBadge = _renderAssetDeltaBadge(asset, v, prevAssetPrices);
+  const deltaBadge = _renderAssetDeltaBadge(asset, v, assetDeltaRefs);
   const assetId = escAttr(asset.id);
 
   return `
@@ -366,11 +364,10 @@ function toggleListCat(catId) {
       const bodyDiv = document.createElement('div');
       bodyDiv.className = 'list-cat-body';
       bodyDiv.setAttribute('role', 'list');
-      const prevSnap = getPreviousSnapshot();
-      const prevAssetPrices = prevSnap ? prevSnap.byAssetPrice || null : null;
+      const assetDeltaRefs = getAssetDeltaReferences();
       bodyDiv.innerHTML = `
         ${visibleAssets.length > 0
-          ? visibleAssets.map(a => renderListAsset(a, prevAssetPrices)).join('')
+          ? visibleAssets.map(a => renderListAsset(a, assetDeltaRefs)).join('')
           : '<div class="empty-cat">자산이 없습니다</div>'}
         ${hasMore ? `
           <button class="btn-sm show-more-btn" data-action="show-more" data-cat="${escAttr(catId)}"

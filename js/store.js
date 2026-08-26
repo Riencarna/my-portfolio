@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.39.1 — State Management
+   My Portfolio v5.39.2 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -684,13 +684,22 @@ function makeSnapshot() {
   const byCategory = calcCategoryTotals(appState.assets);
   const byAsset = {};
   const byAssetPrice = {};
+  const byAssetStartPrice = {};
+  const idx = appState.history.findIndex(h => h.date === dateStr);
+  const existingSnap = idx >= 0 ? appState.history[idx] : null;
   for (const a of appState.assets) {
     const value = calcAssetValue(a);
+    const currentPrice = safeNum(value.price, 0);
+    const savedStartPrice = safeNum(existingSnap?.byAssetStartPrice?.[a.id], 0);
+    const migrationPrice = safeNum(existingSnap?.byAssetPrice?.[a.id], 0);
     byAsset[a.id] = safeNum(value.value, 0);
-    byAssetPrice[a.id] = safeNum(value.price, 0);
+    byAssetPrice[a.id] = currentPrice;
+    // 오늘 첫 정상 단가는 당일에 덮어쓰지 않는다. 구버전 당일 기록은 마지막 저장 단가로 안전하게 시작한다.
+    byAssetStartPrice[a.id] = savedStartPrice > 0
+      ? savedStartPrice
+      : (migrationPrice > 0 ? migrationPrice : currentPrice);
   }
-  const idx = appState.history.findIndex(h => h.date === dateStr);
-  const snap = { date: dateStr, total, byCategory, byAsset, byAssetPrice };
+  const snap = { date: dateStr, total, byCategory, byAsset, byAssetPrice, byAssetStartPrice };
   if (idx >= 0) appState.history[idx] = snap;
   else appState.history.push(snap);
   if (appState.history.length > LIMITS.history) {
