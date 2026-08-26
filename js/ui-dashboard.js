@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.38.0 — Dashboard UI
+   My Portfolio v5.39.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -75,8 +75,8 @@ function _buildDashContext() {
   const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
   const prevSnap = getPreviousSnapshot();
   const prevCatTotals = prevSnap ? prevSnap.byCategory || null : null;
-  const prevAssetValues = prevSnap ? prevSnap.byAsset || null : null;
-  return { total, catTotals, prevTotal, change, changePct, prevCatTotals, prevAssetValues };
+  const prevAssetPrices = prevSnap ? prevSnap.byAssetPrice || null : null;
+  return { total, catTotals, prevTotal, change, changePct, prevCatTotals, prevAssetPrices };
 }
 
 // 오늘 이전의 가장 최근 스냅샷 entry 반환. 없으면 null.
@@ -131,7 +131,7 @@ function _renderDashCardInner(id, ctx) {
     case 'pie':         return _renderPieCard(ctx);
     case 'trend':       return _renderTrendCard(ctx);
     case 'auto-update': return renderAutoUpdateSection();
-    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total, ctx.prevCatTotals, ctx.prevAssetValues);
+    case 'breakdown':   return renderCategoryBreakdown(ctx.catTotals, ctx.total, ctx.prevCatTotals, ctx.prevAssetPrices);
     default: return '';
   }
 }
@@ -987,18 +987,18 @@ function renderPieLegend(catTotals, total, options = {}) {
   return `<div class="pie-legend" role="list" aria-label="자산 분포 범례">${items}</div>`;
 }
 
-function renderCategoryBreakdown(catTotals, total, prevCatTotals, prevAssetValues) {
+function renderCategoryBreakdown(catTotals, total, prevCatTotals, prevAssetPrices) {
   const cats = appState.categoryOrder.filter(c => catTotals[c] > 0);
   if (cats.length === 0) return '';
   return `
     <div class="card" role="region" aria-label="카테고리별 상세">
       <div class="card-title">카테고리별 상세</div>
-      ${cats.map(c => renderCategorySection(c, catTotals[c], total, prevCatTotals, prevAssetValues)).join('')}
+      ${cats.map(c => renderCategorySection(c, catTotals[c], total, prevCatTotals, prevAssetPrices)).join('')}
     </div>
   `;
 }
 
-function renderCategorySection(catId, catTotal, total, prevCatTotals, prevAssetValues) {
+function renderCategorySection(catId, catTotal, total, prevCatTotals, prevAssetPrices) {
   const cat = CAT_MAP[catId];
   const pct = total > 0 ? ((catTotal / total) * 100).toFixed(1) : 0;
   const assets = appState.assets.filter(a => a.category === catId);
@@ -1017,7 +1017,7 @@ function renderCategorySection(catId, catTotal, total, prevCatTotals, prevAssetV
           <span class="chevron ${isOpen ? 'open' : ''}" aria-hidden="true">▸</span>
         </span>
       </div>
-      ${isOpen ? `<div class="cat-assets" role="list">${assets.map(a => renderDashAsset(a, prevAssetValues)).join('')}</div>` : ''}
+      ${isOpen ? `<div class="cat-assets" role="list">${assets.map(a => renderDashAsset(a, prevAssetPrices)).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -1042,10 +1042,10 @@ function _renderCatDeltaBadge(catId, catTotal, prevCatTotals) {
   return `<span class="cat-delta ${cls}" aria-label="${escAttr(label)}">${sign} ${escHtml(fmtKRW(Math.abs(diff)))}</span>`;
 }
 
-function renderDashAsset(asset, prevAssetValues) {
+function renderDashAsset(asset, prevAssetPrices) {
   const v = calcAssetValue(asset);
   const isInv = INVESTMENT_CATS.includes(asset.category);
-  const assetDeltaBadge = _renderAssetDeltaBadge(asset, v.value, prevAssetValues);
+  const assetDeltaBadge = _renderAssetDeltaBadge(asset, v, prevAssetPrices);
   return `
     <div class="dash-asset" data-action="open-asset-detail" data-id="${asset.id}" role="listitem"
       tabindex="0" aria-label="${escAttr(asset.name)}: ${fmtKRW(v.value)}">
@@ -1058,22 +1058,20 @@ function renderDashAsset(asset, prevAssetValues) {
   `;
 }
 
-// 자산별 이전 기록 대비 일일 델타 배지.
+// 자산별 이전 기록 대비 일일 가격 변동 배지. 수량 증감은 계산에서 제외한다.
 // - 활성 카테고리(ASSET_DELTA_ENABLED_CATS) 또는 USDT 자산만 표시
-// - 이전 스냅샷에 byAsset이 없거나 해당 자산 ID가 없으면 미표시 (신규 자산 포함)
+// - 이전 스냅샷에 단가가 없거나 해당 자산 ID가 없으면 미표시 (구버전 기록·신규 자산 포함)
 // - 변동액이 반올림 후 0이면 미표시 (자산 행은 공간이 좁아 ±0 노이즈 방지)
-function _renderAssetDeltaBadge(asset, currValue, prevAssetValues) {
+function _renderAssetDeltaBadge(asset, assetValue, prevAssetPrices) {
   if (!_shouldShowAssetDelta(asset)) return '';
-  if (!prevAssetValues) return '';
-  const prev = prevAssetValues[asset.id];
-  if (prev === undefined || prev === null) return '';
-  const prevN = safeNum(prev, 0);
-  const curr = safeNum(currValue, 0);
-  const diff = Math.round(curr - prevN);
+  if (!prevAssetPrices) return '';
+  const delta = calcPriceOnlyAssetDelta(assetValue, prevAssetPrices[asset.id]);
+  if (!delta) return '';
+  const diff = Math.round(delta.amount);
   if (diff === 0) return '';
   const sign = diff > 0 ? '▲' : '▼';
   const cls = diff > 0 ? 'positive' : 'negative';
-  const label = `이전 기록 대비 ${diff > 0 ? '증가' : '감소'} ${fmtKRW(Math.abs(diff))}`;
+  const label = `이전 기록 가격 대비 ${diff > 0 ? '증가' : '감소'} ${fmtKRW(Math.abs(diff))} (수량 변동 제외)`;
   return `<span class="asset-delta ${cls}" aria-label="${escAttr(label)}">${sign} ${escHtml(fmtKRW(Math.abs(diff)))}</span>`;
 }
 
@@ -1095,11 +1093,11 @@ function toggleDashCat(catId) {
     if (!existingBody) {
       const assets = appState.assets.filter(a => a.category === catId);
       const prevSnap = getPreviousSnapshot();
-      const prevAssetValues = prevSnap ? prevSnap.byAsset || null : null;
+      const prevAssetPrices = prevSnap ? prevSnap.byAssetPrice || null : null;
       const assetsDiv = document.createElement('div');
       assetsDiv.className = 'cat-assets';
       assetsDiv.setAttribute('role', 'list');
-      assetsDiv.innerHTML = assets.map(a => renderDashAsset(a, prevAssetValues)).join('');
+      assetsDiv.innerHTML = assets.map(a => renderDashAsset(a, prevAssetPrices)).join('');
       section.appendChild(assetsDiv);
     }
   } else {

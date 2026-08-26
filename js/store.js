@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.38.0 — State Management
+   My Portfolio v5.39.0 — State Management
    Cycle C compatible
    All IDs from uid() are STRINGS — never use Number() on them
    ============================================= */
@@ -683,11 +683,14 @@ function makeSnapshot() {
   const total = calcTotal(appState.assets);
   const byCategory = calcCategoryTotals(appState.assets);
   const byAsset = {};
+  const byAssetPrice = {};
   for (const a of appState.assets) {
-    byAsset[a.id] = safeNum(calcAssetValue(a).value, 0);
+    const value = calcAssetValue(a);
+    byAsset[a.id] = safeNum(value.value, 0);
+    byAssetPrice[a.id] = safeNum(value.price, 0);
   }
   const idx = appState.history.findIndex(h => h.date === dateStr);
-  const snap = { date: dateStr, total, byCategory, byAsset };
+  const snap = { date: dateStr, total, byCategory, byAsset, byAssetPrice };
   if (idx >= 0) appState.history[idx] = snap;
   else appState.history.push(snap);
   if (appState.history.length > LIMITS.history) {

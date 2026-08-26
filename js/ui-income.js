@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.38.0 — Household Book UI
+   My Portfolio v5.39.0 — Household Book UI
    Cycle C compatible
    ============================================= */
 

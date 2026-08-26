@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.38.0 — Utilities
+   My Portfolio v5.39.0 — Utilities
    Cycle C: calcAssetValue extended (realized P&L, totalBuy/Sell, dates)
    uid() returns crypto.randomUUID string
    Scoped Cleanup for modular listener management
@@ -525,6 +525,20 @@ function calcAssetValue(asset) {
     firstBuyDate,
     lastTxnDate,
   };
+}
+
+// 수량 입출금을 제외한 자산의 가격 변동분만 계산한다.
+// 현재 보유 수량을 기준으로 이전 기록의 단가와 현재 단가 차이를 평가한다.
+function calcPriceOnlyAssetDelta(assetValue, previousUnitPrice) {
+  if (!assetValue || previousUnitPrice === undefined || previousUnitPrice === null) return null;
+  const currentPrice = safeNum(assetValue.price, 0);
+  const previousPrice = safeNum(previousUnitPrice, 0);
+  const currentQty = safeNum(assetValue.qty, 0);
+  if (currentPrice <= 0 || previousPrice <= 0 || currentQty <= 0) return null;
+
+  const amount = safeNum((currentPrice - previousPrice) * currentQty, 0);
+  const pct = safeNum(((currentPrice - previousPrice) / previousPrice) * 100, 0);
+  return { amount, pct, currentPrice, previousPrice, currentQty };
 }
 
 function _buildCalcCache(assets) {
