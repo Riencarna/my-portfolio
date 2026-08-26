@@ -1,9 +1,9 @@
 /* =============================================
-   My Portfolio v5.37.1 — Configuration
+   My Portfolio v5.38.0 — Configuration
    Soft Neutral palette, Cycle C (카테고리별 전일 대비 증감 배지)
    ============================================= */
 
-const APP_VERSION = '5.37.1';
+const APP_VERSION = '5.38.0';
 const APP_NAME = 'My Portfolio';
 
 // ── Timing Constants ──
@@ -354,7 +354,8 @@ const API = Object.freeze({
   openER:        'https://open.er-api.com/v6/latest/USD',
   floatRates:    'https://www.floatrates.com/daily/usd.json',
   upbit:         'https://api.upbit.com/v1/ticker',
-  bithumb:       'https://api.bithumb.com/public/ticker',
+  bithumb:       'https://api.bithumb.com/v1/ticker',
+  bithumbLegacy: 'https://api.bithumb.com/public/ticker',
   daum:          'https://finance.daum.net/api/exchanges',
   gemini:        'https://generativelanguage.googleapis.com/v1beta',
 });

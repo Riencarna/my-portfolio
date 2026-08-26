@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.37.1 — Dashboard UI
+   My Portfolio v5.38.0 — Dashboard UI
    Cycle C compatible
    Soft Neutral: hero + stats + charts + breakdown
    ============================================= */
@@ -221,6 +221,8 @@ function _renderStatsCard(ctx) {
   const { catTotals } = ctx;
   const assetCount = appState.assets.length;
   const kimchi = getKimchiPremiumInfo();
+  const usdRateInfo = getRateDisplayInfo('usdkrw');
+  const usdtRateInfo = getRateDisplayInfo('usdt');
   return `
     <section class="dash-stats" role="region" aria-label="요약 지표">
       <div class="stat-card">
@@ -232,21 +234,21 @@ function _renderStatsCard(ctx) {
         <div class="stat-card">
           <div class="stat-label">USD/KRW 환율</div>
           <div class="stat-value">${escHtml(fmtNum(cachedRate.rate, 2))}</div>
-          <div class="stat-sub">${escHtml(cachedRate.source)} · ${escHtml(fmtRelTime(new Date(cachedRate.time).toISOString()))}</div>
+          <div class="stat-sub">${escHtml(formatRateSourceLabel(usdRateInfo))}</div>
         </div>
       ` : ''}
       ${cachedUsdt ? `
         <div class="stat-card">
           <div class="stat-label">USDT</div>
           <div class="stat-value">${escHtml(fmtNum(cachedUsdt.rate, 0))}원</div>
-          <div class="stat-sub">${escHtml(cachedUsdt.source)}</div>
+          <div class="stat-sub">${escHtml(formatRateSourceLabel(usdtRateInfo))}</div>
         </div>
       ` : ''}
       ${kimchi ? `
         <div class="stat-card stat-kimp">
           <div class="stat-label">김치 프리미엄</div>
           <div class="stat-value ${kimchi.premium >= 0 ? 'positive' : 'negative'}">${escHtml(fmtPct(kimchi.premium, 2))}</div>
-          <div class="stat-sub">${escHtml(fmtNum(kimchi.usdtRate, 0))}원 ÷ ${escHtml(fmtNum(kimchi.usdRate, 2))}${kimchi.fallback ? ' · 저장값 포함' : ''}</div>
+          <div class="stat-sub">${escHtml(fmtNum(kimchi.usdtRate, 0))}원 ÷ ${escHtml(fmtNum(kimchi.usdRate, 2))}${kimchi.fallback ? ' · 이전 저장 가격 포함' : ''}</div>
         </div>
       ` : `
         <div class="stat-card stat-kimp stat-muted">
@@ -862,6 +864,19 @@ function renderBackupReminder() {
 }
 
 function renderAutoUpdateSection() {
+  const issueLogs = updateLogs.filter(entry => !entry.ok || entry.cacheFallback || entry.stale);
+  const issueSet = new Set(issueLogs);
+  const visibleLogs = [
+    ...issueLogs,
+    ...updateLogs.slice(-10).filter(entry => !issueSet.has(entry)),
+  ];
+  const fallbackNames = formatAffectedAssetNames(issueLogs.filter(entry => entry.cacheFallback).map(entry => entry.assetName || entry.name));
+  const failedNames = formatAffectedAssetNames(issueLogs.filter(entry => !entry.ok).map(entry => entry.assetName || entry.name));
+  const staleNames = formatAffectedAssetNames(issueLogs.filter(entry => entry.stale).map(entry => entry.assetName || entry.name));
+  const issueRows = [];
+  if (fallbackNames) issueRows.push(`<div><span>이전 저장 가격 사용</span><strong>${escHtml(fallbackNames)}</strong></div>`);
+  if (failedNames) issueRows.push(`<div><span>시세 연결 실패</span><strong>${escHtml(failedNames)}</strong></div>`);
+  if (staleNames) issueRows.push(`<div><span>가격 확인 필요</span><strong>${escHtml(staleNames)}</strong></div>`);
   return `
     <div class="card" role="region" aria-label="가격 업데이트">
       <div class="card-title">
@@ -879,24 +894,33 @@ function renderAutoUpdateSection() {
         </div>
         <div class="progress-text" id="updateProgressText" aria-live="polite">준비 중...</div>
       </div>
+      ${issueRows.length > 0 ? `
+        <div class="update-issue-summary" role="alert">
+          <div class="update-issue-title">⚠️ 확인이 필요한 자산</div>
+          ${issueRows.join('')}
+        </div>
+      ` : ''}
       <div id="updateLogs" class="update-logs" aria-label="업데이트 로그">
-        ${updateLogs.slice(-10).map(l => {
+        ${visibleLogs.map(l => {
           const cls = !l.ok ? 'log-fail' : (l.cacheFallback ? 'log-cache' : (l.stale ? 'log-stale' : 'log-ok'));
           const prefix = l.stale ? '⚠️ ' : '';
           const right = !l.ok ? '✗ 실패'
             : (l.price ? prefix + escHtml(fmtPrice(l.price)) : '✓');
           const storedMs = new Date(l.cacheStoredAt || '').getTime();
-          const storedAge = Number.isFinite(storedMs) && storedMs > 0 ? formatRateAge(storedMs) : '저장 시각 미상';
-          const errorLabel = l.originStatus ? `서버 오류 ${l.originStatus}`
-            : (l.fallbackReason === 'network-error' ? '네트워크 오류' : '서버 오류');
+          const storedAge = Number.isFinite(storedMs) && storedMs > 0 ? formatRateAge(storedMs) : '저장 시각을 알 수 없음';
+          const errorLabel = l.originStatus ? `시세 서버 오류 ${l.originStatus}`
+            : (l.fallbackReason === 'network-error' ? '네트워크 연결 실패'
+              : (l.fallbackReason === 'app-cache' ? '시세 연결 실패' : '시세 서버 연결 실패'));
           const fallbackDetail = l.cacheFallback
-            ? `${errorLabel} — 저장된 가격 사용 · ${storedAge}${l.stale ? ' · 값 미변화 의심' : ''}`
+            ? `${errorLabel} — 이전 저장 가격 사용 · ${storedAge}${l.stale ? ' · 값 미변화 의심' : ''}`
             : '';
-          const titleText = fallbackDetail || (l.stale ? '값 미변화 의심 — 이전 가격과 동일합니다' : '');
+          const problemDetail = !l.ok ? '최신 시세를 가져오지 못했습니다'
+            : (fallbackDetail || (l.stale ? '값 미변화 의심 — 이전 가격과 동일합니다' : ''));
+          const titleText = problemDetail;
           const title = titleText ? `title="${escAttr(titleText)}"` : '';
-          const aria = fallbackDetail ? `aria-label="${escAttr(`${l.name}, ${fallbackDetail}, ${l.price ? fmtPrice(l.price) : ''}`)}"` : '';
+          const aria = problemDetail ? `aria-label="${escAttr(`${l.name}, ${problemDetail}, ${l.price ? fmtPrice(l.price) : ''}`)}"` : '';
           return `<div class="log-item ${cls}" role="listitem" ${title} ${aria}>
-            <span class="log-name">${escHtml(l.name)}${fallbackDetail ? `<small class="log-detail">${escHtml(fallbackDetail)}</small>` : ''}</span>
+            <span class="log-name">${escHtml(l.name)}${problemDetail ? `<small class="log-detail">${escHtml(problemDetail)}</small>` : ''}</span>
             <span class="log-value">${right}</span>
           </div>`;
         }).join('')}
@@ -927,9 +951,12 @@ async function startAutoUpdate() {
     // 백그라운드 업데이트와 충돌 — autoUpdateAll이 이미 안내 토스트를 띄움
   } else if (summary && summary.total > 0) {
     const parts = [`최신 ${summary.success}건`];
-    if (summary.fallback > 0) parts.push(`⚠️ 저장 가격 ${summary.fallback}건`);
-    if (summary.failed > 0) parts.push(`실패 ${summary.failed}건`);
-    if (summary.stale > 0) parts.push(`값 미변화 의심 ${summary.stale}건`);
+    const fallbackNames = formatAffectedAssetNames(summary.fallbackAssets);
+    const failedNames = formatAffectedAssetNames(summary.failedAssets);
+    const staleNames = formatAffectedAssetNames(summary.staleAssets);
+    if (summary.fallback > 0) parts.push(`⚠️ 이전 저장 가격 ${summary.fallback}건${fallbackNames ? ` (${fallbackNames})` : ''}`);
+    if (summary.failed > 0) parts.push(`실패 ${summary.failed}건${failedNames ? ` (${failedNames})` : ''}`);
+    if (summary.stale > 0) parts.push(`가격 확인 필요 ${summary.stale}건${staleNames ? ` (${staleNames})` : ''}`);
     const msg = `가격 업데이트: ${parts.join(' · ')}`;
     const toastType = (summary.fallback > 0 || summary.failed > 0 || summary.stale > 0) ? 'info' : 'success';
     showToast(msg, toastType);

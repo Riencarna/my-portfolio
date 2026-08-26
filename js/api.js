@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.37.1 — API Integration
+   My Portfolio v5.38.0 — API Integration
    Cycle C compatible
    Naver world stock, Promise.any parallel CORS
    국내주식: polling 1순위 (Worker 차단된 m.stock 우회)
@@ -160,10 +160,34 @@ function getKimchiPremiumInfo() {
 function describeRateSource(info) {
   if (!info) return '';
   if (info.fallback === false) return '현재 시세';
-  if (info.fallback === 'last-usdt') return `마지막 저장 (${formatRateAge(info.time)})`;
-  if (info.fallback === 'last-rate') return `마지막 환율 (${formatRateAge(info.time)})`;
+  if (info.fallback === true) return `이전 저장 가격 (${formatRateAge(info.time)})`;
+  if (info.fallback === 'last-usdt') return `이전 저장 가격 (${formatRateAge(info.time)})`;
+  if (info.fallback === 'last-rate') return `이전 저장 환율 (${formatRateAge(info.time)})`;
   if (info.fallback === 'hardcoded') return '⚠️ 기본값 (시세 없음)';
   return '';
+}
+
+// 대시보드에는 내부 구현명(sw-cache 등)을 노출하지 않고 사용자가 이해할 수 있는 출처를 표시한다.
+function formatRateSourceLabel(info) {
+  if (!info) return '';
+  if (info.fallback) return `이전 저장 가격 · ${formatRateAge(info.time)}`;
+  const labels = {
+    yahoo: 'Yahoo',
+    daum: 'Daum',
+    'open.er-api': '환율 API',
+    floatrates: '환율 API',
+    Upbit: 'Upbit',
+    Bithumb: 'Bithumb',
+    Exchange: 'USD/KRW 환율 기준',
+  };
+  return `${labels[info.source] || info.source || '최신 시세'} · ${formatRateAge(info.time)}`;
+}
+
+function formatAffectedAssetNames(names, limit = 3) {
+  const unique = [...new Set((names || []).filter(Boolean))];
+  if (unique.length === 0) return '';
+  const visible = unique.slice(0, limit).join(', ');
+  return unique.length > limit ? `${visible} 외 ${unique.length - limit}개` : visible;
 }
 
 // ── Fetch with Timeout ──
@@ -431,35 +455,73 @@ async function fetchReliableExchangeRate() {
 
 // ── USDT Rate (KRW) ──
 async function fetchUsdtRate(meta = null) {
+  let storedCandidate = null;
+  const rememberStoredCandidate = (rate, source, fallbackInfo) => {
+    if (!Number.isFinite(rate) || rate <= 0 || !fallbackInfo) return;
+    const time = fallbackInfoTime(fallbackInfo) || Date.now();
+    if (!storedCandidate || time > storedCandidate.time) {
+      storedCandidate = { rate, time, source, fallbackInfo };
+    }
+  };
+
   if (cachedUsdt && Date.now() - cachedUsdt.time < CACHE_TTL_RATE) {
-    mergeCacheFallbackMeta(meta, cachedUsdt.fallbackInfo);
-    return cachedUsdt.rate;
+    // 최신 응답만 TTL 동안 재사용한다. 이전 저장 가격이라면 사용자가 다시 눌렀을 때
+    // Upbit/Bithumb 최신 시세를 즉시 재시도할 수 있어야 한다.
+    if (!cachedUsdt.fallbackInfo) return cachedUsdt.rate;
+    rememberStoredCandidate(cachedUsdt.rate, cachedUsdt.source, cachedUsdt.fallbackInfo);
   }
   try {
     const r = await fetchWithTimeout(`${API.upbit}?markets=KRW-USDT`, 5000);
     const d = await r.json();
     if (d[0]?.trade_price) {
       const fallbackInfo = readCacheFallbackInfo(r);
-      mergeCacheFallbackMeta(meta, fallbackInfo);
-      cachedUsdt = { rate: d[0].trade_price, time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'Upbit', fallbackInfo };
-      if (!fallbackInfo) saveLastRate('usdt', cachedUsdt.rate, 'Upbit');
-      return cachedUsdt.rate;
+      const rate = Number(d[0].trade_price);
+      if (fallbackInfo) {
+        // Upbit의 이전 저장 응답은 후보로만 보관하고 Bithumb 최신 시세를 계속 확인한다.
+        rememberStoredCandidate(rate, 'Upbit', fallbackInfo);
+      } else {
+        cachedUsdt = { rate, time: Date.now(), source: 'Upbit', fallbackInfo: null };
+        saveLastRate('usdt', cachedUsdt.rate, 'Upbit');
+        return cachedUsdt.rate;
+      }
     }
   } catch (e) {
     console.warn('fetchUsdtRate upbit failed:', e.message);
   }
   try {
-    const r = await corsFetch(`${API.bithumb}/USDT_KRW`, 5000);
+    const r = await corsFetch(`${API.bithumb}?markets=KRW-USDT`, 5000);
     const d = await r.json();
-    if (d.data?.closing_price) {
+    if (d[0]?.trade_price) {
       const fallbackInfo = readCacheFallbackInfo(r);
-      mergeCacheFallbackMeta(meta, fallbackInfo);
-      cachedUsdt = { rate: Number(d.data.closing_price), time: fallbackInfoTime(fallbackInfo) || Date.now(), source: fallbackInfo ? 'sw-cache' : 'Bithumb', fallbackInfo };
-      if (!fallbackInfo) saveLastRate('usdt', cachedUsdt.rate, 'Bithumb');
-      return cachedUsdt.rate;
+      const rate = Number(d[0].trade_price);
+      if (fallbackInfo) {
+        rememberStoredCandidate(rate, 'Bithumb', fallbackInfo);
+      } else {
+        cachedUsdt = { rate, time: Date.now(), source: 'Bithumb', fallbackInfo: null };
+        saveLastRate('usdt', cachedUsdt.rate, 'Bithumb');
+        return cachedUsdt.rate;
+      }
     }
   } catch (e) {
     console.warn('fetchUsdtRate bithumb failed:', e.message);
+  }
+  // Bithumb의 이전 공개 API도 마지막 실시간 출처로 유지한다.
+  try {
+    const r = await corsFetch(`${API.bithumbLegacy}/USDT_KRW`, 5000);
+    const d = await r.json();
+    if (d.data?.closing_price) {
+      const fallbackInfo = readCacheFallbackInfo(r);
+      const rate = Number(d.data.closing_price);
+      if (fallbackInfo) {
+        rememberStoredCandidate(rate, 'Bithumb', fallbackInfo);
+      } else {
+        cachedUsdt = { rate, time: Date.now(), source: 'Bithumb', fallbackInfo: null };
+        saveLastRate('usdt', cachedUsdt.rate, 'Bithumb');
+        return cachedUsdt.rate;
+      }
+    }
+  } catch (e) {
+    console.warn('fetchUsdtRate bithumb legacy failed:', e.message);
   }
   // 직거래 시세 두 곳 모두 실패. 라이브 환율(USD/KRW)이 캐시에 살아있으면 그걸 프록시로 사용.
   // 없으면 마지막에 봤던 USDT 시세 → 마지막 환율 → 1350원 순으로 폴백.
@@ -467,6 +529,11 @@ async function fetchUsdtRate(meta = null) {
     mergeCacheFallbackMeta(meta, cachedRate.fallbackInfo);
     cachedUsdt = { rate: cachedRate.rate, time: cachedRate.time, source: 'Exchange', fallbackInfo: cachedRate.fallbackInfo || null };
     return cachedRate.rate;
+  }
+  if (storedCandidate) {
+    mergeCacheFallbackMeta(meta, storedCandidate.fallbackInfo);
+    cachedUsdt = storedCandidate;
+    return storedCandidate.rate;
   }
   const lastUsdt = getLastRate('usdt');
   if (lastUsdt) {
@@ -692,7 +759,8 @@ async function autoUpdateAll(onProgress, options = {}) {
   const { silent = false } = options;
   if (_updatePromise) {
     if (!silent) showToast('업데이트가 이미 진행 중입니다', 'info');
-    return { success: 0, fallback: 0, failed: 0, stale: 0, total: 0, skipped: true };
+    return { success: 0, fallback: 0, failed: 0, stale: 0, total: 0, skipped: true,
+      fallbackAssets: [], failedAssets: [], staleAssets: [] };
   }
   _updatePromise = _doAutoUpdate(onProgress);
   try { return await _updatePromise; } finally { _updatePromise = null; }
@@ -737,6 +805,7 @@ async function _doAutoUpdate(onProgress) {
     const cacheFallback = status === 'fallback';
     updateLogs.push({
       assetId: asset?.id || '',
+      assetName: asset?.name || '',
       name: (asset?.name || '') + suffix,
       status,
       ok: status !== 'failed',
@@ -870,7 +939,17 @@ async function _doAutoUpdate(onProgress) {
   autoUpdateProgress.running = false;
   onProgress?.({ ...autoUpdateProgress, done: autoUpdateProgress.total });
 
-  const summary = { success: successCount, fallback: fallbackCount, failed: failCount, stale: staleCount, total: totalAssets };
+  const issueAssets = predicate => [...new Set(updateLogs.filter(predicate).map(entry => entry.assetName || entry.name).filter(Boolean))];
+  const summary = {
+    success: successCount,
+    fallback: fallbackCount,
+    failed: failCount,
+    stale: staleCount,
+    total: totalAssets,
+    fallbackAssets: issueAssets(entry => entry.cacheFallback),
+    failedAssets: issueAssets(entry => !entry.ok),
+    staleAssets: issueAssets(entry => entry.stale),
+  };
   EventBus.emit('updateComplete', { logs: updateLogs, summary });
   return summary;
 }

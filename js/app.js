@@ -1,5 +1,5 @@
 /* =============================================
-   My Portfolio v5.37.1 — App Entry Point
+   My Portfolio v5.38.0 — App Entry Point
    Cycle C compatible
    Soft Neutral: sidebar/header/FAB/theme-reactive charts
    ============================================= */
@@ -85,9 +85,12 @@ async function autoUpdateOnLoad() {
     render();
     if (summary.fallback > 0 || summary.failed > 0 || summary.stale > 0) {
       const parts = [`최신 ${summary.success}건`];
-      if (summary.fallback > 0) parts.push(`⚠️ 저장 가격 ${summary.fallback}건 사용`);
-      if (summary.failed > 0) parts.push(`실패 ${summary.failed}건`);
-      if (summary.stale > 0) parts.push(`값 미변화 의심 ${summary.stale}건`);
+      const fallbackNames = formatAffectedAssetNames(summary.fallbackAssets);
+      const failedNames = formatAffectedAssetNames(summary.failedAssets);
+      const staleNames = formatAffectedAssetNames(summary.staleAssets);
+      if (summary.fallback > 0) parts.push(`⚠️ 이전 저장 가격 ${summary.fallback}건${fallbackNames ? ` (${fallbackNames})` : ''}`);
+      if (summary.failed > 0) parts.push(`실패 ${summary.failed}건${failedNames ? ` (${failedNames})` : ''}`);
+      if (summary.stale > 0) parts.push(`가격 확인 필요 ${summary.stale}건${staleNames ? ` (${staleNames})` : ''}`);
       showToast(`가격 자동 업데이트: ${parts.join(' · ')}`, 'info');
     }
   } catch (e) {

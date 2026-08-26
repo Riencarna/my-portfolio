@@ -107,6 +107,40 @@ function fallbackResponse(body, { reason = 'server-error', status = '503', cache
   const foreignFromCachedFx = await ctx.fetchForeignStockPrice('TEST', 'NASDAQ', foreignFxMeta);
   assert('해외주식 live 가격 + fallback 환율 계산', foreignFromCachedFx === 14000 && foreignFxMeta.cacheFallback);
 
+  console.log('\n[USDT 최신 시세 우선 복구]');
+  vm.runInContext('cachedUsdt = null; cachedRate = null', ctx);
+  let bithumbLive = false;
+  ctx.fetchWithTimeout = async () => fallbackResponse([{ trade_price: 1390 }], {
+    reason: 'network-error', status: '', cachedAt: '2026-08-05T00:00:00.000Z',
+  });
+  ctx.corsFetch = async url => {
+    if (bithumbLive) {
+      const body = url.includes('/v1/ticker')
+        ? [{ trade_price: 1392 }]
+        : { data: { closing_price: '1392' } };
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    const body = url.includes('/v1/ticker')
+      ? [{ trade_price: 1390 }]
+      : { data: { closing_price: '1390' } };
+    return fallbackResponse(body, { reason: 'network-error', status: '', cachedAt: '2026-08-05T00:00:00.000Z' });
+  };
+
+  const storedUsdtMeta = ctx.createPriceFetchMeta();
+  const storedUsdt = await ctx.fetchUsdtRate(storedUsdtMeta);
+  assert('모든 거래소가 저장 응답이면 이전 가격을 안전하게 사용', storedUsdt === 1390 && storedUsdtMeta.cacheFallback);
+
+  bithumbLive = true;
+  const recoveredUsdtMeta = ctx.createPriceFetchMeta();
+  const recoveredUsdt = await ctx.fetchUsdtRate(recoveredUsdtMeta);
+  const recoveredInfo = ctx.getRateDisplayInfo('usdt');
+  assert('Upbit 저장 응답 뒤에도 Bithumb 최신 시세 계속 확인', recoveredUsdt === 1392 && !recoveredUsdtMeta.cacheFallback);
+  assert('저장 가격 TTL이 최신 시세 재시도를 막지 않음', recoveredInfo?.source === 'Bithumb' && recoveredInfo?.fallback === false);
+  assert('내부 sw-cache 용어를 쉬운 표현으로 변환',
+    ctx.formatRateSourceLabel({ source: 'sw-cache', time: Date.now(), fallback: true }).includes('이전 저장 가격')
+      && !ctx.formatRateSourceLabel({ source: 'sw-cache', time: Date.now(), fallback: true }).includes('sw-cache'));
+  vm.runInContext('cachedUsdt = null; cachedRate = null', ctx);
+
   console.log('\n[자동 업데이트 집계와 마지막 정상 시각]');
   const oldLpu = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
   ctx.appState.assets = [
@@ -142,6 +176,9 @@ function fallbackResponse(body, { reason = 'server-error', status = '503', cache
     JSON.stringify(summary));
   assert('집계 합이 전체 자산 수와 일치', summary.success + summary.fallback + summary.failed === summary.total);
   assert('fallback + 같은 오래된 가격은 stale에도 동시 집계', summary.stale === 1);
+  assert('요약에 이전 저장 가격 자산명 포함',
+    summary.fallbackAssets.includes('저장동일') && summary.fallbackAssets.includes('저장변경'));
+  assert('요약에 시세 연결 실패 자산명 포함', summary.failedAssets.includes('실패'));
 
   const liveUpdates = capturedUpdates.filter(update => update.id.startsWith('live-'));
   const fallbackUpdates = capturedUpdates.filter(update => update.id.startsWith('fallback-'));
@@ -153,11 +190,11 @@ function fallbackResponse(body, { reason = 'server-error', status = '503', cache
 
   const dashboardSource = fs.readFileSync('js/ui-dashboard.js', 'utf8');
   const appSource = fs.readFileSync('js/app.js', 'utf8');
-  assert('개별 로그에 서버 오류 — 저장된 가격 사용 문구 포함', dashboardSource.includes('서버 오류') && dashboardSource.includes('저장된 가격 사용'));
-  assert('수동 완료 토스트가 저장 가격 건수를 별도 표시', dashboardSource.includes('summary.fallback') && dashboardSource.includes('저장 가격'));
-  assert('백그라운드 토스트는 원인을 단정하지 않고 저장 가격 사용을 표시',
-    appSource.includes('⚠️ 저장 가격 ${summary.fallback}건 사용') &&
-    !appSource.includes('서버 오류 — 저장 가격'));
+  assert('개별 로그에 시세 오류 — 이전 저장 가격 사용 문구 포함', dashboardSource.includes('시세 서버 오류') && dashboardSource.includes('이전 저장 가격 사용'));
+  assert('수동 완료 토스트가 자산명과 이전 저장 가격 건수를 표시',
+    dashboardSource.includes('summary.fallbackAssets') && dashboardSource.includes('이전 저장 가격'));
+  assert('백그라운드 토스트도 문제 자산명을 표시',
+    appSource.includes('summary.fallbackAssets') && appSource.includes('⚠️ 이전 저장 가격'));
   assert('fallback 실행은 5분 성공 중복 방지 시각을 갱신하지 않음', appSource.includes('if (!summary.fallback)'));
 
   const cssSource = fs.readFileSync('css/styles.css', 'utf8');
@@ -167,9 +204,16 @@ function fallbackResponse(body, { reason = 'server-error', status = '503', cache
     cssSource.includes('max-width:100%'));
 
   vm.runInContext(dashboardSource, ctx, { filename: 'js/ui-dashboard.js' });
+  vm.runInContext(`for (let i = 0; i < 12; i++) updateLogs.push({
+    assetId: 'recent-' + i, assetName: '최근' + i, name: '최근' + i,
+    status: 'live', ok: true, price: 100 + i, stale: false, cacheFallback: false,
+    fallbackReason: '', originStatus: '', cacheStoredAt: '', time: new Date().toISOString()
+  })`, ctx);
   const updateHtml = ctx.renderAutoUpdateSection();
-  assert('실제 로그 HTML에 서버 오류 — 저장된 가격 사용 문구 렌더링', updateHtml.includes('서버 오류 503 — 저장된 가격 사용'));
-  assert('실제 로그 HTML의 aria-label에도 fallback 경고 포함', updateHtml.includes('aria-label="저장동일, 서버 오류 503 — 저장된 가격 사용'));
+  assert('최근 10개 밖 문제 자산도 확인 영역에 유지',
+    updateHtml.includes('확인이 필요한 자산') && updateHtml.includes('저장동일') && updateHtml.includes('실패'));
+  assert('실제 로그 HTML에 시세 오류 — 이전 저장 가격 사용 문구 렌더링', updateHtml.includes('시세 서버 오류 503 — 이전 저장 가격 사용'));
+  assert('실제 로그 HTML의 aria-label에도 쉬운 fallback 경고 포함', updateHtml.includes('aria-label="저장동일, 시세 서버 오류 503 — 이전 저장 가격 사용'));
 
   if (!process.exitCode) console.log('\n✅ 캐시 폴백 사용자 알림 테스트 통과');
 })().catch(error => {
